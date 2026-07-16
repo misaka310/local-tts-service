@@ -1,0 +1,2 @@
+# Keep repository text files stable across Windows and CI checkouts.
+* text=auto eol=lf

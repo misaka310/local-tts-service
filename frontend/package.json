@@ -1,0 +1,24 @@
+{
+  "name": "local-tts-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Optional frontend for local-tts-service",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test server.test.js public-core.test.js",
+    "check": "node --check server.js && node --check server/tts-request.js && node --check server/rvc/config.js && node --check server/rvc/model-catalog.js && node --check server/rvc/validation.js && node --check server/rvc/artifact-store.js && node --check server/rvc/input-preparer.js && node --check server/rvc/demucs-runner.js && node --check server/rvc/rvc-runner.js && node --check server/rvc/conversion-service.js && node --check public/shared-ui.js && node --check public/tts-api-client.js && node --check public/irodori-emojis.js && node --check public/model-catalog.js && node --check public/model-capabilities.js && node --check public/rvc-chunking.js && node --check public/store.js && node --check public/generation-core.js && node --check public/audio-controller.js && node --check public/normal-controller.js && node --check public/compare-controller.js && node --check public/rvc/rvc-form.js && node --check public/rvc/rvc-mic-recorder.js && node --check public/rvc/rvc-result.js && node --check public/rvc/rvc-controller.js && node --check public/avatar-sync.js && node --check public/normal-page.js && node --check public/compare-page.js && node --check public/rvc-page.js && node --check public/app.js && node --check public/reference-voices.js && node --check public/reference-voices-ux.js && node --check public/history.js && node --check scripts/e2e-smoke.mjs && node --check scripts/e2e-reference-voices.mjs && node --check scripts/e2e-qwen-ui.mjs && node --check scripts/e2e-rvc-tabs.mjs && node --check scripts/e2e-rvc-convert-smoke.mjs && node --check scripts/e2e-wsl-models-live.mjs",
+    "e2e:smoke": "node ./scripts/e2e-smoke.mjs",
+    "e2e:reference-voices": "node ./scripts/e2e-reference-voices.mjs",
+    "e2e:qwen-ui": "node ./scripts/e2e-qwen-ui.mjs",
+    "e2e:wsl-models-live": "node ./scripts/e2e-wsl-models-live.mjs",
+    "e2e:rvc-tabs": "node ./scripts/e2e-rvc-tabs.mjs",
+    "e2e:rvc-convert": "node ./scripts/e2e-rvc-convert-smoke.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.61.1"
+  }
+}

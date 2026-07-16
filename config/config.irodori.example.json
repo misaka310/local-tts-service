@@ -1,0 +1,94 @@
+{
+  "host": "127.0.0.1",
+  "port": 8730,
+  "defaultModel": "irodori_v3",
+  "defaultReferenceVoice": "default",
+  "referenceVoicesDir": "./reference/voices",
+  "audioOutputDir": "./runtime/audio",
+  "chunking": {
+    "softChunkChars": 120,
+    "maxChunkChars": 200,
+    "hardLimitChars": 260,
+    "pauseBetweenChunksMs": 250
+  },
+  "stack": {
+    "stopManagedProcessesBeforeStart": true,
+    "killPortsBeforeStart": false,
+    "portsToKill": [8730, 5177],
+    "startupTimeoutSec": 180,
+    "pollIntervalSec": 1.0
+  },
+  "frontend": {
+    "host": "127.0.0.1",
+    "port": 5177,
+    "ttsBaseUrl": "http://127.0.0.1:8730"
+  },
+  "models": {
+    "irodori_v2": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v2",
+      "family": "irodori",
+      "modelId": "Aratako/Irodori-TTS-500M-v2",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-500M-v2/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsReferenceVoice": true,
+      "supportsCaption": false,
+      "supportsInstruction": false,
+      "supportsSeed": true,
+      "supportsSpeedControl": false,
+      "supportsStyleStrength": false,
+      "supportsVoiceDesign": false
+    },
+    "irodori_v3": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v3",
+      "family": "irodori",
+      "modelId": "Aratako/Irodori-TTS-500M-v3",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-500M-v3/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsCaption": false,
+      "supportsInstruction": false,
+      "supportsSeed": true,
+      "supportsSpeedControl": true,
+      "supportsStyleStrength": false,
+      "supportsVoiceDesign": false,
+      "supportsReferenceVoice": true
+    },
+    "irodori_v3_voicedesign": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v3 VoiceDesign",
+      "family": "irodori",
+      "modelId": "Aratako/Irodori-TTS-600M-v3-VoiceDesign",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-600M-v3-VoiceDesign/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsCaption": true,
+      "supportsInstruction": true,
+      "supportsSeed": true,
+      "supportsSpeedControl": true,
+      "supportsStyleStrength": true,
+      "supportsVoiceDesign": true,
+      "supportsReferenceVoice": true
+    },
+    "mock": {
+      "runtime": "mock_wav",
+      "requiresReferenceAudio": false
+    }
+  },
+  "runtimes": {
+    "mock_wav": {
+      "durationSec": 1.2,
+      "sampleRate": 24000
+    },
+    "irodori_voicedesign_direct": {
+      "pythonExecutable": "./runtime/venv-irodori/Scripts/python.exe",
+      "wrapperDir": "./runtime/vendor/Irodori-TTS-upstream",
+      "checkpoint": "",
+      "timeoutSec": 1800,
+      "modelDevice": "auto",
+      "modelPrecision": "auto",
+      "codecDevice": "auto",
+      "codecPrecision": "fp32",
+      "codecRepo": "./runtime/models/irodori/Semantic-DACVAE-Japanese-32dim/weights.pth"
+    }
+  }
+}

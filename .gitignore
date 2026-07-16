@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+.venv/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local config
+config.local.json
+config/config.local.json
+.env
+.env.*
+!.env.example
+
+# Runtime artifacts
+runtime/
+reference/*
+!reference/README.md
+!reference/workflows/
+!reference/workflows/**
+data/source_audio/
+logs/
+*.log
+frontend/node_modules/
+frontend/.env
+frontend/.env.*
+frontend/.npmrc
+
+# Audio and model assets
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+*.aac
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.index
+!models/rvc/README.md
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Local agent/tool scratch
+.ai-bridge/
+docs/superpowers/
+NUL
+=/
+frontend/=/
+frontend/-c/
+frontend/node/
+frontend/public/motion-pngtuber/
+
+# Local experiment scripts
+scripts/run_local_experiment_*
+scripts/prepare_local_experiment_*
+scripts/run_*_auto*.py
+scripts/run_*_expand_*.py
+scripts/run_*_hq_*.py
+scripts/run_*_gpt_sovits_finetune.ps1
+scripts/run_*_s[12]_train.cmd
+scripts/run_*_step[123].cmd
+scripts/prepare_*_gpt_sovits_dataset.py
+scripts/prepare_*_original_first.py
+scripts/replace_*_reference_from_*.mjs
+
+# OS
+.DS_Store
+Thumbs.db

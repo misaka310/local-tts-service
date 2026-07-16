@@ -1,0 +1,911 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local TTS</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">ローカルTTS</div>
+      <nav class="side-nav" aria-label="メインナビゲーション">
+        <button class="nav-item active" type="button" data-tab="normal"><span>✎</span>通常生成</button>
+        <button class="nav-item" type="button" data-tab="compare"><span>▣</span>モデル比較</button>
+        <button class="nav-item" type="button" data-tab="rvc"><span>◇</span>RVC変換</button>
+        <button class="nav-item" type="button" data-tab="history"><span>↺</span>履歴</button>
+        <button class="nav-item" type="button" data-tab="voices"><span>◉</span>参照音声</button>
+        <button class="nav-item" type="button" data-tab="guide"><span>?</span>使い方</button>
+      </nav>
+      <div class="side-spacer"></div>
+      <section class="service-card">
+        <span>ローカルサービス</span>
+        <strong id="serviceStatus" data-state="checking"><i></i><span>確認中</span></strong>
+        <small id="serviceStatusDetail">バックエンドへ接続しています</small>
+      </section>
+    </aside>
+
+    <main class="main-shell">
+      <header class="topbar">
+        <div class="top-tabs" role="tablist">
+          <button class="top-tab active" type="button" data-tab="normal">通常生成</button>
+          <button class="top-tab" type="button" data-tab="compare">モデル比較</button>
+          <button class="top-tab" type="button" data-tab="rvc">RVC変換</button>
+          <button class="top-tab" type="button" data-tab="history">履歴</button>
+          <button class="top-tab" type="button" data-tab="voices">参照音声</button>
+          <button class="top-tab" type="button" data-tab="guide">使い方</button>
+        </div>
+      </header>
+
+      <section class="page-section active" id="normalPage" data-page="normal">
+        <div class="page-title">
+          <h1>通常生成 / 音声作成</h1>
+          <p>1つのモデルを選んで、テキスト読み上げを生成します。</p>
+        </div>
+
+        <div class="page-layout">
+          <div class="content-column">
+            <section class="panel form-panel">
+              <div class="form-section-head primary-section-head">
+                <div><span class="step-pill">1</span><strong>生成内容</strong></div>
+                <small><b>必須</b>の項目を決めれば生成できます。</small>
+              </div>
+              <div class="control-grid normal-controls">
+                <label class="field model-field">
+                  <span>モデル <b>必須</b></span>
+                  <select id="normalModelSelect"></select>
+                </label>
+                <div class="field reference-field" id="normalReferenceField">
+                  <div class="field-title-row">
+                    <span>参照音声 <strong class="requirement-badge optional" id="normalReferenceRequirement">任意</strong></span>
+                    <label class="compact-toggle"><input type="checkbox" id="normalUseReference" checked> <span id="normalUseReferenceLabel">使用する</span> <span class="info-dot" id="normalUseReferenceTip" tabindex="0" aria-label="参照音声設定の説明" data-tip="ONのときだけ選択中の参照音声をモデルへ渡します。OFFでは参照音声を使いません。">i</span></label>
+                  </div>
+                  <div class="input-with-button reference-input-group">
+                    <select id="normalReferenceVoiceSelect"></select>
+                    <button class="small-square" type="button" id="normalReferencePreviewButton" title="参照音声を確認">▶</button>
+                  </div>
+                </div>
+                <div class="field seed-field">
+                  <span>seed <em>初期値のままでOK</em> <span class="info-dot" tabindex="0" aria-label="seedの説明" data-tip="seedは生成時のランダムな揺らぎを決める数値です。同じモデル・文章・設定で同じseedを使うと、近い条件を再現・比較しやすくなります。">i</span></span>
+                  <input id="normalSeedInput" type="number" inputmode="numeric" value="1" min="0" step="1">
+                  <label class="seed-inline-toggle">
+                    <input id="normalSeedAutoIncrementInput" type="checkbox" checked>
+                    <span>生成後にseedを+1</span>
+                    <span class="info-dot" tabindex="0" aria-label="seed自動更新の説明" data-tip="生成成功後、次回のseedを1増やします。今の生成には入力中のseedを使います。">i</span>
+                  </label>
+                </div>
+                <input hidden id="normalLanguageInput" type="text" value="Japanese" placeholder="Japanese">
+              </div>
+
+              <div class="textarea-grid single-textarea-grid">
+                <label class="field textarea-field">
+                  <span>読み上げテキスト <b>必須</b></span>
+                  <textarea id="normalTextInput" rows="7" maxlength="1000">こんにちは、今日はよいお天気ですね。
+
+この音声はローカルで生成されたサンプルです。
+
+自然で聞き取りやすい話し方を目指して、丁寧に読み上げています。
+
+どうぞ最後までお聞きください。</textarea>
+                  <small id="normalTextCount">0 / 1000</small>
+                </label>
+              </div>
+
+              <details class="advanced-settings" id="normalAdvancedSettings">
+                <summary><span>詳細設定</span><small id="normalAdvancedSummary">話し方・感情・長文分割・保存設定</small></summary>
+                <div class="advanced-guidance-grid" id="normalAdvancedGuidance">
+                  <label class="field textarea-field" id="normalInstructionField">
+                    <span>instruction / 話し方メモ <strong class="requirement-badge optional" id="normalInstructionRequirement">任意</strong></span>
+                    <textarea id="normalInstructionInput" rows="4" maxlength="300" placeholder="穏やかで落ち着いた女性の話し方。ややゆっくり、柔らかいトーンで自然に。">穏やかで落ち着いた女性の話し方。ややゆっくり、柔らかいトーンで自然に。</textarea>
+                    <small id="normalInstructionCount">0 / 300</small>
+                  </label>
+                  <div class="irodori-emoji-slot" id="irodoriEmojiSlot-normal"></div>
+                </div>
+                <div class="advanced-settings-body">
+                  <div class="chunk-panel" data-chunk-scope="normal">
+                    <strong class="chunk-title">長文分割 <span class="info-dot" tabindex="0" aria-label="長文分割の説明" data-tip="長文は発音や抑揚が不安定になりやすいため、短く分けて生成し、最後に1つの音声へ結合します。">i</span></strong>
+                    <label>1区切りの目安 <input data-chunk-target type="number" min="80" max="500" step="10" value="240"> 文字</label>
+                    <input data-chunk-hard-max type="hidden" value="500">
+                    <div class="chunk-presets" aria-label="通常生成の長文分割プリセット">
+                      <button type="button" class="secondary-button small" data-chunk-preset="160">短め 160</button>
+                      <button type="button" class="secondary-button small active" data-chunk-preset="240">標準 240</button>
+                      <button type="button" class="secondary-button small" data-chunk-preset="360">長め 360</button>
+                    </div>
+                    <span class="chunk-summary" data-chunk-summary>分割を計算中</span>
+                    <button class="secondary-button small" type="button" data-chunk-preview-toggle aria-expanded="false">分割を確認</button>
+                  </div>
+                  <div class="chunk-preview" data-chunk-preview hidden></div>
+
+                  <div class="synthesis-control-grid" id="normalSynthesisControls">
+                    <label class="range-control" id="normalSpeedControl" hidden>
+                      <span>話速 <b id="normalSpeedValue">1.00x</b></span>
+                      <input type="range" id="normalSpeedScale" min="0.75" max="1.25" step="0.05" value="1.00">
+                      <small>左ほどゆっくり、右ほど速く生成します。</small>
+                    </label>
+                    <label class="range-control" id="normalStyleStrengthControl" hidden>
+                      <span>スタイル追従度 <b id="normalStyleStrengthValue">3.0</b></span>
+                      <input type="range" id="normalStyleStrength" min="1.0" max="6.0" step="0.5" value="3.0">
+                      <small>話し方メモを入力すると有効になります。値を上げるほど指定した話し方を強く反映します。</small>
+                    </label>
+                  </div>
+                  <div class="options-row normal-output-options">
+                    <label><input type="checkbox" id="normalSaveHistory" checked> 履歴へ保存 <span class="info-dot" tabindex="0" aria-label="履歴保存設定の説明" data-tip="読み上げ文、モデル、seed、生成音声を履歴ページへ保存します。">i</span></label>
+                    <label><input type="checkbox" id="normalAutoPlayInput"> 生成後に音声を自動再生 <span class="info-dot" tabindex="0" aria-label="生成後の自動再生設定の説明" data-tip="生成完了後、この画面の音声プレーヤーを自動で再生します。">i</span></label>
+                  </div>
+                </div>
+              </details>
+
+              <div class="action-row">
+                <button class="primary-button" type="button" id="normalGenerateButton">▶ 生成する</button>
+
+              </div>
+              <p class="status-line" id="normalStatusText">読込中です...</p>
+            </section>
+
+            <section class="section-head">
+              <h2>生成結果</h2>
+            </section>
+            <section class="result-card large-result" id="normalResultCard" hidden>
+              <div class="result-card-head">
+                <h3 id="normalResultModel">Irodori v3</h3>
+                <span class="status-badge success">成功</span>
+              </div>
+              <div class="audio-row">
+                <button class="play-round" type="button" data-audio-target="normalAudioPlayer">▶</button>
+                <div class="waveform"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                <span class="duration-pill" id="normalResultDuration">--:--</span>
+                <a class="icon-link" id="normalDownloadLink" href="#" download title="download">⇩</a>
+                <audio id="normalAudioPlayer" preload="auto"></audio>
+              </div>
+              <div class="meta-chips" id="normalResultMeta"></div>
+              <div class="result-actions">
+                <button class="secondary-button" type="button" id="normalRegenerateButton">↻ 同じ設定・seedで再生成</button>
+                <a class="secondary-button" id="normalDownloadButton" href="#" download>⇩ ダウンロード（WAV）</a>
+              </div>
+            </section>
+
+          </div>
+
+          <aside class="right-column">
+            <section class="panel hint-panel diagnostic-panel">
+              <div class="panel-head compact">
+                <h2>診断ログ</h2>
+                <button class="link-button" type="button" id="normalLogCopyButton">AIに貼るログをコピー</button>
+              </div>
+              <p class="muted">画面には短いエラーだけ表示し、ここには解決に必要な詳細を残します。</p>
+              <pre class="rvc-log-box diagnostic-log-box" id="normalLogBox">エラーはありません。</pre>
+            </section>
+            <section class="panel recent-panel">
+              <div class="panel-head compact">
+                <h2>最近の生成</h2>
+                <button class="link-button" type="button" id="normalClearHistoryButton">すべて消す</button>
+              </div>
+              <div id="normalHistoryList" class="mini-history"></div>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section class="page-section" id="comparePage" data-page="compare">
+        <div class="page-title">
+          <h1>モデル比較 / 一括試聴</h1>
+          <p>同じテキスト・同じ条件で複数のTTSモデルを生成し、出力を比較して最適なモデルを見つけます。</p>
+        </div>
+
+        <div class="compare-layout">
+          <div class="content-column">
+            <section class="panel compare-form-panel">
+              <div class="control-grid compare-primary-controls" id="compareReferencePrimary">
+                <label class="field wide-field">
+                  <span>参照音声 <em>任意</em></span>
+                  <div class="input-with-button">
+                    <select id="compareReferenceVoiceSelect"></select>
+                    <button class="small-square" type="button" id="compareReferencePreviewButton" title="参照音声を確認">▶</button>
+                  </div>
+                </label>
+                <div class="field seed-field">
+                  <span>seed <em>初期値のままでOK</em> <span class="info-dot" tabindex="0" aria-label="比較seedの説明" data-tip="seedは生成時のランダムな揺らぎを決める数値です。モデル比較では全モデルへ同じseedを渡し、条件をそろえて比較します。">i</span></span>
+                  <input id="compareSeedInput" type="number" inputmode="numeric" value="1" min="0" step="1">
+                  <label class="seed-inline-toggle">
+                    <input id="compareSeedAutoIncrementInput" type="checkbox" checked>
+                    <span>生成後にseedを+1</span>
+                    <span class="info-dot" tabindex="0" aria-label="比較seed自動更新の説明" data-tip="一括比較が1回成功するごとに、次回のseedを1増やします。今の比較には入力中のseedを使います。">i</span>
+                  </label>
+                </div>
+              </div>
+              <div class="textarea-grid compare-textareas single-textarea-grid">
+                <label class="field textarea-field">
+                  <span>読み上げテキスト <b>必須</b></span>
+                  <textarea id="compareTextInput" rows="5" maxlength="1000">いつもお世話になっております。平素より格別のご高配を賜り、
+心より御礼申し上げます。今後とも変わらぬご支援のほど、
+よろしくお願い申し上げます。</textarea>
+                  <small id="compareTextCount">0 / 1000</small>
+                </label>
+              </div>
+
+              <details class="advanced-settings compare-advanced-settings" id="compareAdvancedSettings">
+                <summary><span>詳細設定</span><small id="compareAdvancedSummary">話し方・感情・長文分割・再生設定</small></summary>
+                <div class="advanced-guidance-grid" id="compareAdvancedGuidance">
+                  <label class="field textarea-field" id="compareInstructionField">
+                    <span>instruction / 話し方メモ <strong class="requirement-badge optional" id="compareInstructionRequirement">任意</strong></span>
+                    <textarea id="compareInstructionInput" rows="4" maxlength="300">落ち着いた、丁寧でややゆっくり、やわらかいトーンでお願いします。</textarea>
+                    <small id="compareInstructionCount">0 / 300</small>
+                  </label>
+                  <div class="irodori-emoji-slot" id="irodoriEmojiSlot-compare"></div>
+                </div>
+                <div class="advanced-settings-body">
+                  <div class="chunk-panel" data-chunk-scope="compare">
+                    <strong class="chunk-title">長文分割 <span class="info-dot" tabindex="0" aria-label="長文分割の説明" data-tip="長文は発音や抑揚が不安定になりやすいため、短く分けて生成し、最後に1つの音声へ結合します。">i</span></strong>
+                    <label>1区切りの目安 <input data-chunk-target type="number" min="80" max="500" step="10" value="240"> 文字</label>
+                    <input data-chunk-hard-max type="hidden" value="500">
+                    <div class="chunk-presets" aria-label="モデル比較の長文分割プリセット">
+                      <button type="button" class="secondary-button small" data-chunk-preset="160">短め 160</button>
+                      <button type="button" class="secondary-button small active" data-chunk-preset="240">標準 240</button>
+                      <button type="button" class="secondary-button small" data-chunk-preset="360">長め 360</button>
+                    </div>
+                    <span class="chunk-summary" data-chunk-summary>分割を計算中</span>
+                    <button class="secondary-button small" type="button" data-chunk-preview-toggle aria-expanded="false">分割を確認</button>
+                  </div>
+                  <div class="chunk-preview" data-chunk-preview hidden></div>
+
+                  <input hidden id="compareLanguageInput" type="text" value="Japanese">
+                  <div class="generation-options-row compare-generation-options">
+                    <label><input id="compareAutoPlayInput" type="checkbox"> 生成後に音声を自動再生 <span class="info-dot" tabindex="0" aria-label="比較結果の自動再生設定の説明" data-tip="一括生成後はおすすめ結果、単独再生成後はそのモデルを再生します。">i</span></label>
+                  </div>
+                  <p class="compare-condition-note">選択したモデルには、同じテキスト・参照音声・seed・長文分割設定を自動で使います。</p>
+                </div>
+              </details>
+            </section>
+
+            <section class="compare-model-row">
+              <div class="section-head inline-head">
+                <h2>比較するモデル</h2>
+                <div class="head-actions">
+                  <button class="link-button" type="button" id="compareSelectAllButton">すべて選択</button>
+                  <button class="link-button" type="button" id="compareClearButton">選択をクリア</button>
+                </div>
+              </div>
+              <div class="model-card-grid" id="compareModelCards"></div>
+              <div class="compare-action-card">
+                <button class="primary-button" type="button" id="compareGenerateButton">▶ 選択したモデルで一括生成</button>
+                <p id="compareStatusText">モデルを選択してください。</p>
+              </div>
+            </section>
+
+            <section class="section-head inline-head result-section-head">
+              <h2>生成結果 <span id="compareResultCount">（0件）</span></h2>
+            </section>
+            <section class="result-grid" id="compareResultsGrid">
+              <div class="empty-state">同じ文章で複数モデルを生成すると、ここに横並びで結果が表示されます。</div>
+            </section>
+          </div>
+
+          <aside class="right-column compare-right">
+            <section class="panel hint-panel diagnostic-panel">
+              <div class="panel-head compact">
+                <h2>診断ログ</h2>
+                <button class="link-button" type="button" id="compareLogCopyButton">AIに貼るログをコピー</button>
+              </div>
+              <p class="muted">失敗したモデルごとの詳細と、送信した設定を残します。</p>
+              <pre class="rvc-log-box diagnostic-log-box" id="compareLogBox">エラーはありません。</pre>
+            </section>
+            <section class="panel recent-panel">
+              <div class="panel-head compact">
+                <h2>最近の比較</h2>
+                <button class="link-button" type="button" id="compareClearHistoryButton">すべて消す</button>
+              </div>
+              <div id="compareHistoryList" class="mini-history"></div>
+            </section>
+          </aside>
+        </div>
+      </section>
+      <section class="page-section" id="rvcPage" data-page="rvc">
+        <div class="page-title">
+          <h1>RVC変換</h1>
+          <p>通常TTSで中間wavを生成し、その音声をRVCモデルで変換します。通常生成・モデル比較とは分離した専用画面です。</p>
+        </div>
+
+        <section class="panel rvc-model-empty-panel" id="rvcMissingModelPanel" hidden>
+          <span class="status-badge pending">RVCモデル未配置</span>
+          <h2>先にRVCモデルを用意してください</h2>
+          <p>RVC変換には、同じモデルの <code>.pth</code> と <code>.index</code> が必要です。モデルを作成したら、モデルごとのフォルダーへ2ファイルを配置します。</p>
+          <div class="rvc-model-path-box">
+            <span>配置先</span>
+            <code id="rvcModelDirectoryPath">models\rvc</code>
+          </div>
+          <div class="rvc-model-empty-actions">
+            <a class="primary-button" id="rvcModelGuideLink" href="./rvc-model-guide.html" target="_blank" rel="noopener">RVCモデルの作り方を見る</a>
+            <button class="secondary-button" type="button" id="rvcModelReloadButton">配置後に再読み込み</button>
+          </div>
+          <div class="rvc-model-scan-note" id="rvcModelScanNote"></div>
+        </section>
+
+        <div class="page-layout rvc-layout" id="rvcWorkspace">
+          <div class="content-column">
+            <section class="panel form-panel">
+              <div class="rvc-input-source-row" role="group" aria-label="RVC入力元">
+                <label><input type="radio" name="rvcInputSource" value="tts" checked> TTSで作った音声を変換</label>
+                <label><input type="radio" name="rvcInputSource" value="file"> 音声ファイルを変換</label>
+                <label><input type="radio" name="rvcInputSource" value="mic"> マイクで録音して変換</label>
+              </div>
+              <div class="control-grid path-controls rvc-file-source-controls" id="rvcFileSourceControls" hidden>
+                <label class="field wide-field"><span>入力音声（wav / m4a / mp3 / flac など）</span><input id="rvcExternalAudioPathInput" type="text" list="rvcExternalAudioPathHistory"></label>
+                <datalist id="rvcExternalAudioPathHistory"></datalist>
+              </div>
+              <section class="rvc-mic-panel" id="rvcMicControls">
+                <div class="rvc-mic-grid">
+                  <div class="rvc-mic-card">
+                    <h3>マイク入力</h3>
+                    <label class="field textarea-field rvc-mic-script-field">
+                      <span>録音するセリフ <em>メモ</em></span>
+                      <textarea id="rvcMicScriptInput" rows="4" maxlength="1000" placeholder="ここに読むセリフを書いて、見ながら録音します。">音声変換の確認用に、自然な速さではっきり読み上げます。</textarea>
+                      <small id="rvcMicScriptCount">0 / 1000</small>
+                    </label>
+                    <label class="field">
+                      <span>入力デバイス</span>
+                      <select id="rvcMicDeviceSelect"><option value="">既定のマイク</option></select>
+                    </label>
+                    <div class="rvc-record-actions">
+                      <button class="primary-button" type="button" id="rvcMicStartButton">● 録音開始</button>
+                      <button class="secondary-button" type="button" id="rvcMicStopButton" disabled>■ 停止</button>
+                      <span class="duration-pill" id="rvcMicTimer">00:00</span>
+                    </div>
+                    <p class="muted">録音した音声は入力wavとして保存され、録り直すまで再利用されます。</p>
+                  </div>
+                  <div class="rvc-mic-card">
+                    <div class="result-card-head">
+                      <h3>録音済み音声</h3>
+                      <span class="status-badge pending" id="rvcMicBadge">未録音</span>
+                    </div>
+                    <audio id="rvcMicAudio" controls preload="none"></audio>
+                    <div class="memo-box">
+                      <span>file path</span>
+                      <p id="rvcMicPath">-</p>
+                    </div>
+                    <div class="rvc-mic-actions">
+                      <button class="secondary-button" type="button" id="rvcMicRerecordButton">↻ 録り直す</button>
+                      <button class="secondary-button save-button" type="button" id="rvcMicUseButton" disabled>✓ この録音を使う</button>
+                    </div>
+                  </div>
+                </div>
+                <label class="field compact-field rvc-recent-recordings">
+                  <span>直近の録音</span>
+                  <select id="rvcMicHistorySelect"><option value="">録音履歴はまだありません</option></select>
+                </label>
+              </section>
+              <input id="rvcDemucsModelInput" type="hidden" value="htdemucs_ft">
+              <div class="control-grid rvc-tts-controls" id="rvcTtsControls">
+                <label class="field">
+                  <span>TTSモデル</span>
+                  <select id="rvcModelSelect"></select>
+                </label>
+                <label class="field wide-field">
+                  <span>参照音声 <em>任意</em></span>
+                  <div class="input-with-button">
+                    <select id="rvcReferenceVoiceSelect"></select>
+                    <button class="small-square" type="button" id="rvcReferencePreviewButton" title="参照音声を確認">▶</button>
+                  </div>
+                </label>
+                <input hidden id="rvcLanguageInput" type="text" value="Japanese">
+                <div class="field seed-field">
+                  <span>seed <em>初期値のままでOK</em> <span class="info-dot" tabindex="0" aria-label="RVC seedの説明" data-tip="seedはTTSで作る入力音声のランダムな揺らぎを決める数値です。同じ条件を再現・比較しやすくします。ファイル・マイク入力では使いません。">i</span></span>
+                  <input id="rvcSeedInput" type="number" inputmode="numeric" value="1" min="0" step="1">
+                  <label class="seed-inline-toggle">
+                    <input id="rvcSeedAutoIncrementInput" type="checkbox" checked>
+                    <span>生成後にseedを+1</span>
+                    <span class="info-dot" tabindex="0" aria-label="RVC seed自動更新の説明" data-tip="TTS入力からのRVC変換が成功したときだけ、次回のseedを1増やします。今の変換には入力中のseedを使います。">i</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="textarea-grid single-textarea-grid">
+                <label class="field textarea-field">
+                  <span>読み上げテキスト <b>必須</b></span>
+                  <textarea id="rvcTextInput" rows="6" maxlength="1000">これは音声変換の動作確認です。自然な発音と聞き取りやすさを確認します。</textarea>
+                  <small id="rvcTextCount">0 / 1000</small>
+                </label>
+              </div>
+
+              <details class="advanced-settings rvc-advanced-settings" id="rvcAdvancedSettings">
+                <summary><span>詳細設定</span><small id="rvcAdvancedSummary">話し方・感情・長文分割</small></summary>
+                <div class="advanced-guidance-grid" id="rvcAdvancedGuidance">
+                  <label class="field textarea-field" id="rvcInstructionField">
+                    <span>instruction / 話し方メモ <strong class="requirement-badge optional" id="rvcInstructionRequirement">任意</strong></span>
+                    <textarea id="rvcInstructionInput" rows="4" maxlength="300" placeholder="通常生成と同じTTS用の話し方メモ">穏やかで落ち着いた話し方。自然な抑揚で。</textarea>
+                    <small id="rvcInstructionCount">0 / 300</small>
+                  </label>
+                  <div class="irodori-emoji-slot" id="irodoriEmojiSlot-rvc"></div>
+                </div>
+                <div class="advanced-settings-body">
+                  <div class="chunk-panel" id="rvcChunkPanel" data-chunk-scope="rvc">
+                    <strong class="chunk-title">長文分割 <span class="info-dot" tabindex="0" aria-label="長文分割の説明" data-tip="長文は発音や抑揚が不安定になりやすいため、短く分けて生成し、最後に1つの音声へ結合します。">i</span></strong>
+                    <label>1区切りの目安 <input id="rvcChunkTargetInput" data-chunk-target type="number" min="80" max="500" step="10" value="240"> 文字</label>
+                    <input id="rvcChunkHardMaxInput" data-chunk-hard-max type="hidden" value="500">
+                    <div class="chunk-presets" aria-label="RVC用TTSの長文分割プリセット">
+                      <button type="button" class="secondary-button small" data-chunk-preset="160">短め 160</button>
+                      <button type="button" class="secondary-button small active" data-chunk-preset="240">標準 240</button>
+                      <button type="button" class="secondary-button small" data-chunk-preset="360">長め 360</button>
+                    </div>
+                    <span class="chunk-summary" id="rvcChunkSummary" data-chunk-summary>分割を計算中</span>
+                    <button class="secondary-button small" type="button" id="rvcChunkPreviewToggle" data-chunk-preview-toggle aria-expanded="false">分割を確認</button>
+                  </div>
+                  <div class="chunk-preview" id="rvcChunkPreview" data-chunk-preview hidden></div>
+                </div>
+              </details>
+            </section>
+
+            <section class="panel rvc-params-panel">
+              <div class="panel-head compact">
+                <h2>RVCパラメータ</h2>
+                <span class="model-pill">RVC</span>
+              </div>
+              <label class="field rvc-model-selector-field">
+                <span>RVCモデル <b>必須</b></span>
+                <select id="rvcVoiceModelSelect"></select>
+              </label>
+              <div class="control-grid rvc-controls">
+                <label class="field"><span>index_rate</span><input id="rvcIndexRateInput" type="number" min="0" max="1" step="0.05" value="0.35"></label>
+                <label class="field"><span>f0method</span><input id="rvcF0MethodInput" type="text" value="rmvpe"></label>
+                <label class="field"><span>f0up_key</span><input id="rvcF0UpKeyInput" type="number" step="1" value="0"></label>
+                <label class="field"><span>filter_radius</span><input id="rvcFilterRadiusInput" type="number" step="1" value="3"></label>
+                <label class="field"><span>resample_sr</span><input id="rvcResampleSrInput" type="number" step="1" value="0"></label>
+                <label class="field"><span>rms_mix_rate</span><input id="rvcRmsMixRateInput" type="number" min="0" max="1" step="0.05" value="1"></label>
+                <label class="field"><span>protect</span><input id="rvcProtectInput" type="number" min="0" max="0.5" step="0.01" value="0.33"></label>
+              </div>
+              <div class="control-grid path-controls" id="rvcResolvedModelPaths" hidden>
+                <label class="field wide-field"><span>model_path</span><input id="rvcModelPathInput" type="text" readonly></label>
+                <label class="field wide-field"><span>index_path</span><input id="rvcIndexPathInput" type="text" readonly></label>
+              </div>
+              <div class="rvc-simple-params">
+                <label class="field rvc-param-card">
+                  <span class="rvc-param-title">声の似せ度 <button class="rvc-help" type="button" aria-label="声の似せ度の説明" data-tip="低いほど入力音声の自然さを残し、高いほどRVCモデルの声質に寄せます。差を見るときは同じ入力wavで比較してください。">?</button></span>
+                  <select id="rvcIndexRatePresetSelect">
+                    <option value="0.20">弱め</option>
+                    <option value="0.35" selected>標準</option>
+                    <option value="0.55">強め</option>
+                    <option value="0.75">かなり強め</option>
+                  </select>
+                  <small class="rvc-param-hint">入力寄り ↔ モデル寄り</small>
+                </label>
+                <label class="field rvc-param-card">
+                  <span class="rvc-param-title">音程 <button class="rvc-help" type="button" aria-label="音程の説明" data-tip="声の高さを半音単位で上下します。男性声を女性モデルへ寄せる場合は +12〜+15 が目安です。">?</button></span>
+                  <select id="rvcF0UpKeyPresetSelect">
+                    <option value="-12">-12 低く</option>
+                    <option value="-6">-6 少し低く</option>
+                    <option value="0" selected>0 そのまま</option>
+                    <option value="6">+6 少し高く</option>
+                    <option value="12">+12 高く</option>
+                    <option value="15">+15 男性→女性 強め</option>
+                  </select>
+                  <small class="rvc-param-hint">男性→女性は +12〜+15</small>
+                </label>
+                <label class="field rvc-param-card">
+                  <span class="rvc-param-title">安定性 <button class="rvc-help" type="button" aria-label="安定性の説明" data-tip="低いほど変換を強くかけ、高いほど発音・息・子音を守ります。迷ったら標準のままで十分です。">?</button></span>
+                  <select id="rvcProtectPresetSelect">
+                    <option value="0.20">変換強め</option>
+                    <option value="0.33" selected>標準</option>
+                    <option value="0.45">破綻しにくい</option>
+                  </select>
+                  <small class="rvc-param-hint">変換強め ↔ 破綻しにくい</small>
+                </label>
+              </div>
+              <div class="generation-options-row rvc-generation-options">
+                <label><input id="rvcAutoPlayInput" type="checkbox"> 生成後に音声を自動再生 <span class="info-dot" tabindex="0" aria-label="RVC結果の自動再生設定の説明" data-tip="変換完了後、RVC変換後音声を自動で再生します。">i</span></label>
+              </div>
+              <div class="action-row single-action-row">
+                <button class="primary-button" type="button" id="rvcConvertButton">▶ RVC変換する</button>
+              </div>
+              <p class="status-line" id="rvcStatusText">読込中です...</p>
+            </section>
+
+            <section class="section-head">
+              <h2>再生 / 出力</h2>
+            </section>
+            <section class="result-grid rvc-result-grid">
+              <article class="result-card">
+                <div class="result-card-head">
+                  <h3 id="rvcIntermediateTitle">入力音声</h3>
+                  <span class="status-badge pending" id="rvcIntermediateBadge">未生成</span>
+                </div>
+                <audio id="rvcIntermediateAudio" controls preload="none"></audio>
+                <div class="memo-box">
+                  <span>file path</span>
+                  <p id="rvcIntermediatePath">-</p>
+                </div>
+                <a class="secondary-button" id="rvcIntermediateDownload" href="#" download>⇩ 中間wavをダウンロード</a>
+              </article>
+              <article class="result-card">
+                <div class="result-card-head">
+                  <h3>RVC変換後音声</h3>
+                  <span class="status-badge pending" id="rvcConvertedBadge">未生成</span>
+                </div>
+                <audio id="rvcConvertedAudio" controls preload="none"></audio>
+                <div class="memo-box">
+                  <span>file path</span>
+                  <p id="rvcConvertedPath">-</p>
+                </div>
+                <a class="secondary-button" id="rvcConvertedDownload" href="#" download>⇩ RVC wavをダウンロード</a>
+                <button class="secondary-button" type="button" id="rvcDenoiseButton" hidden disabled>ノイズが気になる場合だけ除去版を作る</button>
+              </article>
+              <article class="result-card" id="rvcDenoisedCard" hidden>
+                <div class="result-card-head">
+                  <h3>ノイズ除去版</h3>
+                  <span class="status-badge pending" id="rvcDenoisedBadge">未生成</span>
+                </div>
+                <audio id="rvcDenoisedAudio" controls preload="none"></audio>
+                <div class="memo-box">
+                  <span>file path</span>
+                  <p id="rvcDenoisedPath">-</p>
+                </div>
+                <a class="secondary-button" id="rvcDenoisedDownload" href="#" download>⇩ ノイズ除去版をダウンロード</a>
+              </article>
+            </section>
+          </div>
+
+          <aside class="right-column">
+            <section class="panel hint-panel rvc-log-panel">
+              <div class="panel-head compact">
+                <h2>診断ログ</h2>
+                <button class="link-button" type="button" id="rvcLogCopyButton">AIに貼るログをコピー</button>
+              </div>
+              <p class="muted">画面のエラーは短く保ち、ここには解決に必要な設定と完全なエラーを残します。</p>
+              <pre class="rvc-log-box" id="rvcLogBox">エラーはありません。</pre>
+            </section>
+            <section class="panel recent-panel">
+              <div class="panel-head compact">
+                <h2>最近のRVC変換</h2>
+                <button class="link-button" type="button" id="rvcClearHistoryButton">すべて消す</button>
+              </div>
+              <div id="rvcHistoryList" class="mini-history"></div>
+            </section>
+          </aside>
+        </div>
+      </section>
+      <section class="page-section" id="historyPage" data-page="history">
+        <div class="page-title history-page-title">
+          <div>
+            <h1>履歴</h1>
+            <p>生成した音声、保存した読み上げ文章、RVC変換の結果を保存・管理できます。後から再利用や設定の復元が可能です。</p>
+          </div>
+          <button class="secondary-button history-clear-all" type="button" id="historyClearAllButton">履歴をすべて削除</button>
+        </div>
+
+        <div class="history-layout">
+          <div class="history-main-column">
+            <section class="panel history-filter-panel" aria-label="履歴フィルター">
+              <div class="history-filter-group">
+                <span>種別</span>
+                <div class="history-pill-row" id="historyTypeFilters">
+                  <button class="history-pill active" type="button" data-history-filter="type" data-value="all">すべて</button>
+                  <button class="history-pill" type="button" data-history-filter="type" data-value="normal">通常生成</button>
+                  <button class="history-pill" type="button" data-history-filter="type" data-value="compare">モデル比較</button>
+                  <button class="history-pill" type="button" data-history-filter="type" data-value="rvc">RVC変換</button>
+                </div>
+              </div>
+              <div class="history-filter-group">
+                <span>状態</span>
+                <div class="history-pill-row" id="historyStatusFilters">
+                  <button class="history-pill active" type="button" data-history-filter="status" data-value="all">すべて</button>
+                  <button class="history-pill success" type="button" data-history-filter="status" data-value="success">成功</button>
+                  <button class="history-pill failed" type="button" data-history-filter="status" data-value="failed">失敗</button>
+                </div>
+              </div>
+              <label class="history-favorite-filter"><input type="checkbox" id="historyFavoriteOnly"> お気に入りのみ</label>
+              <label class="history-search-field">
+                <span class="sr-only">履歴検索</span>
+                <input id="historySearchInput" type="search" placeholder="読み上げ文章・モデル名・参照音声で検索">
+              </label>
+            </section>
+
+            <section class="history-list" id="historyList" aria-label="生成履歴一覧"></section>
+            <div class="history-list-footer">
+              <p class="history-result-summary" id="historyResultSummary" aria-live="polite"></p>
+              <button class="secondary-button" type="button" id="historyLoadMoreButton" hidden>さらに20件表示</button>
+            </div>
+          </div>
+
+          <aside class="panel history-detail-panel" id="historyDetailPanel" aria-label="履歴詳細">
+            <div class="history-detail-head">
+              <h2>詳細</h2>
+              <button class="icon-button" type="button" id="historyDetailClose" title="詳細を閉じる">×</button>
+            </div>
+            <div id="historyDetailBody" class="history-detail-body"></div>
+          </aside>
+        </div>
+      </section>
+      <section class="page-section" id="voicesPage" data-page="voices">
+        <div class="page-title">
+          <h1>参照音声</h1>
+          <p>見本にしたい声の新規登録と、登録済み音声の修正・管理を分けて操作できます。</p>
+        </div>
+
+        <div class="voice-subtabs" role="tablist" aria-label="参照音声の作業">
+          <button class="voice-subtab active" type="button" role="tab" aria-selected="true" data-voice-view="register">新しく登録</button>
+          <button class="voice-subtab" type="button" role="tab" aria-selected="false" data-voice-view="manage">登録済み音声</button>
+        </div>
+
+        <section class="voice-register-view" data-voice-view-panel="register">
+          <div class="voice-quality-tip" title="GPT-SoVITSでは3〜10秒が目安です。BGM、反響、複数人の声が少なく、1人がはっきり話す音声ほど声を再現しやすくなります。">
+            <strong>良い参照音声の目安</strong>
+            <span>3〜10秒・1人の声・BGMやノイズが少ない音声がおすすめです。音声内で実際に話している文章を正確に入力してください。</span>
+            <span aria-hidden="true">ⓘ</span>
+          </div>
+          <div class="voice-method-picker" role="tablist" aria-label="登録方法">
+            <button class="voice-method active" type="button" role="tab" aria-selected="true" data-voice-method="mic">マイクで録音</button>
+            <button class="voice-method" type="button" role="tab" aria-selected="false" data-voice-method="file">音声ファイルから登録</button>
+            <button class="voice-method" type="button" role="tab" aria-selected="false" data-voice-method="youtube">動画URLから登録</button>
+          </div>
+
+          <section class="panel voice-method-panel voice-register-panel" data-voice-method-panel="mic">
+            <div class="panel-head compact">
+              <div><h2>マイクで録音</h2><p class="muted">文章を入力してから録音し、内容を確認して保存します。</p></div>
+              <span class="status-badge pending" id="voiceRecordingBadge">未録音</span>
+            </div>
+            <label class="field">
+              <span>参照音声名 <b>必須</b></span>
+              <input id="voiceIdInput" type="text" maxlength="80" placeholder="例: my_voice_02" autocomplete="off">
+              <small class="voice-field-note">半角英数字・_・- のみ。既に使われている名前では登録できません。</small>
+            </label>
+            <label class="field textarea-field">
+              <span>録音時に読む文章 <b>必須</b></span>
+              <textarea id="voiceReferenceTextInput" rows="5" maxlength="5000" placeholder="録音で実際に読む文章を入力してください。"></textarea>
+              <small id="voiceReferenceTextCount">0 / 5000</small>
+            </label>
+            <label class="field">
+              <span>入力デバイス</span>
+              <select id="voiceMicDeviceSelect"><option value="">既定のマイク</option></select>
+            </label>
+            <div class="voice-record-actions">
+              <button class="primary-button" type="button" id="voiceRecordStartButton">● 録音開始</button>
+              <button class="secondary-button" type="button" id="voiceRecordStopButton" disabled>■ 停止</button>
+              <span class="duration-pill" id="voiceRecordTimer">00:00</span>
+            </div>
+            <audio id="voiceRecordedAudio" controls preload="none"></audio>
+            <button class="primary-button voice-save-button" type="button" id="voiceSaveButton" disabled>保存して参照音声に登録</button>
+            <p class="status-line" id="voiceManagerStatus">参照音声名と文章を入力し、マイクで録音してください。</p>
+          </section>
+
+          <section class="panel voice-method-panel voice-file-panel" data-voice-method-panel="file" hidden>
+            <div class="panel-head compact">
+              <div><h2>音声ファイルから登録</h2><p class="muted">ファイルを選ぶと、送信前に再生と長さを確認できます。</p></div>
+              <span class="status-badge pending" id="voiceFileBadge">未選択</span>
+            </div>
+            <label class="field">
+              <span>参照音声名 <b>必須</b></span>
+              <input id="voiceFileIdInput" type="text" maxlength="80" placeholder="例: my_voice_02" autocomplete="off">
+              <small class="voice-field-note">半角英数字・_・- のみ。既存名は上書きしません。</small>
+            </label>
+            <label class="field">
+              <span>音声ファイル <b>必須</b></span>
+              <span class="voice-file-input-shell">
+                <input id="voiceFileInput" type="file" accept=".wav,.mp3,.m4a,.flac,.ogg,.aac,audio/*">
+              </span>
+              <small class="voice-field-note">対応形式: wav・mp3・m4a・flac・ogg・aac</small>
+            </label>
+            <audio id="voiceFilePreview" controls preload="metadata"></audio>
+            <p class="muted" id="voiceFileDuration">音声時間: 未選択</p>
+            <label class="field textarea-field">
+              <span>音声内で実際に話している文章 <b>必須</b></span>
+              <textarea id="voiceFileTextInput" rows="5" maxlength="5000" placeholder="聞こえた文章を省略せず正確に入力してください。"></textarea>
+            </label>
+            <button class="primary-button" type="button" id="voiceFileSaveButton" disabled>この音声ファイルを登録</button>
+            <p class="status-line" id="voiceFileStatus">ファイル、参照音声名、音声内の文章を入力してください。</p>
+          </section>
+
+          <section class="panel voice-method-panel youtube-reference-panel" data-voice-method-panel="youtube" hidden>
+            <div class="panel-head compact">
+              <div>
+                <h2>動画URLから登録</h2>
+                <p class="muted">20分以下の単一動画に対応します。3〜10秒の音声候補と文字起こしを表示します。</p>
+              </div>
+              <span class="status-badge pending" id="youtubeReferenceBadge">未実行</span>
+            </div>
+            <div class="youtube-reference-controls">
+              <label class="field youtube-url-field">
+                <span>動画URL <b>必須</b></span>
+                <input id="youtubeReferenceUrlInput" type="url" placeholder="https://..." autocomplete="off">
+              </label>
+              <label class="field youtube-name-field">
+                <span>登録する参照音声名 <b>登録時必須</b></span>
+                <input id="youtubeReferenceNameInput" type="text" maxlength="80" placeholder="例: authorized_voice_01" autocomplete="off">
+              </label>
+            </div>
+            <div class="youtube-reference-options">
+              <label><input id="youtubeReferenceDemucsInput" type="checkbox" checked> BGM・伴奏を除去する</label>
+              <label class="rights-confirmation"><input id="youtubeReferenceRightsInput" type="checkbox"> 使用する動画・音声の権利や利用規約を確認しました</label>
+            </div>
+            <div class="youtube-reference-actions">
+              <button class="primary-button" type="button" id="youtubeReferenceAnalyzeButton" disabled>音声区間と文字起こしを取得</button>
+              <p class="status-line" id="youtubeReferenceStatus">URLと権利・利用規約を確認すると候補を取得できます。参照音声名は登録時に必要です。</p>
+            </div>
+            <div class="youtube-candidate-grid" id="youtubeReferenceCandidates">
+              <div class="empty-state">候補を取得すると、音声・時間・文字起こしがここに表示されます。</div>
+            </div>
+            <div class="youtube-more-actions">
+              <button class="secondary-button" type="button" id="youtubeReferenceMoreButton" hidden>別の候補を5件追加</button>
+            </div>
+          </section>
+
+          <section class="voice-success panel" id="voiceRegistrationSuccess" hidden></section>
+        </section>
+
+        <section class="panel voice-existing-panel" data-voice-view-panel="manage" hidden>
+          <div class="panel-head compact">
+            <div><h2>登録済み音声</h2><p class="muted">文章の修正、音声プレビュー、アーカイブと復元を行えます。</p></div>
+            <button class="secondary-button small" type="button" id="voiceListReloadButton">再読込</button>
+          </div>
+          <div class="voice-list-filters" role="group" aria-label="参照音声の表示">
+            <button class="voice-list-filter active" type="button" data-voice-filter="all">すべて</button>
+            <button class="voice-list-filter" type="button" data-voice-filter="active">利用中</button>
+            <button class="voice-list-filter" type="button" data-voice-filter="archived">アーカイブ済み</button>
+          </div>
+          <div class="voice-existing-layout">
+            <div class="voice-list" id="voiceManageList"></div>
+            <div class="voice-detail" id="voiceManageDetail">
+              <div class="empty-state">左の参照音声を選択してください。</div>
+            </div>
+          </div>
+        </section>
+      </section>
+      <section class="page-section guide-page" id="guidePage" data-page="guide">
+        <div class="page-title">
+          <h1>使い方</h1>
+          <p>この画面が開いていれば起動は完了しています。まず音声を1つ作り、次に目的に合う機能を選びます。</p>
+        </div>
+
+        <section class="panel guide-section guide-first-steps">
+          <div class="guide-section-head">
+            <span class="guide-step-number">1</span>
+            <div><h2>1. 最初の音声を作る</h2><p>通常生成で文章を入力し、生成結果を再生できれば準備完了です。</p></div>
+          </div>
+          <div class="guide-start-grid">
+            <article class="guide-start-card">
+              <strong>今やること</strong>
+              <ol>
+                <li>「通常生成」を開く</li>
+                <li>利用可能なモデルを選び、読ませる文章を入力する</li>
+                <li>「生成する」を押し、生成結果を再生する</li>
+              </ol>
+            </article>
+            <article class="guide-start-card">
+              <strong>完了の目印</strong>
+              <p>生成結果のプレイヤーが表示され、音声を再生できれば準備完了です。</p>
+            </article>
+            <article class="guide-start-card">
+              <strong>2回目以降</strong>
+              <p><code>local-tts.bat</code> をダブルクリックします。準備済みならそのまま起動します。</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel guide-section">
+          <div class="guide-section-head">
+            <span class="guide-step-number">2</span>
+            <div><h2>2. やりたいことを選ぶ</h2><p>必要な画面へ直接移動できます。</p></div>
+          </div>
+          <div class="guide-task-grid">
+            <article class="guide-task-card">
+              <h3>文章から音声を作る</h3>
+              <p><strong>使う画面:</strong> 通常生成</p>
+              <p><strong>必要:</strong> 読ませる文章、利用可能なTTSモデル</p>
+              <small>参照音声は、対応モデルで見本の声に寄せる場合だけ使います。</small>
+              <button class="primary-button" type="button" data-tab="normal" data-guide-target="normal">通常生成を開く</button>
+            </article>
+            <article class="guide-task-card">
+              <h3>同じ文章を複数モデルで比べる</h3>
+              <p><strong>使う画面:</strong> モデル比較</p>
+              <p><strong>必要:</strong> 読ませる文章、比較するモデル</p>
+              <button class="secondary-button" type="button" data-tab="compare" data-guide-target="compare">モデル比較を開く</button>
+            </article>
+            <article class="guide-task-card" id="guideRvcActionCard">
+              <h3>既存音声の声質を変える</h3>
+              <p><strong>使う画面:</strong> RVC変換</p>
+              <p><strong>必要:</strong> 入力音声、学習済みRVCモデル、必要に応じてindex</p>
+              <small>RVCモデルの学習はこの画面では行いません。<a href="https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI" target="_blank" rel="noopener noreferrer">公式RVC WebUI ↗</a></small>
+              <button class="secondary-button" type="button" data-tab="rvc" data-guide-target="rvc">RVC変換を開く</button>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel guide-section guide-reference-section">
+          <div class="guide-section-head">
+            <span class="guide-step-number">3</span>
+            <div><h2>3. 見本の声に寄せたい場合</h2><p>音声クローン対応モデルを使う前に、参照音声を登録します。</p></div>
+          </div>
+          <div class="guide-reference-layout">
+            <div>
+              <p>登録方法は3つあります。</p>
+              <ul class="guide-compact-list">
+                <li>マイクで録音する</li>
+                <li>手元の音声ファイルを登録する</li>
+                <li>許可のある動画URLから候補を作る</li>
+              </ul>
+              <p class="guide-quality-note"><strong>おすすめ:</strong> 3〜10秒、1人がはっきり話し、BGMやノイズが少ない音声。音声内の文章は聞こえた内容を正確に入力します。</p>
+            </div>
+            <button class="primary-button" type="button" data-tab="voices" data-voice-open="register">参照音声を登録する</button>
+          </div>
+        </section>
+
+        <section class="panel guide-mechanism-section" aria-labelledby="guideMechanismTitle">
+          <div class="guide-mechanism-head">
+            <h3 id="guideMechanismTitle">仕組みと必要なもの</h3>
+            <p>3方式の違いだけを短く確認できます。</p>
+          </div>
+          <div class="guide-mechanism-grid">
+            <article class="guide-mechanism-card">
+              <h4>通常生成</h4>
+              <p>入力した文章をTTSモデルに読ませます。</p>
+              <p><strong>必要:</strong> TTSモデル、読ませる文章</p>
+              <p class="guide-mechanism-flow">文章 ＋ TTSモデル → 読み上げ音声</p>
+            </article>
+            <article class="guide-mechanism-card">
+              <h4>音声クローン</h4>
+              <p>短い見本音声と、その音声で実際に話している文章を使って声を寄せます。</p>
+              <p><strong>必要:</strong> クローン対応TTSモデル、<code>voice.wav</code>、内容を正確に書いた <code>voice.txt</code>、新しく読ませる文章</p>
+              <p class="guide-mechanism-flow">見本音声 ＋ 見本の文章 ＋ 新しい文章 → 見本に近い音声</p>
+            </article>
+            <article class="guide-mechanism-card">
+              <h4>RVC変換</h4>
+              <p>既存音声のセリフやテンポを保ちながら、学習済みモデルの声質へ変換します。</p>
+              <p><strong>必要:</strong> 入力音声、学習済みRVCモデル（<code>.pth</code>）、必要に応じて <code>.index</code></p>
+              <p class="guide-mechanism-flow">入力音声 ＋ RVCモデル → 声質を変換した音声</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel guide-section">
+          <div class="guide-section-head">
+            <span class="guide-step-number">4</span>
+            <div><h2>4. 困ったとき</h2><p>画面の案内で解決しない場合だけ、診断とドキュメントを確認してください。</p></div>
+          </div>
+          <ul class="guide-compact-list">
+            <li>起動できない場合は <code>check-local-tts.bat</code> を実行する</li>
+            <li>モデルが選択不可の場合は、モデル欄に表示される理由を確認する</li>
+            <li>エラー時は画面の診断メッセージを確認する</li>
+          </ul>
+          <p class="muted">詳しい対処は <code>docs/troubleshooting.md</code> にあります。</p>
+        </section>
+
+        <section class="panel guide-section guide-notice-section">
+          <div class="guide-section-head">
+            <span class="guide-step-number">5</span>
+            <div><h2>5. 注意事項</h2><p>操作方法を確認した後、公開や配布の前に確認してください。</p></div>
+          </div>
+          <ul class="guide-compact-list">
+            <li>モデルと使用音声の利用条件は、それぞれ異なります。</li>
+            <li>公開・配布・販売前に商用利用条件を確認してください。</li>
+            <li>参照音声や動画は、本人の同意または利用権限がある素材だけを使ってください。</li>
+            <li>生成物の利用条件もモデルごとに確認してください。</li>
+          </ul>
+        </section>
+      </section>
+    </main>
+  </div>
+  <script src="./shared-ui.js"></script>
+  <script src="./tts-api-client.js"></script>
+  <script src="./irodori-emojis.js"></script>
+  <script src="./model-catalog.js"></script>
+  <script src="./model-capabilities.js"></script>
+  <script src="./rvc-chunking.js"></script>
+  <script src="./store.js"></script>
+  <script src="./generation-core.js"></script>
+  <script src="./audio-controller.js"></script>
+  <script src="./rvc/rvc-form.js"></script>
+  <script src="./rvc/rvc-mic-recorder.js"></script>
+  <script src="./rvc/rvc-result.js"></script>
+  <script src="./normal-controller.js"></script>
+  <script src="./compare-controller.js"></script>
+  <script src="./rvc/rvc-controller.js"></script>
+  <script src="./avatar-sync.js"></script>
+  <script src="./normal-page.js"></script>
+  <script src="./compare-page.js"></script>
+  <script src="./rvc-page.js"></script>
+  <script src="./app.js"></script>
+  <script src="./reference-voices.js"></script>
+  <script src="./reference-voices-ux.js"></script>
+  <script src="./history.js"></script>
+  
+</body>
+</html>
