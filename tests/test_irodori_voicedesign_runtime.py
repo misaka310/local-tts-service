@@ -21,11 +21,22 @@ def _build_runtime(tmp_path: Path) -> IrodoriVoiceDesignDirectRuntime:
     helper_script = tmp_path / "scripts" / "run_irodori_voicedesign.py"
     helper_script.parent.mkdir(parents=True, exist_ok=True)
     helper_script.write_text("print('stub')", encoding="utf-8")
-    return IrodoriVoiceDesignDirectRuntime(
+    checkpoint = tmp_path / "runtime" / "models" / "irodori" / "voicedesign" / "model.safetensors"
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    checkpoint.write_bytes(b"model")
+    codec_dir = tmp_path / "runtime" / "models" / "irodori" / "codec"
+    codec_dir.mkdir(parents=True, exist_ok=True)
+    (codec_dir / "weights.pth").write_bytes(b"codec")
+    processor_dir = tmp_path / "runtime" / "models" / "irodori" / "tokenizers" / "llm-jp-3-150m"
+    processor_dir.mkdir(parents=True, exist_ok=True)
+    (processor_dir / "tokenizer_config.json").write_text("{}", encoding="utf-8")
+    (processor_dir / "tokenizer.json").write_text("{}", encoding="utf-8")
+    runtime = IrodoriVoiceDesignDirectRuntime(
         output_dir=tmp_path / "runtime" / "audio",
         models={
             "irodori_v3_voicedesign": ModelConfig(
                 runtime="irodori_voicedesign_direct",
+                checkpoint=checkpoint,
                 requires_reference_audio=False,
                 supports_caption=True,
                 supports_instruction=True,
@@ -38,12 +49,16 @@ def _build_runtime(tmp_path: Path) -> IrodoriVoiceDesignDirectRuntime:
         root_dir=tmp_path,
         python_executable=str(python_exe),
         wrapper_dir=wrapper_dir,
-        checkpoint="Aratako/Irodori-TTS-600M-v3-VoiceDesign",
+        checkpoint="",
+        codec_repo=str(codec_dir),
+        text_processor_dir=str(processor_dir),
         model_device="cpu",
         model_precision="fp32",
         codec_device="cpu",
         codec_precision="fp32",
     )
+    runtime._prepared_models.add("irodori_v3_voicedesign")
+    return runtime
 
 
 def test_runtime_metadata_warns_when_cuda_falls_back_to_cpu(tmp_path, monkeypatch) -> None:
@@ -51,7 +66,7 @@ def test_runtime_metadata_warns_when_cuda_falls_back_to_cpu(tmp_path, monkeypatc
     runtime.model_device = "cuda"
     calls = []
 
-    def fake_run(cmd, cwd, capture_output, text, timeout, check):  # noqa: ANN001
+    def fake_run(cmd, cwd, capture_output, text, timeout, check, env):  # noqa: ANN001
         calls.append(cmd)
         return subprocess.CompletedProcess(
             cmd,
@@ -71,34 +86,26 @@ def test_runtime_metadata_warns_when_cuda_falls_back_to_cpu(tmp_path, monkeypatc
     assert len(calls) == 1
 
 
-def test_voicedesign_runtime_invokes_helper_with_caption_and_reference(tmp_path, monkeypatch) -> None:
+def test_voicedesign_runtime_sends_only_generation_request_to_ready_worker(tmp_path, monkeypatch) -> None:
     runtime = _build_runtime(tmp_path)
     reference_audio = tmp_path / "ref.wav"
     reference_audio.write_bytes(b"RIFF\x24\x00\x00\x00WAVEfmt ")
     output_wav = tmp_path / "runtime" / "audio" / "clip.wav"
     captured = {}
 
-    def fake_run(cmd, cwd, capture_output, text, timeout, check):  # noqa: ANN001
-        request_path = Path(cmd[-1])
-        captured["cmd"] = cmd
-        captured["cwd"] = cwd
-        captured["request"] = json.loads(request_path.read_text(encoding="utf-8"))
+    def fake_request(payload, timeout_sec):  # noqa: ANN001
+        captured["request"] = dict(payload)
+        captured["timeout"] = timeout_sec
         output_wav.parent.mkdir(parents=True, exist_ok=True)
         output_wav.write_bytes(b"RIFF\x24\x00\x00\x00WAVEdata")
-        return subprocess.CompletedProcess(
-            cmd,
-            0,
-            stdout=json.dumps(
-                {
-                    "ok": True,
-                    "outputPath": str(output_wav),
-                    "captionInjectionMode": "separate_target",
-                }
-            ),
-            stderr="",
-        )
+        return {
+            "ok": True,
+            "outputPath": str(output_wav),
+            "captionInjectionMode": "separate_target",
+            "externalNetworkAttempts": 0,
+        }
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(runtime, "_request_worker", fake_request)
     result = runtime.synthesize(
         SynthesizeRequest(
             text="どうも、ドチタオです",
@@ -113,11 +120,12 @@ def test_voicedesign_runtime_invokes_helper_with_caption_and_reference(tmp_path,
         )
     )
 
-    assert captured["cwd"] == str(tmp_path)
+    assert captured["request"]["action"] == "synthesize"
     assert captured["request"]["caption"] == "自然な配信者の名乗り。短く聞き取りやすい。"
     assert captured["request"]["referenceAudioPath"] == str(reference_audio)
     assert captured["request"]["durationScale"] == pytest.approx(0.8)
     assert captured["request"]["cfgScaleCaption"] == pytest.approx(4.5)
+    assert captured["timeout"] == runtime.timeout_sec
     assert result.audio_path == output_wav.resolve()
     assert result.caption_injection_mode == "separate_target"
 
@@ -127,25 +135,19 @@ def test_voicedesign_runtime_allows_caption_without_reference(tmp_path, monkeypa
     output_wav = tmp_path / "runtime" / "audio" / "caption-only.wav"
     captured = {}
 
-    def fake_run(cmd, cwd, capture_output, text, timeout, check):  # noqa: ANN001
-        request_path = Path(cmd[-1])
-        captured["request"] = json.loads(request_path.read_text(encoding="utf-8"))
+    def fake_request(payload, timeout_sec):  # noqa: ANN001
+        del timeout_sec
+        captured["request"] = dict(payload)
         output_wav.parent.mkdir(parents=True, exist_ok=True)
         output_wav.write_bytes(b"RIFF\x24\x00\x00\x00WAVEdata")
-        return subprocess.CompletedProcess(
-            cmd,
-            0,
-            stdout=json.dumps(
-                {
-                    "ok": True,
-                    "outputPath": str(output_wav),
-                    "captionInjectionMode": "separate_target",
-                }
-            ),
-            stderr="",
-        )
+        return {
+            "ok": True,
+            "outputPath": str(output_wav),
+            "captionInjectionMode": "separate_target",
+            "externalNetworkAttempts": 0,
+        }
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(runtime, "_request_worker", fake_request)
     result = runtime.synthesize(
         SynthesizeRequest(
             text="参照音声なしで生成します。",
@@ -165,15 +167,16 @@ def test_voicedesign_runtime_allows_caption_without_reference(tmp_path, monkeypa
     assert result.audio_path == output_wav.resolve()
 
 
-def test_voicedesign_runtime_fails_when_helper_returns_error(tmp_path, monkeypatch) -> None:
+def test_voicedesign_runtime_fails_when_worker_returns_error(tmp_path, monkeypatch) -> None:
     runtime = _build_runtime(tmp_path)
     reference_audio = tmp_path / "ref.wav"
     reference_audio.write_bytes(b"RIFF\x24\x00\x00\x00WAVEfmt ")
 
-    def fake_run(cmd, cwd, capture_output, text, timeout, check):  # noqa: ANN001
-        return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="caption target missing")
+    def fake_request(payload, timeout_sec):  # noqa: ANN001
+        del payload, timeout_sec
+        raise ProviderError("caption target missing")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(runtime, "_request_worker", fake_request)
 
     with pytest.raises(ProviderError) as exc:
         runtime.synthesize(
@@ -188,7 +191,6 @@ def test_voicedesign_runtime_fails_when_helper_returns_error(tmp_path, monkeypat
         )
 
     assert "VoiceDesign runtime failed" in str(exc.value)
-    assert "process exited with code 1" in str(exc.value)
     assert "caption target missing" in str(exc.value)
 
 
@@ -206,6 +208,10 @@ def test_irodori_direct_runtime_uses_model_specific_repo_local_checkpoint(tmp_pa
     checkpoint.write_bytes(b"model")
     codec_dir = tmp_path / "runtime" / "models" / "irodori" / "Semantic-DACVAE-Japanese-32dim"
     codec_dir.mkdir(parents=True, exist_ok=True)
+    processor_dir = tmp_path / "runtime" / "models" / "irodori" / "tokenizers" / "llm-jp-3-150m"
+    processor_dir.mkdir(parents=True, exist_ok=True)
+    (processor_dir / "tokenizer_config.json").write_text("{}", encoding="utf-8")
+    (processor_dir / "tokenizer.json").write_text("{}", encoding="utf-8")
 
     runtime = IrodoriVoiceDesignDirectRuntime(
         output_dir=tmp_path / "runtime" / "audio",
@@ -225,30 +231,31 @@ def test_irodori_direct_runtime_uses_model_specific_repo_local_checkpoint(tmp_pa
         wrapper_dir=Path("./runtime/vendor/Irodori-TTS-upstream"),
         checkpoint="",
         codec_repo="./runtime/models/irodori/Semantic-DACVAE-Japanese-32dim",
+        text_processor_dir=str(processor_dir),
         model_device="cpu",
         model_precision="fp32",
         codec_device="cpu",
         codec_precision="fp32",
     )
+    runtime._prepared_models.add("irodori_v3")
     reference_audio = tmp_path / "ref.wav"
     reference_audio.write_bytes(b"RIFF\x24\x00\x00\x00WAVEfmt ")
     output_wav = tmp_path / "runtime" / "audio" / "base.wav"
     captured = {}
 
-    def fake_run(cmd, cwd, capture_output, text, timeout, check):  # noqa: ANN001
-        request_path = Path(cmd[-1])
-        captured["cmd"] = cmd
-        captured["request"] = json.loads(request_path.read_text(encoding="utf-8"))
+    def fake_request(payload, timeout_sec):  # noqa: ANN001
+        del timeout_sec
+        captured["request"] = dict(payload)
         output_wav.parent.mkdir(parents=True, exist_ok=True)
         output_wav.write_bytes(b"RIFF\x24\x00\x00\x00WAVEdata")
-        return subprocess.CompletedProcess(
-            cmd,
-            0,
-            stdout=json.dumps({"ok": True, "outputPath": str(output_wav), "captionInjectionMode": "none"}),
-            stderr="",
-        )
+        return {
+            "ok": True,
+            "outputPath": str(output_wav),
+            "captionInjectionMode": "none",
+            "externalNetworkAttempts": 0,
+        }
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(runtime, "_request_worker", fake_request)
     result = runtime.synthesize(
         SynthesizeRequest(
             text="通常版Irodoriの直接実行を確認します。",
@@ -261,7 +268,7 @@ def test_irodori_direct_runtime_uses_model_specific_repo_local_checkpoint(tmp_pa
         )
     )
 
-    assert Path(captured["cmd"][0]) == python_exe.resolve()
+    assert captured["request"]["action"] == "synthesize"
     assert Path(captured["request"]["checkpoint"]) == checkpoint.resolve()
     assert Path(captured["request"]["wrapperDir"]) == wrapper_dir.resolve()
     assert Path(captured["request"]["codecRepo"]) == codec_dir.resolve()
@@ -288,7 +295,8 @@ def test_irodori_direct_runtime_reports_missing_repo_local_install(tmp_path) -> 
     availability = runtime.get_static_model_availability("irodori_v3", model)
 
     assert availability.available is False
-    assert "local-tts.bat -ForceSetup" in str(availability.reason)
+    assert "Tokenizer" in str(availability.reason)
+    assert "runtime/models/irodori/tokenizers/llm-jp-3-150m" in str(availability.reason)
 
 
 def test_irodori_helper_falls_back_to_cpu_and_fp32_without_cuda(monkeypatch) -> None:
@@ -320,3 +328,9 @@ def test_irodori_helper_imports_dataclass_fields_used_by_config_patch() -> None:
     assert "torch.cuda.is_available()" in source
     assert "_resolve_runtime_precision" in source
     assert 'return "fp32"' in source
+    assert "hf_hub_download" not in source
+    assert "local_files_only=True" in source
+    assert "_install_external_network_guard" in source
+    assert '"HF_HUB_OFFLINE"' in source
+    assert 'action == "preload"' in source
+    assert 'action == "synthesize"' in source

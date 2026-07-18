@@ -25,7 +25,7 @@
 
 ## Irodoriモデル
 
-Irodoriは`local-tts.bat`の標準セットアップでリポジトリ内の`runtime/`へ導入し、`irodori_voicedesign_direct` runtimeから直接実行します。v2・v3・v3 VoiceDesignはいずれも参照音声なしで生成でき、参照音声を指定した場合だけ話者条件として使います。v2は`seed`、v3は`seed`と`speedScale`、v3 VoiceDesignはさらにcaption（画面上の「話し方メモ」）と`styleStrength`へ対応します。v2にはduration predictorがないため、このリポジトリでは話速設定を表示・送信しません。
+Irodoriは`local-tts.bat`の標準セットアップでリポジトリ内の`runtime/`へ導入し、`irodori_voicedesign_direct` runtimeから直接実行します。通常起動は既定モデルをローカルcheckpoint・codec・Tokenizerから事前ロードし、生成要求では同じ常駐ワーカーへ本文と生成条件だけを送ります。v2・v3・v3 VoiceDesignはいずれも参照音声なしで生成でき、参照音声を指定した場合だけ話者条件として使います。v2は`seed`、v3は`seed`と`speedScale`、v3 VoiceDesignはさらにcaption（画面上の「話し方メモ」）と`styleStrength`へ対応します。v2にはduration predictorがないため、このリポジトリでは話速設定を表示・送信しません。
 
 ```json
 {
@@ -44,7 +44,10 @@ Irodoriは`local-tts.bat`の標準セットアップでリポジトリ内の`run
     "irodori_voicedesign_direct": {
       "pythonExecutable": "./runtime/venv-irodori/Scripts/python.exe",
       "wrapperDir": "./runtime/vendor/Irodori-TTS-upstream",
-      "codecRepo": "./runtime/models/irodori/Semantic-DACVAE-Japanese-32dim/weights.pth"
+      "startupTimeoutSec": 1800,
+      "codecRepo": "./runtime/models/irodori/Semantic-DACVAE-Japanese-32dim/weights.pth",
+      "textProcessorRepo": "llm-jp/llm-jp-3-150m",
+      "textProcessorDir": "./runtime/models/irodori/tokenizers/llm-jp-3-150m"
     }
   }
 }

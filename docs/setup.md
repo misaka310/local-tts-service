@@ -4,7 +4,8 @@
 
 - Windows 10 / 11（64bit）
 - NVIDIA GPU推奨
-- モデル取得用の空き容量とインターネット接続
+- モデルと実行環境を保存できる空き容量
+- 自動取得を使う場合だけインターネット接続
 
 Python 3.11、Node.js、Gitはアプリ内の `runtime/tools/` へ自動導入されるため、通常はWindowsへ別途インストールする必要はありません。
 
@@ -28,19 +29,35 @@ local-tts.bat
 - 固定版MinGitを公式配布元から取得し、SHA-256検証後に保存
 - frontend依存を導入
 - Qwen3-TTS Voice Clone 1.7Bモデルを取得
-- Irodori v2 / v3 / v3 VoiceDesignをリポジトリ内へ導入
+- Irodori v2 / v3 / v3 VoiceDesign、codec、Tokenizerをリポジトリ内へ導入
 - FFmpegを導入
 - yt-dlpとfaster-whisperを確認
 - BGM・伴奏除去用のDemucs環境を導入
 - サービスを起動してブラウザを開く
 
-動画URLから参照音声を作るためのツールも初回セットアップに含まれます。文字起こしモデルやBGM・伴奏除去モデルは、機能を初めて使った時に追加ダウンロードされる場合があります。
+動画URLから参照音声を作るためのツールもセットアップに含まれます。文字起こしモデルやBGM・伴奏除去モデルは、機能を初めて使った時に追加ダウンロードされる場合があります。
+
+## Irodori v3の完全オフライン配置
+
+別PCなどで取得済みの実行環境とモデルを配置すれば、通常起動と生成はネットワークなしで動作します。Irodori v3には次が必要です。
+
+```text
+runtime/venv-irodori/Scripts/python.exe
+runtime/vendor/Irodori-TTS-upstream/
+runtime/models/irodori/Irodori-TTS-500M-v3/model.safetensors
+runtime/models/irodori/Semantic-DACVAE-Japanese-32dim/weights.pth
+runtime/models/irodori/tokenizers/llm-jp-3-150m/tokenizer.json
+runtime/models/irodori/tokenizers/llm-jp-3-150m/tokenizer_config.json
+runtime/models/irodori/tokenizers/llm-jp-3-150m/special_tokens_map.json
+```
+
+起動時にcheckpoint、codec、Tokenizer、専用Python、Irodoriコードを検査し、既定のIrodori v3を事前ロードします。不足時は「○○がありません」と配置先を表示し、生成ボタンでは取得や初期化を行いません。通常起動と生成はHugging Faceのログイン状態や認証トークンに依存しません。
 
 ## 2回目以降
 
 同じ `local-tts.bat` をダブルクリックします。
 
-通常起動ではモデルの追加ダウンロードや全WSLモデルの外部確認を行いません。バックエンド、軽量なモデル状態、フロントエンドを確認してブラウザを開きます。
+通常起動ではモデルやTokenizerをダウンロードせず、全WSLモデルの外部確認も行いません。バックエンド起動中に既定のIrodori v3をローカルから事前ロードし、準備完了後にブラウザを開きます。
 
 ## 修復セットアップ
 

@@ -4,13 +4,15 @@
 
 `irodori_v2`、`irodori_v3`、`irodori_v3_voicedesign`を、ComfyUIを介さずリポジトリ内の専用Python環境から直接実行します。
 
-- 標準の`local-tts.bat`が初回セットアップ時に`runtime/venv-irodori`、固定revisionの公式コード、各checkpoint、codecを`runtime/`内へ導入します
+- 標準の`local-tts.bat`がセットアップ時に`runtime/venv-irodori`、固定revisionの公式コード、各checkpoint、codec、Tokenizerを`runtime/`内へ導入します
+- 通常起動時に既定のIrodoriモデルを完全ローカルから事前ロードし、生成時は常駐ワーカーで推論だけを行います
+- worker内はTransformers/Hugging Faceのオフラインモードと外部ソケット遮断を有効にし、外部通信が検出された要求は失敗として扱います
 - `irodori_v2`は参照音声なしで使用できます
 - `irodori_v3`は参照音声なしでも使用でき、`voiceId`を指定した場合だけその音声を追加条件として使います
 - 通常版v2/v3は`seed`と`speedScale`に対応します
 - VoiceDesignはさらにcaptionと`styleStrength`に対応します
 
-`voiceId`が指定された場合はserver側で解決し、runtimeへ`reference_audio_path`を渡します。未指定でも`requiresReferenceAudio=false`のIrodoriモデルは生成できます。モデルごとのcheckpointは`models.<id>.checkpoint`で指定し、`/v1/models`は専用Python、公式コード、checkpoint、codec、必要importを確認します。不足時は`local-tts.bat -ForceSetup`の実行案内を`unavailableReason`へ返します。
+`voiceId`が指定された場合はserver側で解決し、runtimeへ`reference_audio_path`を渡します。未指定でも`requiresReferenceAudio=false`のIrodoriモデルは生成できます。モデルごとのcheckpointは`models.<id>.checkpoint`で指定し、起動時に専用Python、公式コード、checkpoint、codec、Tokenizerを検査します。不足時は欠けている項目と`runtime/models/...`の配置先を`unavailableReason`へ返します。通常起動・生成中にモデルやTokenizerを取得せず、Hugging Faceのログイン状態や認証トークンも参照しません。
 
 ## `comfyui`
 

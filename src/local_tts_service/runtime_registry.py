@@ -125,6 +125,7 @@ def build_runtime_registry(config: Any) -> dict[str, Any]:
             ),
             checkpoint=str(voicedesign_cfg.get("checkpoint", "")),
             timeout_sec=int(voicedesign_cfg.get("timeoutSec", 1800)),
+            startup_timeout_sec=int(voicedesign_cfg.get("startupTimeoutSec", 1800)),
             model_device=str(voicedesign_cfg.get("modelDevice", "auto")),
             model_precision=str(voicedesign_cfg.get("modelPrecision", "auto")),
             codec_device=str(
@@ -132,7 +133,19 @@ def build_runtime_registry(config: Any) -> dict[str, Any]:
             ),
             codec_precision=str(voicedesign_cfg.get("codecPrecision", "fp32")),
             codec_repo=str(
-                voicedesign_cfg.get("codecRepo", "Aratako/Semantic-DACVAE-Japanese-32dim")
+                voicedesign_cfg.get(
+                    "codecRepo",
+                    "./runtime/models/irodori/Semantic-DACVAE-Japanese-32dim",
+                )
+            ),
+            text_processor_repo=str(
+                voicedesign_cfg.get("textProcessorRepo", "llm-jp/llm-jp-3-150m")
+            ),
+            text_processor_dir=str(
+                voicedesign_cfg.get(
+                    "textProcessorDir",
+                    "./runtime/models/irodori/tokenizers/llm-jp-3-150m",
+                )
             ),
         )
 

@@ -132,11 +132,14 @@
       "wrapperDir": "./runtime/vendor/Irodori-TTS-upstream",
       "checkpoint": "",
       "timeoutSec": 1800,
+      "startupTimeoutSec": 1800,
       "modelDevice": "auto",
       "modelPrecision": "auto",
       "codecDevice": "auto",
       "codecPrecision": "fp32",
-      "codecRepo": "./runtime/models/irodori/Semantic-DACVAE-Japanese-32dim/weights.pth"
+      "codecRepo": "./runtime/models/irodori/Semantic-DACVAE-Japanese-32dim/weights.pth",
+      "textProcessorRepo": "llm-jp/llm-jp-3-150m",
+      "textProcessorDir": "./runtime/models/irodori/tokenizers/llm-jp-3-150m"
     },
     "qwen3_tts": {
       "device": "auto",

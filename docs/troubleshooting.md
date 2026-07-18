@@ -43,8 +43,12 @@ CPU音声生成は推論処理なので長時間かかる場合があります�
 
 - `runtime/venv-irodori/Scripts/python.exe`があるか
 - checkpointとcodecが`runtime/models/irodori/`にあるか
+- `runtime/models/irodori/tokenizers/llm-jp-3-150m/`に`tokenizer.json`と`tokenizer_config.json`があるか
+- 起動時の「○○がありません」に表示された配置先を確認
 - `GET /health/deep`の`modelChecks.irodori_v3`を確認
-- `runtime/logs/local-tts-service.err.log`のIrodori helperエラーを確認
+- `runtime/logs/local-tts-service.err.log`のIrodori workerエラーを確認
+
+生成ボタンを押した時に401やHugging Faceへの接続が出るのは正常ではありません。通常起動・生成は完全ローカルで動作し、認証トークンを必要としません。
 
 ## chunk 結合がおかしい
 

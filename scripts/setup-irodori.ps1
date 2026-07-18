@@ -29,10 +29,15 @@ $BootstrapPython = if ($PythonCommand) {
 }
 
 $Models = @(
-  @{ RepoId = 'Aratako/Irodori-TTS-500M-v2'; Directory = 'Irodori-TTS-500M-v2' },
-  @{ RepoId = 'Aratako/Irodori-TTS-500M-v3'; Directory = 'Irodori-TTS-500M-v3' },
-  @{ RepoId = 'Aratako/Irodori-TTS-600M-v3-VoiceDesign'; Directory = 'Irodori-TTS-600M-v3-VoiceDesign' },
-  @{ RepoId = 'Aratako/Semantic-DACVAE-Japanese-32dim'; Directory = 'Semantic-DACVAE-Japanese-32dim' }
+  @{ RepoId = 'Aratako/Irodori-TTS-500M-v2'; Directory = 'Irodori-TTS-500M-v2'; AllowPatterns = @() },
+  @{ RepoId = 'Aratako/Irodori-TTS-500M-v3'; Directory = 'Irodori-TTS-500M-v3'; AllowPatterns = @() },
+  @{ RepoId = 'Aratako/Irodori-TTS-600M-v3-VoiceDesign'; Directory = 'Irodori-TTS-600M-v3-VoiceDesign'; AllowPatterns = @() },
+  @{ RepoId = 'Aratako/Semantic-DACVAE-Japanese-32dim'; Directory = 'Semantic-DACVAE-Japanese-32dim'; AllowPatterns = @() },
+  @{
+    RepoId = 'llm-jp/llm-jp-3-150m'
+    Directory = 'tokenizers\llm-jp-3-150m'
+    AllowPatterns = @('tokenizer*', 'special_tokens_map.json', 'added_tokens.json', 'vocab.json', 'merges.txt', '*.model')
+  }
 )
 
 function Write-Step([string]$Message) {
@@ -201,7 +206,11 @@ if (-not $SkipModelDownload) {
   foreach ($model in $Models) {
     $target = Join-Path $ModelRoot $model.Directory
     Write-Step "download $($model.RepoId) into runtime/models/irodori"
-    Invoke-Native -FilePath $VenvPython -Arguments @($DownloadScript, '--repo-id', $model.RepoId, '--local-dir', $target, '--cache-dir', (Join-Path $RuntimeRoot 'hf-cache')) -Label "download $($model.RepoId)"
+    $downloadArguments = @($DownloadScript, '--repo-id', $model.RepoId, '--local-dir', $target, '--cache-dir', (Join-Path $RuntimeRoot 'hf-cache'))
+    foreach ($pattern in $model.AllowPatterns) {
+      $downloadArguments += @('--allow-pattern', $pattern)
+    }
+    Invoke-Native -FilePath $VenvPython -Arguments $downloadArguments -Label "download $($model.RepoId)"
   }
 } else {
   Write-Step 'skip Irodori model downloads'
@@ -220,6 +229,12 @@ if (-not $DryRun) {
   $codecWeights = Join-Path (Join-Path $ModelRoot 'Semantic-DACVAE-Japanese-32dim') 'weights.pth'
   if (-not (Test-Path -LiteralPath $codecWeights -PathType Leaf)) {
     throw "Irodori codec files not found: $codecWeights"
+  }
+  $textProcessorRoot = Join-Path $ModelRoot 'tokenizers\llm-jp-3-150m'
+  $textProcessorConfig = Join-Path $textProcessorRoot 'tokenizer_config.json'
+  $textProcessorData = Join-Path $textProcessorRoot 'tokenizer.json'
+  if (-not (Test-Path -LiteralPath $textProcessorConfig -PathType Leaf) -or -not (Test-Path -LiteralPath $textProcessorData -PathType Leaf)) {
+    throw "Irodori Tokenizer files not found: $textProcessorRoot"
   }
 }
 
