@@ -16,6 +16,7 @@
 
 ```powershell
 python -m pytest --rootdir=. -c config/pytest.ini tests
+python .\scripts\verify-irodori-offline.py
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-setup-local-tts.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-managed-processes.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-managed-job.ps1

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
@@ -12,6 +11,7 @@ def main() -> int:
     parser.add_argument("--local-dir", required=True)
     parser.add_argument("--cache-dir", default="")
     parser.add_argument("--revision", default="")
+    parser.add_argument("--allow-pattern", action="append", default=[])
     args = parser.parse_args()
 
     try:
@@ -28,6 +28,7 @@ def main() -> int:
         "local_dir": str(local_dir),
         "local_dir_use_symlinks": False,
         "resume_download": True,
+        "token": False,
     }
     if args.cache_dir:
         cache_dir = Path(args.cache_dir).resolve()
@@ -35,9 +36,8 @@ def main() -> int:
         kwargs["cache_dir"] = str(cache_dir)
     if args.revision:
         kwargs["revision"] = args.revision
-    if os.environ.get("HF_TOKEN"):
-        kwargs["token"] = os.environ["HF_TOKEN"]
-
+    if args.allow_pattern:
+        kwargs["allow_patterns"] = list(args.allow_pattern)
     print(f"[INFO] downloading {args.repo_id} -> {local_dir}")
     snapshot_download(**kwargs)
     print(f"[DONE] downloaded {args.repo_id}")

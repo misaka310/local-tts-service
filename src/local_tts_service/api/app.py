@@ -16,9 +16,19 @@ def create_app(root_dir: Path | None = None) -> FastAPI:
     app=FastAPI(title="local-tts-service", version="0.2.0")
     app.add_middleware(CORSMiddleware, allow_origins=config.cors_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","OPTIONS"], allow_headers=["*"])
     service=LocalTTSService(config, runtimes); catalog=ModelCatalogService(config, runtimes)
+    default_cfg = config.models.get(config.default_model)
+    default_runtime = runtimes.get(default_cfg.runtime) if default_cfg is not None else None
+    prepare_default = getattr(default_runtime, "prepare_model", None)
+    if callable(prepare_default):
+        prepare_default(config.default_model)
     synthesis=SynthesisService(config, runtimes, service.pick_model, service.resolve_reference_voice, catalog.availability)
     app.state.service=service; app.state.model_catalog=catalog; app.state.synthesis_service=synthesis
     app.state.health_service=HealthService(config, runtimes, catalog.availability, service.list_reference_voices)
+    def close_runtimes() -> None:
+        for runtime in runtimes.values():
+            close = getattr(runtime, "close", None)
+            if callable(close): close()
+    app.router.add_event_handler("shutdown", close_runtimes)
     def error(status: int, exc: Exception) -> JSONResponse:
         message=str(exc); return JSONResponse(status_code=status, content={"ok":False,"error":message,"errorMessage":message})
     @app.exception_handler(RequestValidationError)
