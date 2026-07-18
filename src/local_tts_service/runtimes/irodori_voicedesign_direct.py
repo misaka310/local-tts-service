@@ -244,9 +244,52 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
             if line:
                 self._stderr_lines.append(line)
 
-    def _start_worker(self) -> None:
-        if self._worker is not None and self._worker.poll() is None:
+    def _worker_is_alive(self) -> bool:
+        return self._worker is not None and self._worker.poll() is None
+
+    def _drain_worker_events(self) -> None:
+        while True:
+            try:
+                self._worker_events.get_nowait()
+            except queue.Empty:
+                return
+
+    def _stop_worker_process(self, worker: subprocess.Popen[str]) -> None:
+        if worker.poll() is not None:
             return
+        worker.terminate()
+        try:
+            worker.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            worker.kill()
+            worker.wait(timeout=5)
+
+    def _mark_worker_failed(
+        self,
+        reason: str,
+        *,
+        worker: subprocess.Popen[str] | None = None,
+        terminate: bool = False,
+    ) -> None:
+        affected_worker = worker or self._worker
+        if worker is not None and self._worker is not worker:
+            return
+        prepared_models = tuple(self._prepared_models)
+        self._worker = None
+        self._prepared_models.clear()
+        message = f"Irodori runtimeが停止しました: {reason}. サービスを再起動してください"
+        for model_name in prepared_models:
+            self._startup_errors[model_name] = message
+        if terminate and affected_worker is not None:
+            self._stop_worker_process(affected_worker)
+        self._drain_worker_events()
+
+    def _start_worker(self) -> None:
+        if self._worker_is_alive():
+            return
+        if self._worker is not None:
+            self._mark_worker_failed("worker process exited", worker=self._worker)
+        self._stderr_lines.clear()
         helper_script = (self.root_dir / "scripts" / "run_irodori_voicedesign.py").resolve()
         creationflags = 0
         if os.name == "nt" and hasattr(subprocess, "CREATE_NO_WINDOW"):
@@ -294,17 +337,24 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
                 worker.stdin.write(json.dumps(payload, ensure_ascii=False) + "\n")
                 worker.stdin.flush()
             except (BrokenPipeError, OSError) as exc:
+                self._mark_worker_failed(str(exc), worker=worker, terminate=True)
                 raise ProviderError(f"Irodori runtimeへ要求を送信できません: {exc}") from exc
             deadline = time.monotonic() + max(1, int(timeout_sec))
             while True:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
+                    self._mark_worker_failed(
+                        f"request timed out after {timeout_sec}s",
+                        worker=worker,
+                        terminate=True,
+                    )
                     raise ProviderError(f"Irodori runtime timed out after {timeout_sec}s")
                 try:
                     event = self._worker_events.get(timeout=min(remaining, 1.0))
                 except queue.Empty:
                     if worker.poll() is not None:
                         detail = "\n".join(self._stderr_lines) or f"exit code {worker.returncode}"
+                        self._mark_worker_failed(detail, worker=worker)
                         raise ProviderError(f"Irodori runtimeが終了しました: {detail}")
                     continue
                 if str(event.get("protocolRequestId") or "") != request_id:
@@ -336,8 +386,10 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         if not static.available:
             self._startup_errors[model_name] = static.reason or "Irodoriの必要ファイルが不足しています"
             return static
-        if model_name in self._prepared_models:
+        if model_name in self._prepared_models and self._worker_is_alive():
             return IrodoriDirectAvailability(True, None)
+        if model_name in self._prepared_models:
+            self._mark_worker_failed("worker process exited", worker=self._worker)
         payload = {"action": "preload", **self._runtime_payload(model_name, model_cfg)}
         try:
             result = self._request_worker(payload, self.startup_timeout_sec)
@@ -368,10 +420,14 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         if request.reference_audio_path is not None and not request.reference_audio_path.is_file():
             raise ProviderError(f"referenceAudioPath not found: {request.reference_audio_path}")
 
-        if request.model_name not in self._prepared_models:
-            prepared = self.prepare_model(request.model_name)
-            if not prepared.available:
-                raise ProviderError(prepared.reason or "Irodori runtime is not ready")
+        if request.model_name not in self._prepared_models or not self._worker_is_alive():
+            if request.model_name in self._prepared_models:
+                self._mark_worker_failed("worker process exited", worker=self._worker)
+            reason = self._startup_errors.get(request.model_name)
+            raise ProviderError(
+                reason
+                or "Irodori runtimeの準備が完了していません。サービスを再起動してください"
+            )
 
         out_file = self.output_dir / f"{request.output_basename}.wav"
         out_file.parent.mkdir(parents=True, exist_ok=True)
@@ -431,9 +487,4 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
                 worker.stdin.flush()
                 worker.wait(timeout=10)
         except (OSError, subprocess.TimeoutExpired):
-            if worker.poll() is None:
-                worker.terminate()
-                try:
-                    worker.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    worker.kill()
+            self._stop_worker_process(worker)

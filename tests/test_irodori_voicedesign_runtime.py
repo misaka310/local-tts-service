@@ -13,6 +13,18 @@ from local_tts_service.runtimes.base import SynthesizeRequest
 from local_tts_service.runtimes.irodori_voicedesign_direct import IrodoriVoiceDesignDirectRuntime
 
 
+class _LiveWorker:
+    def poll(self) -> None:
+        return None
+
+
+class _DeadWorker:
+    returncode = 1
+
+    def poll(self) -> int:
+        return self.returncode
+
+
 def _build_runtime(tmp_path: Path) -> IrodoriVoiceDesignDirectRuntime:
     python_exe = tmp_path / "python.exe"
     python_exe.write_bytes(b"")
@@ -57,6 +69,7 @@ def _build_runtime(tmp_path: Path) -> IrodoriVoiceDesignDirectRuntime:
         codec_device="cpu",
         codec_precision="fp32",
     )
+    runtime._worker = _LiveWorker()  # type: ignore[assignment]
     runtime._prepared_models.add("irodori_v3_voicedesign")
     return runtime
 
@@ -237,6 +250,7 @@ def test_irodori_direct_runtime_uses_model_specific_repo_local_checkpoint(tmp_pa
         codec_device="cpu",
         codec_precision="fp32",
     )
+    runtime._worker = _LiveWorker()  # type: ignore[assignment]
     runtime._prepared_models.add("irodori_v3")
     reference_audio = tmp_path / "ref.wav"
     reference_audio.write_bytes(b"RIFF\x24\x00\x00\x00WAVEfmt ")
@@ -274,6 +288,32 @@ def test_irodori_direct_runtime_uses_model_specific_repo_local_checkpoint(tmp_pa
     assert Path(captured["request"]["codecRepo"]) == codec_dir.resolve()
     assert captured["request"]["durationScale"] == pytest.approx(1 / 0.9)
     assert result.audio_path == output_wav.resolve()
+
+
+def test_generation_does_not_reload_after_worker_exit(tmp_path, monkeypatch) -> None:
+    runtime = _build_runtime(tmp_path)
+    runtime._worker = _DeadWorker()  # type: ignore[assignment]
+    requests: list[dict[str, object]] = []
+
+    def fake_request(payload, timeout_sec):  # noqa: ANN001
+        del timeout_sec
+        requests.append(dict(payload))
+        return {"ok": True, "externalNetworkAttempts": 0}
+
+    monkeypatch.setattr(runtime, "_request_worker", fake_request)
+
+    with pytest.raises(ProviderError, match="サービスを再起動"):
+        runtime.synthesize(
+            SynthesizeRequest(
+                text="worker停止後の生成です。",
+                request_id="dead-worker",
+                model_name="irodori_v3_voicedesign",
+                output_basename="dead-worker",
+            )
+        )
+
+    assert requests == []
+    assert "irodori_v3_voicedesign" not in runtime._prepared_models
 
 
 def test_irodori_direct_runtime_reports_missing_repo_local_install(tmp_path) -> None:

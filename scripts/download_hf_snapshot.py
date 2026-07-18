@@ -28,6 +28,7 @@ def main() -> int:
         "local_dir": str(local_dir),
         "local_dir_use_symlinks": False,
         "resume_download": True,
+        "token": False,
     }
     if args.cache_dir:
         cache_dir = Path(args.cache_dir).resolve()
