@@ -1,5 +1,7 @@
 # local-tts-service
 
+[![CI](https://github.com/misaka310/local-tts-service/actions/workflows/ci.yml/badge.svg)](https://github.com/misaka310/local-tts-service/actions/workflows/ci.yml)
+
 Windows PC上で複数の音声合成モデルをまとめて使うためのローカルアプリです。文章の読み上げ、モデルの聞き比べ、参照音声を使った生成、RVCによる声質変換をブラウザから操作できます。
 
 https://github.com/user-attachments/assets/29ad093a-7950-4a17-ba09-8899dabb4828
@@ -84,6 +86,17 @@ local-tts.bat -Check
 - [トラブルシューティング](./docs/troubleshooting.md)
 - [セットアップガイド](./docs/setup.md)
 - [利用ガイド](./docs/user-guide.md)
+
+## 開発と品質確認
+
+```powershell
+python -m pytest --rootdir=. -c config/pytest.ini tests
+cd frontend
+npm run check
+npm test
+```
+
+CIではバックエンド、セットアップdry-run、管理プロセス、公開履歴監査、フロントエンド、ブラウザE2Eを実行します。FastAPI app factoryは依存を差し替えた単体テストを持ち、Ruffのimport・modernization・bugbear規則と70%のfocused coverageを要求します。
 
 ## 開発者向け資料
 
