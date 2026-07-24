@@ -9,6 +9,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'managed-processes.ps1')
+. (Join-Path $PSScriptRoot 'no-window-process.ps1')
 
 function Read-JsonFile {
     param([string]$Path)
@@ -110,9 +111,11 @@ $env:PYTHONUTF8 = '1'
 $checkScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("local-tts-env-check-" + [guid]::NewGuid().ToString('N') + '.py')
 $checkOutPath = [System.IO.Path]::GetTempFileName()
 $checkErrPath = [System.IO.Path]::GetTempFileName()
+$checkProcess = $null
 try {
     [System.IO.File]::WriteAllText($checkScriptPath, $envCheckScript, [System.Text.UTF8Encoding]::new($false))
-    $checkProcess = Start-Process -FilePath $python -ArgumentList @($checkScriptPath) -WorkingDirectory $repoRoot -RedirectStandardOutput $checkOutPath -RedirectStandardError $checkErrPath -WindowStyle Hidden -Wait -PassThru
+    $checkProcess = Start-LocalTtsNoWindowProcess -FilePath $python -ArgumentList @($checkScriptPath) -WorkingDirectory $repoRoot -StandardOutputPath $checkOutPath -StandardErrorPath $checkErrPath -RepoRoot $repoRoot
+    $checkProcess.WaitForExit()
     $checkOutput = @(
         if (Test-Path -LiteralPath $checkOutPath) { Get-Content -LiteralPath $checkOutPath -Raw -Encoding UTF8 }
         if (Test-Path -LiteralPath $checkErrPath) { Get-Content -LiteralPath $checkErrPath -Raw -Encoding UTF8 }
@@ -124,6 +127,7 @@ try {
     }
 }
 finally {
+    if ($null -ne $checkProcess) { $checkProcess.Dispose() }
     Remove-Item -LiteralPath $checkScriptPath, $checkOutPath, $checkErrPath -Force -ErrorAction SilentlyContinue
 }
 
@@ -137,7 +141,6 @@ if ($WaitForHealth) {
 }
 
 if ($Background) {
-    $windowStyle = if ($VisibleWindow) { "Normal" } else { "Hidden" }
     $previousPythonPath = $env:PYTHONPATH
     $previousConfigPath = $env:LOCAL_TTS_CONFIG_PATH
     $previousManagedRepo = $env:LOCAL_TTS_MANAGED_REPO
@@ -147,7 +150,12 @@ if ($Background) {
         $env:LOCAL_TTS_CONFIG_PATH = $resolvedConfig
         $env:LOCAL_TTS_MANAGED_REPO = [string]$repoRoot
         $env:LOCAL_TTS_MANAGED_SERVICE = 'local-tts-service'
-        $proc = Start-Process -FilePath $python -ArgumentList @('-m', 'local_tts_service.server') -WorkingDirectory $repoRoot -RedirectStandardOutput $outLog -RedirectStandardError $errLog -WindowStyle $windowStyle -PassThru
+        if ($VisibleWindow) {
+            $proc = Start-Process -FilePath $python -ArgumentList @('-m', 'local_tts_service.server') -WorkingDirectory $repoRoot -RedirectStandardOutput $outLog -RedirectStandardError $errLog -WindowStyle Normal -PassThru
+        }
+        else {
+            $proc = Start-LocalTtsNoWindowProcess -FilePath $python -ArgumentList @('-m', 'local_tts_service.server') -WorkingDirectory $repoRoot -StandardOutputPath $outLog -StandardErrorPath $errLog -RepoRoot $repoRoot
+        }
     }
     finally {
         $env:PYTHONPATH = $previousPythonPath

@@ -7,6 +7,7 @@
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'managed-processes.ps1')
+. (Join-Path $PSScriptRoot 'no-window-process.ps1')
 . (Join-Path $PSScriptRoot 'node-runtime.ps1')
 
 function Read-JsonFile {
@@ -187,7 +188,7 @@ if ($rvcModelPath -and $rvcIndexPath) {
 
 $repoMarker = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$repoRoot))
 $processArgs = @('server.js', '--local-tts-managed-service', 'frontend', '--local-tts-managed-repo-b64', $repoMarker)
-$proc = Start-Process -FilePath $nodeSource -ArgumentList $processArgs -WorkingDirectory $frontendDir -RedirectStandardOutput $outLog -RedirectStandardError $errLog -WindowStyle Hidden -PassThru
+$proc = Start-LocalTtsNoWindowProcess -FilePath $nodeSource -ArgumentList $processArgs -WorkingDirectory $frontendDir -StandardOutputPath $outLog -StandardErrorPath $errLog -RepoRoot $repoRoot
 
 $null = Register-ManagedProcess -RepoRoot $repoRoot -Service 'frontend' -Process $proc -ExpectedCommandFragments @('server.js', '--local-tts-managed-service', 'frontend', '--local-tts-managed-repo-b64', $repoMarker) -HealthUrl "$frontUrl/api/health" -Port $frontPort
 

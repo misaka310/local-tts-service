@@ -18,6 +18,9 @@ $gitRuntimeScript = Join-Path $RepoRoot 'scripts/git-runtime.ps1'
 $gitRuntimeTest = Join-Path $RepoRoot 'scripts/test-git-runtime.ps1'
 $managedProcessScript = Join-Path $RepoRoot 'scripts/managed-processes.ps1'
 $managedJobScript = Join-Path $RepoRoot 'scripts/managed-job.ps1'
+$noWindowProcessScript = Join-Path $RepoRoot 'scripts/no-window-process.ps1'
+$noWindowLauncherSource = Join-Path $RepoRoot 'src/LocalTtsNoWindowLauncher.cs'
+$noWindowProcessTest = Join-Path $RepoRoot 'scripts/test-no-window-process.ps1'
 $stackHostScript = Join-Path $RepoRoot 'scripts/run-local-tts-stack.ps1'
 $stopManagedScript = Join-Path $RepoRoot 'scripts/stop-managed-processes.ps1'
 $startStackScript = Join-Path $RepoRoot 'scripts/start-local-tts-stack.ps1'
@@ -63,6 +66,9 @@ foreach ($path in @(
   $gitRuntimeTest,
   $managedProcessScript,
   $managedJobScript,
+  $noWindowProcessScript,
+  $noWindowLauncherSource,
+  $noWindowProcessTest,
   $stackHostScript,
   $stopManagedScript,
   $startStackScript,
@@ -109,6 +115,8 @@ $nodeRuntimeText = Get-Content -LiteralPath $nodeRuntimeScript -Raw -Encoding UT
 $gitRuntimeText = Get-Content -LiteralPath $gitRuntimeScript -Raw -Encoding UTF8
 $managedProcessText = Get-Content -LiteralPath $managedProcessScript -Raw -Encoding UTF8
 $managedJobText = Get-Content -LiteralPath $managedJobScript -Raw -Encoding UTF8
+$noWindowProcessText = Get-Content -LiteralPath $noWindowProcessScript -Raw -Encoding UTF8
+$noWindowLauncherText = Get-Content -LiteralPath $noWindowLauncherSource -Raw -Encoding UTF8
 $stackHostText = Get-Content -LiteralPath $stackHostScript -Raw -Encoding UTF8
 $agentsText = Get-Content -LiteralPath $agentsPath -Raw -Encoding UTF8
 $readmeText = Get-Content -LiteralPath $readmePath -Raw -Encoding UTF8
@@ -258,8 +266,19 @@ Assert-True ($stackText -match 'stop-managed-processes\.ps1') 'startup must stop
 Assert-True ($stackText -notmatch 'kill-tts-stack-ports\.ps1') 'startup must not kill arbitrary port owners'
 Assert-True ($stackText -match '/v1/models\?probe=false') 'normal startup must use lightweight model checks'
 Assert-True ($localText -match 'Register-ManagedProcess') 'backend startup must register its process'
+Assert-True ($localText -match 'no-window-process\.ps1') 'backend startup must load the no-window process helper'
+Assert-True ($localText -match 'Start-LocalTtsNoWindowProcess') 'backend startup must use the no-window launcher for unattended Python processes'
+Assert-True ($localText -notmatch 'Start-Process -FilePath \$python .*WindowStyle Hidden') 'backend startup must not rely on WindowStyle Hidden for Python processes'
 Assert-True ($frontendText -match 'Register-ManagedProcess') 'frontend startup must register its process'
+Assert-True ($frontendText -match 'no-window-process\.ps1') 'frontend startup must load the no-window process helper'
+Assert-True ($frontendText -match 'Start-LocalTtsNoWindowProcess') 'frontend startup must use the no-window launcher for Node.js'
 Assert-True ($frontendText -match 'node-runtime\.ps1') 'frontend startup must use the shared Node.js resolver'
+Assert-True ($noWindowProcessText -match 'CreateNoWindow\s*=\s*\$true') 'PowerShell helper must create the launcher without a console'
+Assert-True ($noWindowProcessText -match 'UseShellExecute\s*=\s*\$false') 'PowerShell helper must disable shell execution'
+Assert-True ($noWindowLauncherText -match 'CreateNoWindow\s*=\s*true') 'native launcher must create the child without a console'
+Assert-True ($noWindowLauncherText -match 'UseShellExecute\s*=\s*false') 'native launcher must disable shell execution'
+Assert-True ($noWindowLauncherText -match 'RedirectStandardOutput\s*=\s*true') 'native launcher must preserve stdout diagnostics'
+Assert-True ($noWindowLauncherText -match 'RedirectStandardError\s*=\s*true') 'native launcher must preserve stderr diagnostics'
 Assert-True ($setupIrodoriText -match 'eaf74d6a19138f743acb5b71a445fd25a57db987') 'Irodori setup must pin the verified revision'
 Assert-True ($setupIrodoriText -match 'git-runtime\.ps1') 'Irodori setup must use the shared Git resolver'
 Assert-True ($setupIrodoriText -match 'Install-LocalTtsManagedGitRuntime') 'Irodori setup must repair missing Git automatically'
@@ -297,5 +316,6 @@ Assert-True ($ciText -match 'test-setup-local-tts\.ps1') 'CI must verify setup b
 & $pythonRuntimeTest
 & $nodeRuntimeTest
 & $gitRuntimeTest
+& $noWindowProcessTest
 
 Write-Host '[OK] setup-local-tts tests passed'
