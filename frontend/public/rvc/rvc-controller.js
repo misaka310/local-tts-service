@@ -20,6 +20,7 @@
       "selectVoiceModel",
       "reloadModels",
       "rememberFilePath",
+      "selectFilePath",
       "saveMicDevice",
       "loadMicDevices",
       "previewReference",
@@ -78,6 +79,7 @@
         .forEach((element) => listen(element, "input", actions.updateModel));
 
       listen(elements.externalAudioPath, "change", actions.rememberFilePath);
+      listen(elements.externalAudioPathHistory, "change", () => actions.selectFilePath(elements.externalAudioPathHistory?.value || ""));
       listen(elements.micDevice, "input", actions.saveMicDevice);
       listen(elements.micDevice, "change", () => {
         actions.saveMicDevice();

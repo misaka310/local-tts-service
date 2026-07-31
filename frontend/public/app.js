@@ -160,7 +160,7 @@ const pageControllers = Object.freeze({
       seed: els.rvcSeed,
       seedAutoIncrement: els.rvcSeedAutoIncrement,
       autoPlay: els.rvcAutoPlay,
-      externalAudioPath: els.rvcExternalAudioPath,
+      externalAudioPath: els.rvcExternalAudioPath, externalAudioPathHistory: els.rvcExternalAudioPathHistory,
       demucsModel: els.rvcDemucsModel,
       indexRatePreset: els.rvcIndexRatePreset,
       f0UpKeyPreset: els.rvcF0UpKeyPreset,
@@ -191,7 +191,7 @@ const pageControllers = Object.freeze({
         updateRvcModelInfo();
       },
       reloadModels: () => refreshRvcModelCatalog(),
-      rememberFilePath: () => rememberRvcFilePath(),
+      rememberFilePath: () => rememberRvcFilePath(), selectFilePath: (value) => selectSavedRvcFilePath(value),
       saveMicDevice: () => saveSelectedRvcMicDeviceId(),
       loadMicDevices: () => loadRvcMicDevices(),
       previewReference: () => toggleReferencePreview(els.rvcVoice, els.rvcReferencePreview, els.rvcStatus),

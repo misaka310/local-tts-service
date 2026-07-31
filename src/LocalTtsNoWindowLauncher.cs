@@ -1,12 +1,69 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 
 internal static class LocalTtsNoWindowLauncher
 {
+    private const uint JobObjectLimitKillOnJobClose = 0x00002000;
+    private const int JobObjectExtendedLimitInformationClass = 9;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JobObjectBasicLimitInformation
+    {
+        public long PerProcessUserTimeLimit;
+        public long PerJobUserTimeLimit;
+        public uint LimitFlags;
+        public UIntPtr MinimumWorkingSetSize;
+        public UIntPtr MaximumWorkingSetSize;
+        public uint ActiveProcessLimit;
+        public IntPtr Affinity;
+        public uint PriorityClass;
+        public uint SchedulingClass;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct IoCounters
+    {
+        public ulong ReadOperationCount;
+        public ulong WriteOperationCount;
+        public ulong OtherOperationCount;
+        public ulong ReadTransferCount;
+        public ulong WriteTransferCount;
+        public ulong OtherTransferCount;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JobObjectExtendedLimitInformation
+    {
+        public JobObjectBasicLimitInformation BasicLimitInformation;
+        public IoCounters IoInfo;
+        public UIntPtr ProcessMemoryLimit;
+        public UIntPtr JobMemoryLimit;
+        public UIntPtr PeakProcessMemoryUsed;
+        public UIntPtr PeakJobMemoryUsed;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr CreateJobObject(IntPtr jobAttributes, string name);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetInformationJobObject(
+        IntPtr job,
+        int informationClass,
+        IntPtr information,
+        uint informationLength);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr handle);
+
     private sealed class Options
     {
         public string FilePath = string.Empty;
@@ -106,6 +163,38 @@ internal static class LocalTtsNoWindowLauncher
         return options;
     }
 
+    private static IntPtr CreateKillOnCloseJob()
+    {
+        var job = CreateJobObject(IntPtr.Zero, null);
+        if (job == IntPtr.Zero)
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not create the child-process job object.");
+        }
+
+        var limits = new JobObjectExtendedLimitInformation();
+        limits.BasicLimitInformation.LimitFlags = JobObjectLimitKillOnJobClose;
+        var size = Marshal.SizeOf(typeof(JobObjectExtendedLimitInformation));
+        var buffer = Marshal.AllocHGlobal(size);
+        try
+        {
+            Marshal.StructureToPtr(limits, buffer, false);
+            if (!SetInformationJobObject(job, JobObjectExtendedLimitInformationClass, buffer, (uint)size))
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not configure the child-process job object.");
+            }
+            return job;
+        }
+        catch
+        {
+            CloseHandle(job);
+            throw;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
     private static int RunChild(Options options)
     {
         var startInfo = new ProcessStartInfo
@@ -121,52 +210,67 @@ internal static class LocalTtsNoWindowLauncher
             RedirectStandardError = true
         };
 
-        using (var stdout = CreateWriter(options.StandardOutputPath))
-        using (var stderr = CreateWriter(options.StandardErrorPath))
-        using (var stdoutClosed = new ManualResetEvent(false))
-        using (var stderrClosed = new ManualResetEvent(false))
-        using (var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true })
+        var job = CreateKillOnCloseJob();
+        try
         {
-            var stdoutLock = new object();
-            var stderrLock = new object();
+            using (var stdout = CreateWriter(options.StandardOutputPath))
+            using (var stderr = CreateWriter(options.StandardErrorPath))
+            using (var stdoutClosed = new ManualResetEvent(false))
+            using (var stderrClosed = new ManualResetEvent(false))
+            using (var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true })
+            {
+                var stdoutLock = new object();
+                var stderrLock = new object();
 
-            process.OutputDataReceived += delegate(object sender, DataReceivedEventArgs eventArgs)
-            {
-                if (eventArgs.Data == null)
+                process.OutputDataReceived += delegate(object sender, DataReceivedEventArgs eventArgs)
                 {
-                    stdoutClosed.Set();
-                    return;
-                }
-                lock (stdoutLock)
+                    if (eventArgs.Data == null)
+                    {
+                        stdoutClosed.Set();
+                        return;
+                    }
+                    lock (stdoutLock)
+                    {
+                        stdout.WriteLine(eventArgs.Data);
+                    }
+                };
+                process.ErrorDataReceived += delegate(object sender, DataReceivedEventArgs eventArgs)
                 {
-                    stdout.WriteLine(eventArgs.Data);
-                }
-            };
-            process.ErrorDataReceived += delegate(object sender, DataReceivedEventArgs eventArgs)
-            {
-                if (eventArgs.Data == null)
-                {
-                    stderrClosed.Set();
-                    return;
-                }
-                lock (stderrLock)
-                {
-                    stderr.WriteLine(eventArgs.Data);
-                }
-            };
+                    if (eventArgs.Data == null)
+                    {
+                        stderrClosed.Set();
+                        return;
+                    }
+                    lock (stderrLock)
+                    {
+                        stderr.WriteLine(eventArgs.Data);
+                    }
+                };
 
-            if (!process.Start())
-            {
-                throw new InvalidOperationException("The child process did not start.");
+                if (!process.Start())
+                {
+                    throw new InvalidOperationException("The child process did not start.");
+                }
+                if (!AssignProcessToJobObject(job, process.Handle))
+                {
+                    var error = Marshal.GetLastWin32Error();
+                    try { process.Kill(); }
+                    catch { }
+                    throw new Win32Exception(error, "Could not attach the child process to its kill-on-close job object.");
+                }
+
+                process.StandardInput.Close();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+                process.WaitForExit();
+                stdoutClosed.WaitOne(5000);
+                stderrClosed.WaitOne(5000);
+                return process.ExitCode;
             }
-
-            process.StandardInput.Close();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            process.WaitForExit();
-            stdoutClosed.WaitOne(5000);
-            stderrClosed.WaitOne(5000);
-            return process.ExitCode;
+        }
+        finally
+        {
+            CloseHandle(job);
         }
     }
 

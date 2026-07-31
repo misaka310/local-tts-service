@@ -516,6 +516,11 @@ function saveRvcInputSource(value = selectedRvcInputSource()) {
   } catch {
     // 保存できない環境でも選択自体は使える。
   }
+  if (value === "file") {
+    const latest = rvcFilePathHistory[0]?.path || rvcFilePathHistory[0] || "";
+    if (els.rvcExternalAudioPath && latest) els.rvcExternalAudioPath.value = latest;
+    renderRvcFilePathHistory();
+  }
 }
 
 function selectedRvcInputSource() {
@@ -703,9 +708,15 @@ function setRvcLog(value) {
 
 function renderRvcFilePathHistory() {
   if (!els.rvcExternalAudioPathHistory) return;
-  els.rvcExternalAudioPathHistory.innerHTML = rvcFilePathHistory
-    .map((item) => `<option value="${escapeHtml(item.path || item)}"></option>`)
-    .join("");
+  const paths = rvcFilePathHistory.map((item) => item.path || item).filter(Boolean);
+  const currentPath = String(els.rvcExternalAudioPath?.value || "").trim();
+  const placeholder = paths.length ? "保存済みのパスを選択" : "保存履歴はありません";
+  els.rvcExternalAudioPathHistory.innerHTML = [
+    `<option value="">${placeholder}</option>`,
+    ...paths.map((pathValue) => `<option value="${escapeHtml(pathValue)}">${escapeHtml(pathValue)}</option>`),
+  ].join("");
+  els.rvcExternalAudioPathHistory.disabled = paths.length === 0;
+  els.rvcExternalAudioPathHistory.value = paths.includes(currentPath) ? currentPath : "";
 }
 
 function rememberRvcFilePath(value = els.rvcExternalAudioPath?.value) {
@@ -716,10 +727,18 @@ function rememberRvcFilePath(value = els.rvcExternalAudioPath?.value) {
   renderRvcFilePathHistory();
 }
 
+function selectSavedRvcFilePath(value) {
+  const pathValue = String(value || "").trim();
+  if (!pathValue || !els.rvcExternalAudioPath) return;
+  els.rvcExternalAudioPath.value = pathValue;
+  rememberRvcFilePath(pathValue);
+  updateRvcModelInfo();
+}
+
 function restoreRvcFilePathHistory() {
-  renderRvcFilePathHistory();
   const latest = rvcFilePathHistory[0]?.path || rvcFilePathHistory[0] || "";
   if (els.rvcExternalAudioPath && latest) els.rvcExternalAudioPath.value = latest;
+  renderRvcFilePathHistory();
 }
 
 function setBadge(badge, text, state) {

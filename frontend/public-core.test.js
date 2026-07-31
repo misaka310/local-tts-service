@@ -285,7 +285,7 @@ test("compare and RVC controllers bind delegated and device events through injec
   const deviceEvents = fakeElement();
   const rvcElements = {
     inputSources: [fakeElement()], text: fakeElement(), instruction: fakeElement(), micScript: fakeElement(), model: fakeElement(), voiceModel: fakeElement(), reloadModels: fakeElement(), voice: fakeElement(), language: fakeElement(), seed: fakeElement(),
-    seedAutoIncrement: fakeElement(), autoPlay: fakeElement(), externalAudioPath: fakeElement(), demucsModel: fakeElement(), indexRatePreset: fakeElement(),
+    seedAutoIncrement: fakeElement(), autoPlay: fakeElement(), externalAudioPath: fakeElement(), externalAudioPathHistory: fakeElement(), demucsModel: fakeElement(), indexRatePreset: fakeElement(),
     f0UpKeyPreset: fakeElement(), protectPreset: fakeElement(), micDevice: fakeElement(), referencePreview: fakeElement(), convert: fakeElement(), denoise: fakeElement(),
     micStart: fakeElement(), micStop: fakeElement(), micRerecord: fakeElement(), micUse: fakeElement(), micHistory: fakeElement(), history: fakeElement(), clearHistory: fakeElement(),
   };
@@ -294,7 +294,7 @@ test("compare and RVC controllers bind delegated and device events through injec
     deviceEvents,
     actions: {
       refreshText: () => rvcCalls.push("refreshText"), saveInputSource: () => rvcCalls.push("saveInputSource"), saveSettings: () => rvcCalls.push("saveSettings"),
-      updateModel: () => rvcCalls.push("updateModel"), selectVoiceModel: () => rvcCalls.push("selectVoiceModel"), reloadModels: () => rvcCalls.push("reloadModels"), rememberFilePath: () => rvcCalls.push("rememberFilePath"), saveMicDevice: () => rvcCalls.push("saveMicDevice"),
+      updateModel: () => rvcCalls.push("updateModel"), selectVoiceModel: () => rvcCalls.push("selectVoiceModel"), reloadModels: () => rvcCalls.push("reloadModels"), rememberFilePath: () => rvcCalls.push("rememberFilePath"), selectFilePath: (value) => rvcCalls.push(`selectFilePath:${value}`), saveMicDevice: () => rvcCalls.push("saveMicDevice"),
       loadMicDevices: () => rvcCalls.push("loadMicDevices"), previewReference: () => rvcCalls.push("previewReference"), convert: () => rvcCalls.push("convert"),
       denoise: () => rvcCalls.push("denoise"), startRecording: () => rvcCalls.push("startRecording"), stopRecording: () => rvcCalls.push("stopRecording"),
       useRecording: () => rvcCalls.push("useRecording"), selectRecording: () => rvcCalls.push("selectRecording"), restoreHistory: (index) => rvcCalls.push(`restore:${index}`), clearHistory: () => rvcCalls.push("clearHistory"),
@@ -304,8 +304,10 @@ test("compare and RVC controllers bind delegated and device events through injec
   deviceEvents.dispatch("devicechange");
   rvcElements.voiceModel.dispatch("change");
   rvcElements.reloadModels.dispatch("click");
+  rvcElements.externalAudioPathHistory.value = "C:\\audio\\saved.wav";
+  rvcElements.externalAudioPathHistory.dispatch("change");
   rvcElements.convert.dispatch("click");
   rvcElements.history.dispatch("click", { target: { closest: () => ({ dataset: { restoreRvcHistory: "2" } }) } });
   rvcElements.clearHistory.dispatch("click");
-  assert.deepEqual(rvcCalls, ["loadMicDevices", "selectVoiceModel", "reloadModels", "convert", "restore:2", "clearHistory"]);
+  assert.deepEqual(rvcCalls, ["loadMicDevices", "selectVoiceModel", "reloadModels", "selectFilePath:C:\\audio\\saved.wav", "convert", "restore:2", "clearHistory"]);
 });

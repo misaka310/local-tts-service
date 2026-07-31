@@ -331,8 +331,8 @@
                 <label><input type="radio" name="rvcInputSource" value="mic"> マイクで録音して変換</label>
               </div>
               <div class="control-grid path-controls rvc-file-source-controls" id="rvcFileSourceControls" hidden>
-                <label class="field wide-field"><span>入力音声（wav / m4a / mp3 / flac など）</span><input id="rvcExternalAudioPathInput" type="text" list="rvcExternalAudioPathHistory"></label>
-                <datalist id="rvcExternalAudioPathHistory"></datalist>
+                <label class="field wide-field"><span>入力音声（wav / m4a / mp3 / flac など）</span><input id="rvcExternalAudioPathInput" type="text"></label>
+                <label class="field wide-field"><span>保存済みの入力音声</span><select id="rvcExternalAudioPathHistory"><option value="">保存履歴はありません</option></select></label>
               </div>
               <section class="rvc-mic-panel" id="rvcMicControls">
                 <div class="rvc-mic-grid">

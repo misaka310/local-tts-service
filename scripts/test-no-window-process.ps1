@@ -15,6 +15,8 @@ $stderrPath = Join-Path $tempRoot 'stderr.log'
 $powershell = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
 $terminalBefore = @(Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
 $process = $null
+$orphanProbeLauncher = $null
+$orphanProbeChildPid = 0
 
 Assert-True ((ConvertTo-LocalTtsWindowsArgument -Value 'plain') -eq 'plain') 'plain arguments must not be quoted'
 Assert-True ((ConvertTo-LocalTtsWindowsArgument -Value 'hello world') -eq '"hello world"') 'arguments with spaces must use Windows command-line quotes'
@@ -61,6 +63,36 @@ try {
     $newTerminal = @($terminalAfter | Where-Object { $_ -notin $terminalBefore })
     Assert-True ($newTerminal.Count -eq 0) "no new Windows Terminal process may be created: $($newTerminal -join ', ')"
 
+    $orphanProbeLauncher = Start-LocalTtsNoWindowProcess `
+        -FilePath $powershell `
+        -ArgumentList @(
+            '-NoLogo',
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            'Start-Sleep -Seconds 60'
+        ) `
+        -WorkingDirectory $tempRoot `
+        -StandardOutputPath (Join-Path $tempRoot 'orphan-probe.out.log') `
+        -StandardErrorPath (Join-Path $tempRoot 'orphan-probe.err.log') `
+        -RepoRoot $repoRoot
+
+    $orphanProbeChild = $null
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    while ([DateTime]::UtcNow -lt $deadline -and $null -eq $orphanProbeChild) {
+        $orphanProbeChild = Get-CimInstance Win32_Process -Filter "ParentProcessId=$($orphanProbeLauncher.Id)" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($null -eq $orphanProbeChild) { Start-Sleep -Milliseconds 100 }
+    }
+    Assert-True ($null -ne $orphanProbeChild) 'orphan-prevention child process was not observed'
+    $orphanProbeChildPid = [int]$orphanProbeChild.ProcessId
+
+    Stop-Process -Id $orphanProbeLauncher.Id -Force -ErrorAction Stop
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    while ([DateTime]::UtcNow -lt $deadline -and (Get-Process -Id $orphanProbeChildPid -ErrorAction SilentlyContinue)) {
+        Start-Sleep -Milliseconds 100
+    }
+    Assert-True (-not (Get-Process -Id $orphanProbeChildPid -ErrorAction SilentlyContinue)) 'child process must exit when the no-window launcher is terminated'
+
     Write-Host '[OK] no-window process launcher tests passed'
 }
 finally {
@@ -68,5 +100,12 @@ finally {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
     }
     if ($null -ne $process) { $process.Dispose() }
+    if ($null -ne $orphanProbeLauncher -and -not $orphanProbeLauncher.HasExited) {
+        Stop-Process -Id $orphanProbeLauncher.Id -Force -ErrorAction SilentlyContinue
+    }
+    if ($orphanProbeChildPid -gt 0 -and (Get-Process -Id $orphanProbeChildPid -ErrorAction SilentlyContinue)) {
+        Stop-Process -Id $orphanProbeChildPid -Force -ErrorAction SilentlyContinue
+    }
+    if ($null -ne $orphanProbeLauncher) { $orphanProbeLauncher.Dispose() }
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

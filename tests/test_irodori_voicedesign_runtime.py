@@ -99,6 +99,46 @@ def test_runtime_metadata_warns_when_cuda_falls_back_to_cpu(tmp_path, monkeypatc
     assert len(calls) == 1
 
 
+def test_voicedesign_runtime_preloads_newly_selected_model_before_generation(tmp_path, monkeypatch) -> None:
+    runtime = _build_runtime(tmp_path)
+    runtime._prepared_models.clear()
+    output_wav = tmp_path / "runtime" / "audio" / "lazy-prepare.wav"
+    requests: list[dict[str, object]] = []
+
+    def fake_request(payload, timeout_sec):  # noqa: ANN001
+        del timeout_sec
+        requests.append(dict(payload))
+        if payload["action"] == "preload":
+            return {"ok": True, "externalNetworkAttempts": 0}
+        output_wav.parent.mkdir(parents=True, exist_ok=True)
+        output_wav.write_bytes(b"RIFF\x24\x00\x00\x00WAVEdata")
+        return {
+            "ok": True,
+            "outputPath": str(output_wav),
+            "captionInjectionMode": "separate_target",
+            "externalNetworkAttempts": 0,
+        }
+
+    monkeypatch.setattr(runtime, "_request_worker", fake_request)
+
+    result = runtime.synthesize(
+        SynthesizeRequest(
+            text="初めて選択したモデルを準備して生成します。",
+            caption="落ち着いた大人の女性の声。",
+            request_id="lazy-prepare",
+            model_name="irodori_v3_voicedesign",
+            output_basename="lazy-prepare",
+            seed=1000,
+            speed_scale=1.0,
+            style_strength=4.0,
+        )
+    )
+
+    assert [request["action"] for request in requests] == ["preload", "synthesize"]
+    assert result.audio_path == output_wav.resolve()
+    assert "irodori_v3_voicedesign" in runtime._prepared_models
+
+
 def test_voicedesign_runtime_sends_only_generation_request_to_ready_worker(tmp_path, monkeypatch) -> None:
     runtime = _build_runtime(tmp_path)
     reference_audio = tmp_path / "ref.wav"

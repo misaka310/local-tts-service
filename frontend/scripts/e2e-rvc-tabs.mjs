@@ -485,9 +485,15 @@ async function main() {
     await ensureHidden(page.locator('#rvcMicControls'), "RVC mic controls should hide in wav mode");
     await ensureHidden(page.locator('#rvcTextInput'), "RVC text should hide in wav mode");
     ensure(await page.locator('#rvcIntermediateTitle').textContent() === "ファイル入力音声", "file mode title mismatch");
+    ensure(await page.locator('#rvcExternalAudioPathHistory').evaluate((element) => element.tagName) === 'SELECT', "RVC saved paths must use a real select control");
     await page.locator('#rvcExternalAudioPathInput').fill('C:\\audio\\sample.m4a');
     await page.locator('#rvcExternalAudioPathInput').dispatchEvent('change');
     ensure(await page.locator('#rvcExternalAudioPathHistory option[value="C:\\\\audio\\\\sample.m4a"]').count() === 1, "RVC file path history option missing");
+    await page.locator('#rvcExternalAudioPathInput').fill('C:\\audio\\second.wav');
+    await page.locator('#rvcExternalAudioPathInput').dispatchEvent('change');
+    ensure(await page.locator('#rvcExternalAudioPathHistory option:not([value=""])').count() === 2, "RVC saved path selector should list every saved path");
+    await page.locator('#rvcExternalAudioPathHistory').selectOption('C:\\audio\\sample.m4a');
+    ensure(await page.locator('#rvcExternalAudioPathInput').inputValue() === 'C:\\audio\\sample.m4a', "selecting an RVC saved path should update the input path");
 
     await page.locator('input[name="rvcInputSource"][value="mic"]').click();
     await ensureVisible(page.locator('#rvcMicControls'), "RVC mic controls should return in mic mode");
@@ -532,6 +538,8 @@ async function main() {
     ensure(rvcLayout.convertWidth >= rvcLayout.paramsWidth - 40, "RVC convert button should fill the parameter panel");
 
     ensure(await page.locator('#rvcExternalAudioPathHistory option[value="C:\\\\audio\\\\sample.m4a"]').count() === 1, "RVC file path history should persist after reload");
+    await page.locator('input[name="rvcInputSource"][value="file"]').click();
+    ensure(await page.locator('#rvcExternalAudioPathInput').inputValue() === 'C:\\audio\\sample.m4a', "switching back to file mode should restore the selected RVC file path");
 
     if (process.env.RVC_LAYOUT_SCREENSHOT) {
       await page.locator('input[name="rvcInputSource"][value="tts"]').click();

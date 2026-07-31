@@ -420,9 +420,15 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         if request.reference_audio_path is not None and not request.reference_audio_path.is_file():
             raise ProviderError(f"referenceAudioPath not found: {request.reference_audio_path}")
 
-        if request.model_name not in self._prepared_models or not self._worker_is_alive():
-            if request.model_name in self._prepared_models:
-                self._mark_worker_failed("worker process exited", worker=self._worker)
+        if request.model_name not in self._prepared_models:
+            prepared = self.prepare_model(request.model_name)
+            if not prepared.available:
+                raise ProviderError(
+                    prepared.reason
+                    or "Irodori runtimeの準備が完了していません。サービスを再起動してください"
+                )
+        elif not self._worker_is_alive():
+            self._mark_worker_failed("worker process exited", worker=self._worker)
             reason = self._startup_errors.get(request.model_name)
             raise ProviderError(
                 reason
