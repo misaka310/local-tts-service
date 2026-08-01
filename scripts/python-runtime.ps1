@@ -4,8 +4,10 @@ $script:LocalTtsPythonInstallerSha256 = '5EE42C4EEE1E6B4464BB23722F90B45303F7944
 $script:LocalTtsPythonDownloadUrl = 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe'
 $script:LocalTtsPythonEmbedUrl = 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip'
 $script:LocalTtsPythonEmbedSha256 = '009D6BF7E3B2DDCA3D784FA09F90FE54336D5B60F0E0F305C37F400BF83CFD3B'
-$script:LocalTtsGetPipUrl = 'https://bootstrap.pypa.io/get-pip.py'
-$script:LocalTtsGetPipSha256 = 'A341E1A43E38001C551A1508A73FF23636A11970B61D901D9A1CAD2A18F57055'
+$script:LocalTtsPipVersion = '26.1.2'
+$script:LocalTtsPipWheelName = 'pip-26.1.2-py3-none-any.whl'
+$script:LocalTtsPipWheelUrl = 'https://files.pythonhosted.org/packages/5d/95/6b5cb3461ea5673ba0995989746db58eb18b91b54dbf331e72f569540946/pip-26.1.2-py3-none-any.whl'
+$script:LocalTtsPipWheelSha256 = '382FF9F685EE3BC25864F820AA50505825F10F5458FFFF07E30A6D96E5715CAB'
 
 function New-LocalTtsPythonRuntimeResult {
     param(
@@ -204,22 +206,32 @@ function Install-LocalTtsManagedPythonRuntime {
         # is already installed elsewhere. Fall back to the official embeddable
         # distribution so each repository still receives an independent runtime.
         $embedPath = Join-Path $toolsDir '.python-3.11.9-embed-amd64.zip'
-        $getPipPath = Join-Path $toolsDir '.get-pip.py'
+        $pipWheelPath = Join-Path $toolsDir ('.' + $script:LocalTtsPipWheelName)
         try {
             Invoke-WebRequest -UseBasicParsing -Uri $script:LocalTtsPythonEmbedUrl -OutFile $embedPath
             if ((Get-FileHash -LiteralPath $embedPath -Algorithm SHA256).Hash.ToUpperInvariant() -ne $script:LocalTtsPythonEmbedSha256) { throw 'embedded Python SHA-256 mismatch' }
             Expand-Archive -LiteralPath $embedPath -DestinationPath $managedDir -Force
+            $sitePackagesPath = Join-Path $managedDir 'Lib\site-packages'
+            New-Item -ItemType Directory -Force -Path $sitePackagesPath | Out-Null
             $pthPath = Join-Path $managedDir 'python311._pth'
-            (Get-Content -LiteralPath $pthPath -Raw -Encoding ASCII) -replace '#import site', 'import site' | Set-Content -LiteralPath $pthPath -Encoding ASCII
-            Invoke-WebRequest -UseBasicParsing -Uri $script:LocalTtsGetPipUrl -OutFile $getPipPath
-            if ((Get-FileHash -LiteralPath $getPipPath -Algorithm SHA256).Hash.ToUpperInvariant() -ne $script:LocalTtsGetPipSha256) { throw 'get-pip.py SHA-256 mismatch' }
-            & $managedPath $getPipPath --no-warn-script-location
-            if ($LASTEXITCODE -ne 0) { throw "get-pip.py failed with exit code $LASTEXITCODE" }
-            & $managedPath -m pip install virtualenv --disable-pip-version-check
-            if ($LASTEXITCODE -ne 0) { throw "virtualenv install failed with exit code $LASTEXITCODE" }
+            $pthText = Get-Content -LiteralPath $pthPath -Raw -Encoding ASCII
+            $pthText = $pthText -replace '#import site', "Lib\site-packages`r`nimport site"
+            $pthText | Set-Content -LiteralPath $pthPath -Encoding ASCII
+
+            Invoke-WebRequest -UseBasicParsing -Uri $script:LocalTtsPipWheelUrl -OutFile $pipWheelPath
+            $actualPipWheelHash = (Get-FileHash -LiteralPath $pipWheelPath -Algorithm SHA256).Hash.ToUpperInvariant()
+            if ($actualPipWheelHash -ne $script:LocalTtsPipWheelSha256) {
+                throw "pip wheel SHA-256 mismatch. expected=$script:LocalTtsPipWheelSha256 actual=$actualPipWheelHash"
+            }
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            [System.IO.Compression.ZipFile]::ExtractToDirectory($pipWheelPath, $sitePackagesPath)
+            $pipVersionProcess = Start-Process -FilePath $managedPath -ArgumentList @('-m', 'pip', '--version') -Wait -PassThru -NoNewWindow
+            if ($pipVersionProcess.ExitCode -ne 0) { throw "pinned pip $script:LocalTtsPipVersion bootstrap failed with exit code $($pipVersionProcess.ExitCode)" }
+            $virtualenvProcess = Start-Process -FilePath $managedPath -ArgumentList @('-m', 'pip', 'install', 'virtualenv', '--disable-pip-version-check', '--no-warn-script-location') -Wait -PassThru -NoNewWindow
+            if ($virtualenvProcess.ExitCode -ne 0) { throw "virtualenv install failed with exit code $($virtualenvProcess.ExitCode)" }
         }
         finally {
-            Remove-Item -LiteralPath $embedPath, $getPipPath -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $embedPath, $pipWheelPath -Force -ErrorAction SilentlyContinue
         }
         if (-not (Test-LocalTtsPython311 -PythonPath $managedPath)) {
             $detail = if (Test-Path -LiteralPath $installerLogPath) { (Get-Content -LiteralPath $installerLogPath -Tail 20 -ErrorAction SilentlyContinue) -join "`n" } else { 'installer log was not created' }
