@@ -1,0 +1,101 @@
+name: Windows clean install and BAT lifecycle
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/windows-clean-install.yml
+      - local-tts.bat
+      - config/config.example.json
+      - config/requirements.txt
+      - frontend/package.json
+      - frontend/package-lock.json
+      - frontend/server.js
+      - frontend/server/**
+      - reference/irodori/**
+      - reference/workflows/**
+      - scripts/clean-install-ports.ps1
+      - scripts/download_hf_snapshot.py
+      - scripts/git-runtime.ps1
+      - scripts/kill-tts-stack-ports.ps1
+      - scripts/launch-local-tts.ps1
+      - scripts/managed-job.ps1
+      - scripts/managed-processes.ps1
+      - scripts/node-runtime.ps1
+      - scripts/no-window-process.ps1
+      - scripts/python-runtime.ps1
+      - scripts/run_irodori_voicedesign.py
+      - scripts/run-local-tts-stack.ps1
+      - scripts/setup-irodori.ps1
+      - scripts/setup-local-tts.ps1
+      - scripts/start-local-tts-console.ps1
+      - scripts/start-local-tts-stack.ps1
+      - scripts/start-local-tts.ps1
+      - scripts/start-tts-frontend.ps1
+      - scripts/stop-managed-processes.ps1
+      - scripts/test-local-tts-lifecycle.ps1
+      - scripts/test-local-tts-lifecycle-watchdog.ps1
+      - scripts/verify-clean-install.bat
+      - scripts/verify-clean-install.ps1
+      - src/**
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-clean-install-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clean-install-and-bat-lifecycle:
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Show available disk space
+        shell: powershell
+        run: Get-PSDrive -PSProvider FileSystem | Format-Table Name, Used, Free, Root
+
+      - name: Run clean install and real CPU generation
+        id: clean-install
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File .\scripts\verify-clean-install.ps1
+          -TimeoutSec 3600
+
+      - name: Stop clean-install services
+        id: stop-clean-install
+        if: always()
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-managed-processes.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\kill-tts-stack-ports.ps1 -ConfigPath config/config.local.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run root BAT startup and shutdown lifecycle
+        if: steps.clean-install.outcome == 'success' && steps.stop-clean-install.outcome == 'success'
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File .\scripts\test-local-tts-lifecycle-watchdog.ps1
+          -Mode CtrlC
+          -OverallTimeoutSec 1200
+          -StartupTimeoutSec 900
+
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-clean-install-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            runtime/clean-install-verification/**
+            runtime/logs/**
+            runtime/processes/**
