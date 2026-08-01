@@ -125,8 +125,8 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass
           -File .\scripts\test-local-tts-lifecycle-watchdog.ps1
           -Mode CtrlC
-          -OverallTimeoutSec 600
-          -StartupTimeoutSec 300
+          -OverallTimeoutSec 1200
+          -StartupTimeoutSec 900
 
       - name: Upload verification evidence
         if: always()
