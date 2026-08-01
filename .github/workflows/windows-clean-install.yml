@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - codex/**
     paths:
       - .github/workflows/windows-clean-install.yml
       - local-tts.bat
@@ -41,45 +40,6 @@ on:
       - scripts/verify-clean-install.bat
       - scripts/verify-clean-install.ps1
       - src/**
-  pull_request:
-    branches:
-      - main
-    paths:
-      - .github/workflows/windows-clean-install.yml
-      - local-tts.bat
-      - config/config.example.json
-      - config/requirements.txt
-      - frontend/package.json
-      - frontend/package-lock.json
-      - frontend/server.js
-      - frontend/server/**
-      - reference/irodori/**
-      - reference/workflows/**
-      - scripts/clean-install-ports.ps1
-      - scripts/download_hf_snapshot.py
-      - scripts/git-runtime.ps1
-      - scripts/kill-tts-stack-ports.ps1
-      - scripts/launch-local-tts.ps1
-      - scripts/managed-job.ps1
-      - scripts/managed-processes.ps1
-      - scripts/node-runtime.ps1
-      - scripts/no-window-process.ps1
-      - scripts/python-runtime.ps1
-      - scripts/run_irodori_voicedesign.py
-      - scripts/run-local-tts-stack.ps1
-      - scripts/setup-irodori.ps1
-      - scripts/setup-local-tts.ps1
-      - scripts/start-local-tts-console.ps1
-      - scripts/start-local-tts-stack.ps1
-      - scripts/start-local-tts.ps1
-      - scripts/start-tts-frontend.ps1
-      - scripts/stop-managed-processes.ps1
-      - scripts/test-local-tts-lifecycle.ps1
-      - scripts/test-local-tts-lifecycle-watchdog.ps1
-      - scripts/verify-clean-install.bat
-      - scripts/verify-clean-install.ps1
-      - src/**
-
 permissions:
   contents: read
 
