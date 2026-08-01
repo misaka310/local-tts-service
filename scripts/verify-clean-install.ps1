@@ -23,6 +23,10 @@ $modelDirectory = Join-Path $modelRoot 'Qwen__Qwen3-TTS-12Hz-1.7B-Base'
 $reportDirectory = Join-Path $repoRoot 'runtime/clean-install-verification'
 $reportPath = Join-Path $reportDirectory 'clean-install-report.json'
 $audioPath = Join-Path $reportDirectory 'generated.wav'
+$qwenCloneAudioPath = Join-Path $reportDirectory 'generated-qwen-clone.wav'
+$qwenReferenceVoiceId = 'ci_qwen_clone_reference'
+$qwenReferenceVoiceDirectory = Join-Path $repoRoot "reference/voices/$qwenReferenceVoiceId"
+$qwenCloneText = '"\u3053\u308c\u306f\u58f0\u3092\u8907\u88fd\u3057\u305f\u97f3\u58f0\u751f\u6210\u30c6\u30b9\u30c8\u3067\u3059\u3002"' | ConvertFrom-Json
 $startedAt = Get-Date
 $canWriteReport = $false
 
@@ -61,6 +65,19 @@ $report = [ordered]@{
     generation = [ordered]@{
         audioUrl = $null
         audioPath = $audioPath
+        bytes = 0
+        sha256 = $null
+        riffHeader = $false
+    }
+    qwenCloneGeneration = [ordered]@{
+        model = $qwenCloneModelId
+        runtime = $null
+        referenceVoiceId = $qwenReferenceVoiceId
+        referenceText = $null
+        referenceDurationSec = $null
+        text = $qwenCloneText
+        audioUrl = $null
+        audioPath = $qwenCloneAudioPath
         bytes = 0
         sha256 = $null
         riffHeader = $false
@@ -380,12 +397,93 @@ print(json.dumps({
     }
     $report.generation.sha256 = (Get-FileHash -LiteralPath $audioPath -Algorithm SHA256).Hash.ToLowerInvariant()
 
+    $report.stage = 'qwen-reference-registration'
+    if (Test-Path -LiteralPath $qwenReferenceVoiceDirectory) {
+        Remove-Item -LiteralPath $qwenReferenceVoiceDirectory -Recurse -Force
+    }
+    $referenceDataUrl = 'data:audio/wav;base64,' + [Convert]::ToBase64String($audioBytes)
+    $referenceRegistration = Invoke-JsonRequest -Method Post -Uri "$frontBase/api/reference-voices" -Body ([ordered]@{
+        voiceId = $qwenReferenceVoiceId
+        referenceText = $verificationText
+        dataUrl = $referenceDataUrl
+        mimeType = 'audio/wav'
+    })
+    if (-not $referenceRegistration.ok) {
+        throw 'Qwen reference voice registration returned ok=false'
+    }
+    $registeredVoice = $referenceRegistration.voice
+    if ([string]$registeredVoice.voiceId -ne $qwenReferenceVoiceId) {
+        throw "Unexpected registered reference voice ID: $($registeredVoice.voiceId)"
+    }
+    if (-not [bool]$registeredVoice.hasReferenceAudio -or -not [bool]$registeredVoice.hasReferenceText) {
+        throw 'Registered Qwen reference voice is missing audio or transcript'
+    }
+    $referenceDurationSec = [double]$registeredVoice.audioDurationSec
+    if ($referenceDurationSec -lt 3 -or $referenceDurationSec -gt 10) {
+        throw "Qwen reference voice duration must be between 3 and 10 seconds: $referenceDurationSec"
+    }
+    $report.qwenCloneGeneration.referenceText = $verificationText
+    $report.qwenCloneGeneration.referenceDurationSec = $referenceDurationSec
+
+    $report.stage = 'qwen-clone-generation'
+    $qwenSpeak = Invoke-JsonRequest -Method Post -Uri "$frontBase/api/speak" -Body ([ordered]@{
+        model = $qwenCloneModelId
+        voiceId = $qwenReferenceVoiceId
+        text = $qwenCloneText
+        language = 'Japanese'
+        seed = 260712
+        format = 'wav'
+    })
+    if (-not $qwenSpeak.ok) {
+        throw 'Qwen voice-clone generation returned ok=false'
+    }
+    $qwenResult = if ($null -ne $qwenSpeak.result) { $qwenSpeak.result } else { $qwenSpeak }
+    if ([string]$qwenResult.model -ne $qwenCloneModelId) {
+        throw "Unexpected Qwen voice-clone model: $($qwenResult.model)"
+    }
+    if ([string]$qwenResult.runtime -ne 'qwen3_tts') {
+        throw "Unexpected Qwen voice-clone runtime: $($qwenResult.runtime)"
+    }
+    if ([string]$qwenResult.voiceId -ne $qwenReferenceVoiceId) {
+        throw "Unexpected Qwen voice-clone reference voice: $($qwenResult.voiceId)"
+    }
+    $qwenAudioUrl = [string]$qwenResult.audioUrl
+    if ([string]::IsNullOrWhiteSpace($qwenAudioUrl)) {
+        throw 'Qwen voice-clone generation did not return audioUrl'
+    }
+    $report.qwenCloneGeneration.runtime = [string]$qwenResult.runtime
+    $report.qwenCloneGeneration.audioUrl = $qwenAudioUrl
+
+    $qwenAudioUri = if ([System.Uri]::IsWellFormedUriString($qwenAudioUrl, [System.UriKind]::Absolute)) {
+        [System.Uri]$qwenAudioUrl
+    }
+    else {
+        [System.Uri]::new([System.Uri]("$frontBase/"), $qwenAudioUrl.TrimStart('/'))
+    }
+    Invoke-WebRequest -Uri $qwenAudioUri.AbsoluteUri -OutFile $qwenCloneAudioPath -TimeoutSec $TimeoutSec -ErrorAction Stop | Out-Null
+    $qwenAudioBytes = [System.IO.File]::ReadAllBytes($qwenCloneAudioPath)
+    $report.qwenCloneGeneration.bytes = $qwenAudioBytes.Length
+    if ($qwenAudioBytes.Length -le 44) {
+        throw "Generated Qwen voice-clone WAV is too small: $($qwenAudioBytes.Length) bytes"
+    }
+    $qwenRiff = [System.Text.Encoding]::ASCII.GetString($qwenAudioBytes, 0, 4)
+    $report.qwenCloneGeneration.riffHeader = ($qwenRiff -eq 'RIFF')
+    if (-not $report.qwenCloneGeneration.riffHeader) {
+        throw "Generated Qwen voice-clone file is not a RIFF WAV: header=$qwenRiff"
+    }
+    $report.qwenCloneGeneration.sha256 = (Get-FileHash -LiteralPath $qwenCloneAudioPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($report.qwenCloneGeneration.sha256 -eq $report.generation.sha256) {
+        throw 'Qwen voice-clone output unexpectedly matches the reference WAV byte-for-byte'
+    }
+    Remove-Item -LiteralPath $qwenReferenceVoiceDirectory -Recurse -Force -ErrorAction SilentlyContinue
+
     $report.stage = 'complete'
     $report.pass = $true
     Save-Report
 
-    Write-Host '[PASS] Fresh dependency install, model download, service startup, and real WAV generation succeeded.' -ForegroundColor Green
-    Write-Host "audio: $audioPath"
+    Write-Host '[PASS] Fresh dependency install, Irodori generation, and Qwen voice-clone generation succeeded.' -ForegroundColor Green
+    Write-Host "irodori audio: $audioPath"
+    Write-Host "qwen clone audio: $qwenCloneAudioPath"
     Write-Host "report: $reportPath"
     if ($OpenBrowser) {
         Start-Process $frontBase
@@ -393,6 +491,7 @@ print(json.dumps({
     exit 0
 }
 catch {
+    Remove-Item -LiteralPath $qwenReferenceVoiceDirectory -Recurse -Force -ErrorAction SilentlyContinue
     $report.error = $_.Exception.Message
     $report.stage = "failed:$($report.stage)"
     if ($canWriteReport) {
