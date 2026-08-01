@@ -15,9 +15,11 @@
 - `config/config.example.json` から `config/config.local.json` の自動作成
 - Qwen3-TTS Voice Clone 1.7Bの新規ダウンロード
 - Irodoriの新規セットアップと既定のIrodori v3による生成
+- そのIrodori生成音声と正しい読み上げ文を参照音声として登録
+- Qwen3-TTS Voice Clone 1.7Bによる実ボイスクローン生成
 - backend / frontendの起動
 - frontend API経由の実音声生成
-- 生成WAVのRIFFヘッダー、サイズ、SHA-256確認
+- Irodori・Qwen両方の生成WAVについてRIFFヘッダー、サイズ、SHA-256を確認
 
 Sarashina、FireRedTTS-2、T5Gemma、FishAudio、GPT-SoVITS、ComfyUI、RVCなどの任意追加機能は、この最短導線の検証対象外です。
 
@@ -76,18 +78,21 @@ scripts\verify-clean-install.bat -OpenBrowser
 5. `torch`と`torchaudio`が同じ2.8.0系列になり、GPUなしでは両方`2.8.0+cpu`かつ`torch.cuda.is_available()`が`false`になる。NVIDIA GPUがある場合はCUDAが利用可能になる。
 6. Windowsではシステム全体へVisual C++再頒布可能パッケージを入れなくてもPyTorchを読み込める。
 7. backendとfrontendが起動する。
-8. `/api/models` で既定モデルが利用可能になる。
-9. `/api/speak` から実際に音声を生成できる。
-10. 保存されたファイルが44バイトを超えるRIFF WAVである。
+8. `/api/models` で既定モデルとQwen3-TTS Voice Clone 1.7Bが利用可能になる。
+9. `/api/speak` からIrodori v3で実際に音声を生成できる。
+10. Irodori生成音声と正しい読み上げ文を参照音声として登録できる。
+11. Qwen3-TTS Voice Clone 1.7Bが、その参照音声を使って別の文章を実生成できる。
+12. 両方の保存ファイルが44バイトを超えるRIFF WAVで、SHA-256が異なる。
 
 結果は次へ保存されます。
 
 ```text
 runtime/clean-install-verification/clean-install-report.json
 runtime/clean-install-verification/generated.wav
+runtime/clean-install-verification/generated-qwen-clone.wav
 ```
 
-`clean-install-report.json` にはOS、Python、Node、npm、検出したNVIDIA GPU、`torch` / `torchaudio` / CUDA状態、モデル状態、WAVサイズ、SHA-256が入ります。PyTorch importに失敗した場合は、完全なstderrと終了コードを`error`に保存します。
+`clean-install-report.json` にはOS、Python、Node、npm、検出したNVIDIA GPU、`torch` / `torchaudio` / CUDA状態、モデル状態、参照音声の長さ、Irodori・Qwen両WAVのサイズとSHA-256が入ります。PyTorch importに失敗した場合は、完全なstderrと終了コードを`error`に保存します。
 
 ## 開発PCでできる事前確認
 
