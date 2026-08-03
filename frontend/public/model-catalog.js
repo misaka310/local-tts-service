@@ -1,5 +1,6 @@
 (() => {
   const MODEL_LABELS = {
+    irodori_v4_small: "Irodori v4 Small",
     irodori_v3: "Irodori v3",
     irodori_v3_voicedesign: "Irodori v3 VoiceDesign",
     irodori_v2: "Irodori v2",
@@ -16,9 +17,18 @@
   };
 
   const MODEL_PROFILE = {
+    irodori_v4_small: {
+      badges: ["最新版", "公式v4", "約0.8B"],
+      description: "声寄せと話し方指定を1つに統合した公式Irodori v4。Smallは公式モデル名で、約7.66億パラメータの通常版です。",
+      features: ["参照音声による声寄せ", "話し方メモによる感情・スタイル指定", "参照音声なしでも生成可能", "本文中の絵文字による表現調整", "最大120秒の参照音声に対応"],
+      scores: { 自然さ: "高", 感情表現: "高", 安定性: "高" },
+      memo: "量子化版ではない公式チェックポイントです。短い参照1本でも使えますが、声寄せは30秒程度以上のきれいな参照音声で安定しやすくなります。",
+      rankReason: "声寄せと表現制御を1モデルで扱え、Irodori系の第一候補です。",
+      baseScore: 98,
+    },
     irodori_v3: {
       badges: ["感情表現強化", "自然さ向上", "長文向け"],
-      description: "自然さと安定性を重視した最新版。本文中の絵文字で感情表現を寄せられます。",
+      description: "自然さと安定性を重視した定番モデル。本文中の絵文字で感情表現を寄せられます。",
       features: ["自然で聞き取りやすい音質", "絵文字入り本文で感情を寄せられる", "感情表現が豊かで抑揚が自然", "長文でも安定した生成品質", "参照音声の再現性が高い"],
       scores: { 自然さ: "高", 感情表現: "高", 安定性: "高" },
       memo: "自然で聞き取りやすい。感情の起伏が穏やかで、全体的なバランスが良い。",
@@ -73,6 +83,7 @@
   };
 
   const DESIRED_MODELS = [
+    "irodori_v4_small",
     "gpt_sovits_zero_shot",
     "qwen3_tts_clone_1_7b",
     "irodori_v3_voicedesign",

@@ -551,7 +551,7 @@ async function toggleReferencePreview(selectEl, button, statusEl) {
 }
 
 function fillModelSelect() {
-  const order = ["irodori_v3", "irodori_v3_voicedesign", "gpt_sovits_zero_shot", "qwen3_tts_clone_1_7b", "f5_tts_zero_shot", "irodori_v2", "qwen3_tts_clone_0_6b", "mock"];
+  const order = ["irodori_v4_small", "irodori_v3", "irodori_v3_voicedesign", "gpt_sovits_zero_shot", "qwen3_tts_clone_1_7b", "f5_tts_zero_shot", "irodori_v2", "qwen3_tts_clone_0_6b", "mock"];
   const prioritizedModels = [...order.map((id) => modelsById.get(id)).filter(Boolean), ...[...modelsById.values()].filter((m) => !order.includes(modelId(m)))];
   const sorted = window.LocalTtsModelCatalog.sortModelsAvailableFirst(prioritizedModels);
   els.normalModel.innerHTML = "";

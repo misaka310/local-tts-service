@@ -445,6 +445,9 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
             "referenceAudioPath": (
                 str(request.reference_audio_path) if request.reference_audio_path else None
             ),
+            "enableReferenceWithCaption": bool(
+                request.caption and request.reference_audio_path
+            ),
             "outputPath": str(out_file),
             "seed": request.seed,
             "durationScale": 1.0 / request.speed_scale if request.speed_scale else 1.0,

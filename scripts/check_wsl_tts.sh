@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 if [[ $# -ne 1 ]]; then
   echo "usage: check_wsl_tts.sh MODEL" >&2
   exit 2
@@ -84,5 +86,9 @@ if importlib.util.find_spec("torch") is None:
 if importlib.util.find_spec(module_name) is None:
     raise SystemExit(f"専用Python環境に必要なモジュールがありません: {module_name}")
 PY
+
+if [[ "$MODEL" == "t5gemma_tts_2b_2b" ]]; then
+  "$PYTHON" "$SCRIPT_DIR/t5gemma_offline_infer.py" --check-cache --model-dir "$MODEL_DIR"
+fi
 
 printf '利用可能: %s (%s)\n' "$MODEL" "$ENV_KEY"

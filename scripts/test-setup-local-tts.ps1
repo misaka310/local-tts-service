@@ -27,6 +27,7 @@ $startStackScript = Join-Path $RepoRoot 'scripts/start-local-tts-stack.ps1'
 $startLocalScript = Join-Path $RepoRoot 'scripts/start-local-tts.ps1'
 $startFrontendScript = Join-Path $RepoRoot 'scripts/start-tts-frontend.ps1'
 $setupIrodoriScript = Join-Path $RepoRoot 'scripts/setup-irodori.ps1'
+$smokeIrodoriV4Script = Join-Path $RepoRoot 'scripts/smoke-irodori-v4.ps1'
 $gitignorePath = Join-Path $RepoRoot '.gitignore'
 $gitattributesPath = Join-Path $RepoRoot '.gitattributes'
 $licensePath = Join-Path $RepoRoot 'LICENSE'
@@ -75,6 +76,7 @@ foreach ($path in @(
   $startLocalScript,
   $startFrontendScript,
   $setupIrodoriScript,
+  $smokeIrodoriV4Script,
   $gitignorePath,
   $gitattributesPath,
   $licensePath,
@@ -133,6 +135,7 @@ $stackText = Get-Content -LiteralPath $startStackScript -Raw -Encoding UTF8
 $localText = Get-Content -LiteralPath $startLocalScript -Raw -Encoding UTF8
 $frontendText = Get-Content -LiteralPath $startFrontendScript -Raw -Encoding UTF8
 $setupIrodoriText = Get-Content -LiteralPath $setupIrodoriScript -Raw -Encoding UTF8
+$smokeIrodoriV4Text = Get-Content -LiteralPath $smokeIrodoriV4Script -Raw -Encoding UTF8
 $ciText = Get-Content -LiteralPath $ciWorkflow -Raw -Encoding UTF8
 
 Assert-True ($entryText -match 'scripts\\start-local-tts-console\.ps1') 'local-tts.bat must start the isolated console helper'
@@ -292,7 +295,12 @@ Assert-True ($noWindowLauncherText -match 'CreateNoWindow\s*=\s*true') 'native l
 Assert-True ($noWindowLauncherText -match 'UseShellExecute\s*=\s*false') 'native launcher must disable shell execution'
 Assert-True ($noWindowLauncherText -match 'RedirectStandardOutput\s*=\s*true') 'native launcher must preserve stdout diagnostics'
 Assert-True ($noWindowLauncherText -match 'RedirectStandardError\s*=\s*true') 'native launcher must preserve stderr diagnostics'
-Assert-True ($setupIrodoriText -match 'eaf74d6a19138f743acb5b71a445fd25a57db987') 'Irodori setup must pin the verified revision'
+Assert-True ($setupIrodoriText -match '8ca3acb58ab4e19ad6d594aaed6bafe3e88f7f71') 'Irodori setup must pin the verified v4 revision'
+Assert-True ($setupIrodoriText -match 'Aratako/Irodori-TTS-v4-Small') 'Irodori setup must install the v4 Small checkpoint'
+Assert-True ($smokeIrodoriV4Text -match 'verification/irodori-v4-small-smoke\.wav') 'Irodori v4 smoke output must not overwrite the backend artifact'
+Assert-True ($smokeIrodoriV4Text -match 'NewGuid\(\)') 'Irodori v4 smoke must use a unique request id'
+Assert-True ($smokeIrodoriV4Text -match 'sampleRate -ne 48000') 'Irodori v4 smoke must verify the expected sample rate'
+Assert-True ($smokeIrodoriV4Text -match 'inspection\.rms -lt 0\.0001') 'Irodori v4 smoke must reject silent output'
 Assert-True ($setupIrodoriText -match 'git-runtime\.ps1') 'Irodori setup must use the shared Git resolver'
 Assert-True ($setupIrodoriText -match 'Install-LocalTtsManagedGitRuntime') 'Irodori setup must repair missing Git automatically'
 Assert-True ($setupIrodoriText -match 'msvc-runtime==14\.44\.35112') 'Irodori setup must install the pinned app-local MSVC runtime'

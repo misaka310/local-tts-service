@@ -13,6 +13,7 @@ def test_default_irodori_capabilities_match_official_models() -> None:
     v2 = models["irodori_v2"]
     v3 = models["irodori_v3"]
     voice_design = models["irodori_v3_voicedesign"]
+    v4 = models["irodori_v4_small"]
 
     assert v2["supportsReferenceVoice"] is True
     assert v2["requiresReferenceAudio"] is False
@@ -30,6 +31,15 @@ def test_default_irodori_capabilities_match_official_models() -> None:
     assert voice_design["supportsCaption"] is True
     assert voice_design["supportsSpeedControl"] is True
     assert voice_design["supportsStyleStrength"] is True
+
+    assert v4["modelId"] == "Aratako/Irodori-TTS-v4-Small"
+    assert v4["supportsReferenceVoice"] is True
+    assert v4["requiresReferenceAudio"] is False
+    assert v4["supportsInstruction"] is True
+    assert v4["supportsCaption"] is True
+    assert v4["supportsSpeedControl"] is True
+    assert v4["supportsStyleStrength"] is True
+    assert v4["supportsVoiceDesign"] is True
 
 
 def test_load_config_reads_default_and_local(tmp_path) -> None:

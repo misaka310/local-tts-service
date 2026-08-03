@@ -2,15 +2,18 @@
 
 ## `irodori_voicedesign_direct`
 
-`irodori_v2`、`irodori_v3`、`irodori_v3_voicedesign`を、ComfyUIを介さずリポジトリ内の専用Python環境から直接実行します。
+`irodori_v4_small`、`irodori_v3`、`irodori_v3_voicedesign`、`irodori_v2`を、ComfyUIを介さずリポジトリ内の専用Python環境から直接実行します。
 
 - 標準の`local-tts.bat`がセットアップ時に`runtime/venv-irodori`、固定revisionの公式コード、各checkpoint、codec、Tokenizerを`runtime/`内へ導入します
 - 通常起動時に既定のIrodoriモデルを完全ローカルから事前ロードし、生成時は常駐ワーカーで推論だけを行います
 - worker内はTransformers/Hugging Faceのオフラインモードと外部ソケット遮断を有効にし、外部通信が検出された要求は失敗として扱います
+- `irodori_v4_small`は参照音声による声寄せとcaptionによるVoiceDesignを1モデルで利用でき、参照音声なしでも生成できます
+- `Small`は公式checkpoint名です。約7.66億パラメータの通常版を導入しており、低精度の量子化版へ置き換えてはいません
+- v4 Smallは最大120秒の参照に対応します。短い参照1本でも使えますが、公式評価では約30秒以上のきれいな参照で声の類似度が大きく改善しています
 - `irodori_v2`は参照音声なしで使用できます
 - `irodori_v3`は参照音声なしでも使用でき、`voiceId`を指定した場合だけその音声を追加条件として使います
 - 通常版v2/v3は`seed`と`speedScale`に対応します
-- VoiceDesignはさらにcaptionと`styleStrength`に対応します
+- v4 Smallとv3 VoiceDesignはさらにcaptionと`styleStrength`に対応します
 
 `voiceId`が指定された場合はserver側で解決し、runtimeへ`reference_audio_path`を渡します。未指定でも`requiresReferenceAudio=false`のIrodoriモデルは生成できます。モデルごとのcheckpointは`models.<id>.checkpoint`で指定し、起動時に専用Python、公式コード、checkpoint、codec、Tokenizerを検査します。不足時は欠けている項目と`runtime/models/...`の配置先を`unavailableReason`へ返します。通常起動・生成中にモデルやTokenizerを取得せず、Hugging Faceのログイン状態や認証トークンも参照しません。
 
@@ -63,7 +66,7 @@ payloadには次を含みます。
 
 - 外部プロセスの終了コードをそのまま失敗として扱う
 - stdout / stderrをUTF-8で取得
-- timeoutをAPIエラーへ変換
+- timeoutをAPIエラーへ変換し、起動したPowerShell・`wsl.exe`・WSL内Pythonのプロセスツリーを終了する
 - 出力WAVが存在しない、空、または指定パス外の場合は失敗
 
 詳細は[`wsl-tts-models.md`](./wsl-tts-models.md)を参照してください。

@@ -82,6 +82,35 @@ download_model() {
   HF_HUB_DISABLE_XET=1 hf download "$repo_id" --revision "$revision" --local-dir "$target"
 }
 
+cache_t5gemma_dependencies() {
+  local python="$1" model_dir="$2"
+  local config_path="$model_dir/config.json"
+  [[ -f "$config_path" ]] || { echo "T5Gemma config is missing: $config_path" >&2; return 1; }
+  local dependencies=()
+  mapfile -t dependencies < <("$python" - "$config_path" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+text_key = "text_" + "tokenizer_name"
+text_repo = str(payload.get(text_key) or payload.get("t5gemma_model_name") or "").strip()
+codec_repo = str(payload.get("xcodec2_model_name") or "").strip()
+if not text_repo or not codec_repo:
+    raise SystemExit("T5Gemma dependency ids are missing from config.json")
+print(text_repo)
+print(codec_repo)
+PY
+  )
+  [[ ${#dependencies[@]} -eq 2 ]] || { echo "T5Gemma dependency ids could not be resolved" >&2; return 1; }
+  local text_dependency="${dependencies[0]}" codec_dependency="${dependencies[1]}"
+  log "Caching T5Gemma text tokenizer dependency: $text_dependency"
+  HF_HUB_DISABLE_XET=1 hf download "$text_dependency" \
+    --include 'tokenizer*' 'special_tokens_map.json' 'added_tokens.json' '*.model'
+  log "Caching T5Gemma codec dependency: $codec_dependency"
+  HF_HUB_DISABLE_XET=1 hf download "$codec_dependency"
+}
+
 write_manifest() {
   local key="$1" repo="$2" code_revision="$3" model_id="$4" model_revision="$5" model_dir="$6" python="$7"
   local torch_version
@@ -130,6 +159,7 @@ setup_t5gemma() {
   install_torch_28 "$python"
   uv pip install --python "$python" -r "$vendor/requirements.txt"
   download_model "Aratako/T5Gemma-TTS-2b-2b" "$T5GEMMA_MODEL_REV" "$model"
+  cache_t5gemma_dependencies "$python" "$model"
   write_manifest "$key" "https://github.com/Aratako/T5Gemma-TTS.git" "$T5GEMMA_REV" "Aratako/T5Gemma-TTS-2b-2b" "$T5GEMMA_MODEL_REV" "$model" "$python"
 }
 

@@ -176,6 +176,7 @@ def test_voicedesign_runtime_sends_only_generation_request_to_ready_worker(tmp_p
     assert captured["request"]["action"] == "synthesize"
     assert captured["request"]["caption"] == "自然な配信者の名乗り。短く聞き取りやすい。"
     assert captured["request"]["referenceAudioPath"] == str(reference_audio)
+    assert captured["request"]["enableReferenceWithCaption"] is True
     assert captured["request"]["durationScale"] == pytest.approx(0.8)
     assert captured["request"]["cfgScaleCaption"] == pytest.approx(4.5)
     assert captured["timeout"] == runtime.timeout_sec
@@ -216,6 +217,7 @@ def test_voicedesign_runtime_allows_caption_without_reference(tmp_path, monkeypa
 
     assert captured["request"]["caption"] == "落ち着いた低めの女性の声。"
     assert captured["request"]["referenceAudioPath"] is None
+    assert captured["request"]["enableReferenceWithCaption"] is False
     assert captured["request"]["cfgScaleCaption"] == pytest.approx(4.0)
     assert result.audio_path == output_wav.resolve()
 

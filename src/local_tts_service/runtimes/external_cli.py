@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
 from typing import Any
 
@@ -16,6 +17,62 @@ from .base import BaseRuntime, SynthesizeRequest, SynthesizeResult
 class ExternalCliAvailability:
     available: bool
     reason: str | None = None
+
+
+def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
+    """Terminate the command and its descendants after a timeout."""
+
+    if process.poll() is not None:
+        return
+    if os.name == "nt":
+        completed = subprocess.run(
+            ["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        if completed.returncode == 0:
+            return
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+            return
+        except (OSError, ProcessLookupError):
+            pass
+    if process.poll() is None:
+        process.kill()
+
+
+def _run_external_command(
+    command: list[str],
+    *,
+    cwd: Path,
+    timeout: float,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    popen_kwargs: dict[str, Any] = {
+        "cwd": str(cwd),
+        "env": env,
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+        "text": True,
+        "encoding": "utf-8",
+        "errors": "replace",
+    }
+    if os.name == "nt":
+        popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:
+        popen_kwargs["start_new_session"] = True
+    process = subprocess.Popen(command, **popen_kwargs)
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _terminate_process_tree(process)
+        process.communicate()
+        raise
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
 class ExternalCliRuntime(BaseRuntime):
@@ -76,16 +133,11 @@ class ExternalCliRuntime(BaseRuntime):
                     "missing availability check script(s): " + ", ".join(missing_availability_scripts),
                 )
             try:
-                completed = subprocess.run(
+                completed = _run_external_command(
                     formatted_command,
-                    cwd=str(self.root_dir),
+                    cwd=self.root_dir,
                     env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
                     timeout=60,
-                    check=False,
                 )
             except subprocess.TimeoutExpired:
                 return ExternalCliAvailability(False, f"モデル環境の確認が60秒でタイムアウトしました: {model_name}")
@@ -128,15 +180,10 @@ class ExternalCliRuntime(BaseRuntime):
             raise ProviderError("external_cli dryRun is enabled; command was not executed")
 
         try:
-            completed = subprocess.run(
+            completed = _run_external_command(
                 command,
-                cwd=str(self.root_dir),
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
+                cwd=self.root_dir,
                 timeout=self.timeout_sec,
-                check=False,
             )
         except subprocess.TimeoutExpired as exc:
             raise ProviderError(f"external command timed out after {self.timeout_sec}s: {command_key}") from exc

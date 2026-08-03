@@ -120,6 +120,21 @@
       "supportsStyleStrength": true,
       "supportsVoiceDesign": true,
       "supportsReferenceVoice": true
+    },
+    "irodori_v4_small": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v4 Small",
+      "family": "irodori",
+      "modelId": "Aratako/Irodori-TTS-v4-Small",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-v4-Small/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsCaption": true,
+      "supportsInstruction": true,
+      "supportsSeed": true,
+      "supportsSpeedControl": true,
+      "supportsStyleStrength": true,
+      "supportsVoiceDesign": true,
+      "supportsReferenceVoice": true
     }
   },
   "runtimes": {

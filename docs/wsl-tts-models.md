@@ -48,8 +48,8 @@ FishAudioはS1-miniに対応する上記revisionを使用します。現行S2向
 
 モデル固有条件:
 
-- FireRedTTS-2: `transformers==4.57.3`、`huggingface_hub<1.0`
-- T5Gemma-TTS: 固定revisionの公式CLIには`--low_vram`引数がないため、公式実装のBF16・Accelerate device mappingをそのまま使用し、量子化はしない
+- FireRedTTS-2: `transformers==4.57.3`、`huggingface_hub<1.0`。WSLのメモリ急増を避けるためCPU checkpointをmemory-mapし、`torch.compile`をeager実行へ固定する。参照条件によって空生成になった場合は、同じ参照音声の先頭3秒と最初の1文で1回だけ再試行する
+- T5Gemma-TTS: 固定revisionの公式CLIには`--low_vram`引数がないため、公式実装のBF16・Accelerate device mappingを使用し、量子化はしない。セットアップ時に本文モデルに加えてTokenizerと音声Codecの依存snapshotもキャッシュし、推論とavailability判定では`local_files_only`で検査・読込する。`torch.compile`はeager実行へ固定する
 - FishAudio S1-mini: S1互換依存を専用venvへ固定
 
 ## 事前条件
@@ -104,6 +104,7 @@ runtime/logs/setup-wsl-tts-models.err.log
 - GitのHEADが固定コードrevisionと一致
 - manifestのモデルrevisionが固定値と一致
 - `torch`とモデル固有Pythonモジュールをimport可能
+- T5Gemma-TTSではTokenizerと音声Codecの依存snapshotがローカルキャッシュに揃っている
 
 個別確認:
 
@@ -181,3 +182,12 @@ npm run e2e:wsl-models-live
 - 実Chrome: 4つのWSLモデルが通常生成・モデル比較で選択可能。T5Gemmaの生成ボタン実行、結果表示、音声メタデータ読込に成功
 
 全6モデルを同一runIdで再生成した結果は`runtime/audio/model-smoke/manifest.json`に保存され、`passedCount: 6`、`failedCount: 0`、`allPassed: true`を確認しています。
+
+## 2026-08-03の回帰検証
+
+60秒級の長尺参照音声を選び、モデル比較画面から4モデルを一括生成して次を確認しました。
+
+- Sarashina2.2-TTS、FireRedTTS-2、T5Gemma-TTS 2B-2B、FishAudio S1-miniがすべて成功表示になる
+- 4件すべての`audio`要素で新規生成WAVを読み込める
+- FireRedTTS-2の空生成時フォールバックと、T5Gemma-TTSのoffline・eager実行が実際のAPI/UI経路で機能する
+- 一括生成の実測時間は271.1秒

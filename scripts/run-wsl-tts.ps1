@@ -58,8 +58,8 @@ $ConvertedJsonWsl = Convert-ToWslPath $ConvertedJson
 try {
   $RawArgs = @('--exec', 'bash', $ShellWsl, $Model, $RepoWsl, $CliWsl, $ConvertedJsonWsl, $OutputWsl)
   $Process = Start-Process -FilePath 'wsl.exe' -ArgumentList $RawArgs -RedirectStandardOutput $StdoutLog -RedirectStandardError $StderrLog -WindowStyle Hidden -PassThru -Wait
-  $Stdout = if (Test-Path -LiteralPath $StdoutLog) { Get-Content -LiteralPath $StdoutLog -Raw -Encoding UTF8 } else { '' }
-  $Stderr = if (Test-Path -LiteralPath $StderrLog) { Get-Content -LiteralPath $StderrLog -Raw -Encoding UTF8 } else { '' }
+  $Stdout = if (Test-Path -LiteralPath $StdoutLog) { [string](Get-Content -LiteralPath $StdoutLog -Raw -Encoding UTF8) } else { '' }
+  $Stderr = if (Test-Path -LiteralPath $StderrLog) { [string](Get-Content -LiteralPath $StderrLog -Raw -Encoding UTF8) } else { '' }
   if ($Stdout) { Write-Output $Stdout.TrimEnd() }
   if ($Process.ExitCode -ne 0) {
     $Details = if ($Stderr.Trim()) { $Stderr.Trim() } elseif ($Stdout.Trim()) { $Stdout.Trim() } else { "exit code $($Process.ExitCode)" }

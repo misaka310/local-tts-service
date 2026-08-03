@@ -191,6 +191,14 @@ def _patch_safetensors_load_device(inference_runtime_module, model_device: str) 
             str(path), framework="pt", device="cpu"
         ) as handle:
             metadata = handle.metadata() or {}
+        parse_quantization_metadata = getattr(
+            inference_runtime_module, "parse_quantization_metadata", None
+        )
+        if callable(parse_quantization_metadata) and parse_quantization_metadata(metadata) is not None:
+            model_state, _ = inference_runtime_module.unflatten_quantized_state_dict(
+                model_state,
+                metadata=metadata,
+            )
         flat_config = inference_runtime_module._parse_json_mapping(
             metadata.get(inference_runtime_module._CONFIG_META_KEY),
             field=inference_runtime_module._CONFIG_META_KEY,
@@ -201,6 +209,16 @@ def _patch_safetensors_load_device(inference_runtime_module, model_device: str) 
             path=path,
             flat_config=flat_config,
         )
+        text_encoder_meta_key = getattr(
+            inference_runtime_module, "_TEXT_ENCODER_CONFIG_META_KEY", None
+        )
+        if text_encoder_meta_key:
+            text_encoder_config = inference_runtime_module._parse_json_mapping(
+                metadata.get(text_encoder_meta_key),
+                field=text_encoder_meta_key,
+                path=path,
+            )
+            return model_state, model_cfg, inference_cfg, text_encoder_config
         return model_state, model_cfg, inference_cfg
 
     inference_runtime_module._load_checkpoint_from_safetensors = (
@@ -224,8 +242,15 @@ def _patch_text_processor_loader(wrapper_dir: Path, expected_repo: str, local_di
     mappings[str(expected_repo)] = str(local_dir.resolve())
     processor_cls._local_tts_processor_mappings = mappings
 
-    def local_loader(cls, repo_id: str, add_bos: bool = True, local_files_only: bool = False):
-        del local_files_only
+    def local_loader(
+        cls,
+        repo_id: str,
+        add_bos: bool = True,
+        local_files_only: bool = False,
+        revision: str | None = None,
+        **kwargs,
+    ):
+        del local_files_only, revision, kwargs
         location = cls._local_tts_processor_mappings.get(str(repo_id))
         if location is None:
             candidate = Path(str(repo_id)).resolve()

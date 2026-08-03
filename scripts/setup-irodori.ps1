@@ -15,7 +15,7 @@ $ModelRoot = Join-Path $RuntimeRoot 'models\irodori'
 $VenvRoot = Join-Path $RuntimeRoot 'venv-irodori'
 $VenvPython = Join-Path $VenvRoot 'Scripts\python.exe'
 $SourceRoot = Join-Path $VendorRoot 'Irodori-TTS-upstream'
-$PinnedRevision = 'eaf74d6a19138f743acb5b71a445fd25a57db987'
+$PinnedRevision = '8ca3acb58ab4e19ad6d594aaed6bafe3e88f7f71'
 $RepositoryUrl = 'https://github.com/Aratako/Irodori-TTS.git'
 $DownloadScript = Join-Path $PSScriptRoot 'download_hf_snapshot.py'
 $RepoPython = Join-Path $RepoRoot '.venv\Scripts\python.exe'
@@ -32,6 +32,7 @@ $Models = @(
   @{ RepoId = 'Aratako/Irodori-TTS-500M-v2'; Directory = 'Irodori-TTS-500M-v2'; AllowPatterns = @() },
   @{ RepoId = 'Aratako/Irodori-TTS-500M-v3'; Directory = 'Irodori-TTS-500M-v3'; AllowPatterns = @() },
   @{ RepoId = 'Aratako/Irodori-TTS-600M-v3-VoiceDesign'; Directory = 'Irodori-TTS-600M-v3-VoiceDesign'; AllowPatterns = @() },
+  @{ RepoId = 'Aratako/Irodori-TTS-v4-Small'; Directory = 'Irodori-TTS-v4-Small'; AllowPatterns = @() },
   @{ RepoId = 'Aratako/Semantic-DACVAE-Japanese-32dim'; Directory = 'Semantic-DACVAE-Japanese-32dim'; AllowPatterns = @() },
   @{
     RepoId = 'llm-jp/llm-jp-3-150m'
@@ -243,5 +244,5 @@ if ($DryRun) {
   Write-Output '[DRY-RUN] Irodori setup plan completed without changing files.'
 } else {
   Write-Output '[OK] Irodori is installed inside this repository under runtime/.'
-  Write-Output 'Restart local-tts.bat, then select Irodori v2, Irodori v3, or Irodori v3 VoiceDesign.'
+  Write-Output 'Restart local-tts.bat, then select Irodori v4 Small, Irodori v3, Irodori v3 VoiceDesign, or Irodori v2.'
 }

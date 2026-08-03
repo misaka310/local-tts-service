@@ -5,7 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 import sys
 
-from scripts.wsl_tts_infer import load_request
+from scripts.wsl_tts_infer import load_request, resolve_reference_prompt
 from scripts.wsl_tts_runner import GENERATORS, validate_output
 
 
@@ -16,6 +16,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         request = load_request(Path(args.request_json))
+        request = resolve_reference_prompt(request)
         if args.output_path:
             request = replace(request, output_path=Path(args.output_path).expanduser())
             request.output_path.parent.mkdir(parents=True, exist_ok=True)

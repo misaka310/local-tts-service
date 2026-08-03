@@ -4,6 +4,7 @@
   const HISTORY_PAGE_SIZE = 20;
   const MAX_DIAGNOSTIC_TEXT_CHARS = 6000;
   const MODEL_LABELS_FALLBACK = {
+    irodori_v4_small: "Irodori v4 Small",
     irodori_v3: "Irodori v3",
     irodori_v3_voicedesign: "Irodori v3 VoiceDesign",
     irodori_v2: "Irodori v2",
