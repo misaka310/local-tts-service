@@ -37,7 +37,7 @@ CPU音声生成は推論処理なので長時間かかる場合があります�
 - `runtime/logs/comfyui-runtime.out.log`
 - `runtime/logs/comfyui-runtime.err.log`
 
-## `irodori_v3` が失敗する
+## Irodori が失敗する
 
 `irodori_v3`は参照音声なしでも生成できます。`voiceId`を指定した場合だけ、`reference/voices/<voiceId>/voice.wav`が存在するか確認してください。
 
@@ -47,8 +47,13 @@ CPU音声生成は推論処理なので長時間かかる場合があります�
 - 起動時の「○○がありません」に表示された配置先を確認
 - `GET /health/deep`の`modelChecks.irodori_v3`を確認
 - `runtime/logs/local-tts-service.err.log`のIrodori workerエラーを確認
+- `runtime/logs/irodori-worker.log`の終了コードとworker標準エラーを確認
 
 生成ボタンを押した時に401やHugging Faceへの接続が出るのは正常ではありません。通常起動・生成は完全ローカルで動作し、認証トークンを必要としません。
+
+生成の間にIrodori workerが終了していた場合、次の生成要求で1回自動的にworkerとモデルを再準備します。RVC診断の`partialResult.stage`が`tts`、`rvcStarted`が`false`の場合は、RVC変換ではなく前段の`POST /v1/speak`が最初の失敗です。
+
+Windowsイベントログに`nvlddmkm`エラーが繰り返し記録され、`nvidia-smi`も初期化できない場合は、モデルやRVC設定ではなくNVIDIAドライバ側の状態を先に復旧してください。worker再起動にも失敗する状態ではWindows再起動後に再確認します。
 
 ## chunk 結合がおかしい
 

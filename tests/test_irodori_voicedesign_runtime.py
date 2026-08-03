@@ -332,30 +332,46 @@ def test_irodori_direct_runtime_uses_model_specific_repo_local_checkpoint(tmp_pa
     assert result.audio_path == output_wav.resolve()
 
 
-def test_generation_does_not_reload_after_worker_exit(tmp_path, monkeypatch) -> None:
+def test_generation_reloads_after_worker_exit_and_records_diagnostics(tmp_path, monkeypatch) -> None:
     runtime = _build_runtime(tmp_path)
     runtime._worker = _DeadWorker()  # type: ignore[assignment]
+    runtime._stderr_lines.append("CUDA worker terminated after a driver reset")
     requests: list[dict[str, object]] = []
+    output_wav = tmp_path / "runtime" / "audio" / "dead-worker.wav"
 
     def fake_request(payload, timeout_sec):  # noqa: ANN001
         del timeout_sec
         requests.append(dict(payload))
-        return {"ok": True, "externalNetworkAttempts": 0}
+        if payload["action"] == "preload":
+            return {"ok": True, "externalNetworkAttempts": 0}
+        output_wav.parent.mkdir(parents=True, exist_ok=True)
+        output_wav.write_bytes(b"RIFF\x24\x00\x00\x00WAVEdata")
+        return {
+            "ok": True,
+            "outputPath": str(output_wav),
+            "captionInjectionMode": "separate_target",
+            "externalNetworkAttempts": 0,
+        }
 
     monkeypatch.setattr(runtime, "_request_worker", fake_request)
 
-    with pytest.raises(ProviderError, match="サービスを再起動"):
-        runtime.synthesize(
-            SynthesizeRequest(
-                text="worker停止後の生成です。",
-                request_id="dead-worker",
-                model_name="irodori_v3_voicedesign",
-                output_basename="dead-worker",
-            )
+    result = runtime.synthesize(
+        SynthesizeRequest(
+            text="worker停止後の生成です。",
+            request_id="dead-worker",
+            model_name="irodori_v3_voicedesign",
+            output_basename="dead-worker",
         )
+    )
 
-    assert requests == []
-    assert "irodori_v3_voicedesign" not in runtime._prepared_models
+    assert [request["action"] for request in requests] == ["preload", "synthesize"]
+    assert result.audio_path == output_wav.resolve()
+    assert "irodori_v3_voicedesign" in runtime._prepared_models
+    failure_log = (tmp_path / "runtime" / "logs" / "irodori-worker.log").read_text(
+        encoding="utf-8"
+    )
+    assert "exit code 1" in failure_log
+    assert "CUDA worker terminated after a driver reset" in failure_log
 
 
 def test_irodori_direct_runtime_reports_missing_repo_local_install(tmp_path) -> None:

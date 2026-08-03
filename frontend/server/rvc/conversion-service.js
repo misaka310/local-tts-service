@@ -21,7 +21,19 @@ export async function synthesizeAndConvertRvc(context, config, body, dependencie
   let speak = null; let audioCopy;
   if (inputOptions.inputSource === "tts") {
     speak = await (dependencies.callTtsJson || callTtsJson)(config.ttsBaseUrl, "POST", "/v1/speak", ttsBody);
-    if (!speak.ok) throw new Error(speak.body.errorMessage || speak.body.error || "TTS生成に失敗しました。");
+    if (!speak.ok) {
+      const error = new Error(speak.body.errorMessage || speak.body.error || "TTS生成に失敗しました。");
+      error.stdout = speak.body.stdout || "";
+      error.stderr = speak.body.stderr || "";
+      error.command = speak.body.command || null;
+      error.partialResult = {
+        stage: "tts",
+        firstFailedOperation: "POST /v1/speak",
+        rvcStarted: false,
+        tts: { request: ttsBody, result: speak.body },
+      };
+      throw error;
+    }
     audioCopy = await (dependencies.copyTtsAudio || copyTtsAudio)(context, config.ttsBaseUrl, speak.body, artifacts.intermediatePath);
     audioCopy = await optionallyCleanTtsAudio(context, inputOptions, artifacts.intermediatePath, id, audioCopy, dependencies);
   } else audioCopy = await (dependencies.prepareExternalAudio || prepareExternalAudio)(context, inputOptions, artifacts.intermediatePath, id, dependencies);
