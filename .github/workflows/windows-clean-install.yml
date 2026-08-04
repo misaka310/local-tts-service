@@ -17,6 +17,7 @@ on:
       - reference/irodori/**
       - reference/workflows/**
       - scripts/clean-install-ports.ps1
+      - scripts/console-control.ps1
       - scripts/download_hf_snapshot.py
       - scripts/git-runtime.ps1
       - scripts/kill-tts-stack-ports.ps1
@@ -37,6 +38,7 @@ on:
       - scripts/stop-managed-processes.ps1
       - scripts/test-local-tts-lifecycle.ps1
       - scripts/test-local-tts-lifecycle-watchdog.ps1
+      - scripts/test-console-control.ps1
       - scripts/verify-clean-install.bat
       - scripts/verify-clean-install.ps1
       - src/**
@@ -90,7 +92,7 @@ jobs:
 
       - name: Upload verification evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-clean-install-${{ github.run_id }}
           if-no-files-found: warn

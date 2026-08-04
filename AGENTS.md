@@ -43,6 +43,7 @@ python -m pytest --rootdir=. -c config/pytest.ini tests
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-setup-local-tts.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-managed-processes.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-managed-job.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-console-control.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-clean-install.ps1 -AllowExistingState -PreflightOnly
 cd frontend
 npm run check

@@ -4,12 +4,12 @@ param(
     [int]$StartupTimeoutSec = 240,
     [int]$PidTimeoutSec = 30,
     [int]$PortTimeoutSec = 30,
-    [string]$RunId = '',
-    [int]$SendCtrlCToLauncherPid = 0
+    [string]$RunId = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
+. (Join-Path $PSScriptRoot 'console-control.ps1')
 if ([string]::IsNullOrWhiteSpace($RunId)) { $RunId = [guid]::NewGuid().ToString('N') }
 $windowTitle = "LocalTtsLifecycle-$RunId"
 $backendPort = 8730
@@ -34,7 +34,6 @@ using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading;
 
 public static class LocalTtsLifecycleUiNative
 {
@@ -53,14 +52,6 @@ public static class LocalTtsLifecycleUiNative
     private static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr SendMessageTimeout(IntPtr window, uint message, IntPtr wParam, IntPtr lParam, uint flags, uint timeoutMs, out IntPtr result);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool AttachConsole(uint processId);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool FreeConsole();
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool SetConsoleCtrlHandler(IntPtr handler, bool add);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GenerateConsoleCtrlEvent(uint ctrlEvent, uint processGroupId);
 
     public static IntPtr FindVisibleWindowByExactTitle(string expectedTitle)
     {
@@ -81,22 +72,6 @@ public static class LocalTtsLifecycleUiNative
         return found;
     }
 
-    public static void SendConsoleCtrlC(int launcherProcessId)
-    {
-        FreeConsole();
-        if (!AttachConsole((uint)launcherProcessId)) throw new Win32Exception(Marshal.GetLastWin32Error());
-        try
-        {
-            SetConsoleCtrlHandler(IntPtr.Zero, true);
-            if (!GenerateConsoleCtrlEvent(0, 0)) throw new Win32Exception(Marshal.GetLastWin32Error());
-            Thread.Sleep(300);
-        }
-        finally
-        {
-            FreeConsole();
-        }
-    }
-
     public static void CloseWindow(string title)
     {
         IntPtr window = FindVisibleWindowByExactTitle(title);
@@ -107,11 +82,6 @@ public static class LocalTtsLifecycleUiNative
     }
 }
 '@
-}
-
-if ($SendCtrlCToLauncherPid -gt 0) {
-    [LocalTtsLifecycleUiNative]::SendConsoleCtrlC($SendCtrlCToLauncherPid)
-    exit 0
 }
 
 function Write-TestStage {
@@ -304,18 +274,8 @@ try {
 
     $stage = 'send-exit-event'
     if ($Mode -eq 'CtrlC') {
-        $senderArgs = @(
-            '-NoProfile',
-            '-ExecutionPolicy', 'Bypass',
-            '-File', $PSCommandPath,
-            '-SendCtrlCToLauncherPid', [string]$launcherPid
-        )
-        $sender = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe') -ArgumentList $senderArgs -WindowStyle Hidden -PassThru
-        if (-not $sender.WaitForExit(10000)) {
-            $sender.Kill()
-            throw 'Ctrl+C sender timeout'
-        }
-        if ($sender.ExitCode -ne 0) { throw "Ctrl+C sender failed with exit code $($sender.ExitCode)" }
+        $senderError = Join-Path $logDir "lifecycle-test-$RunId.ctrl-c-sender.err.log"
+        Send-LocalTtsConsoleCtrlC -TargetProcessId $launcherPid -TimeoutMs 10000 -ErrorLogPath $senderError -RepoRoot $repoRoot
     }
     else {
         [LocalTtsLifecycleUiNative]::CloseWindow($windowTitle)

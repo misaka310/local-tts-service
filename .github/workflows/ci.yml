@@ -51,6 +51,10 @@ jobs:
         shell: powershell
         run: ./scripts/test-managed-job.ps1
 
+      - name: Verify no-window console Ctrl+C sender
+        shell: powershell
+        run: ./scripts/test-console-control.ps1
+
       - name: Verify public history auditor
         run: python scripts/test_public_history_audit.py
 
