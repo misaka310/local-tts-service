@@ -44,7 +44,12 @@ class SynthesisService:
         available, reason = self.model_availability(model_name, model_cfg)
         if not available:
             return SynthesisOutcome(status_code=400, error_payload={"ok": False, "requestId": request_id, "model": model_name, "runtime": model_cfg.runtime, "voiceId": reference_voice.voice_id if reference_voice is not None else requested_voice, "audioPath": "", "audioUrl": "", "seedUsed": normalized.payload.seed, "instructionUsed": normalized.instruction, "available": False, "unavailableReason": reason, "errorMessage": reason or f"model unavailable: {model_name}", "timings": None, "textLength": len(normalized.payload.text), "voiceDescription": normalized.payload.voiceDescription or normalized.instruction, "captionInjectionMode": None})
-        validate_voice_design_instruction(normalized.payload, model_name, model_cfg)
+        validate_voice_design_instruction(
+            normalized.payload,
+            model_name,
+            model_cfg,
+            reference_voice=reference_voice,
+        )
         runtime_name = resolve_runtime_name(payload.engine, model_cfg.runtime)
         runtime = self.runtimes.get(runtime_name)
         if runtime is None: raise RequestValidationError(f"unknown runtime: {runtime_name}")

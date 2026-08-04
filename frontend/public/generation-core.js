@@ -47,7 +47,7 @@
       const voiceError = String(validators.validateVoice(model, voice) || "").trim();
       if (voiceError) return voiceError;
     }
-    if (capabilities.requiresInstruction(model) && !String(instruction || "").trim()) {
+    if (capabilities.requiresInstruction(model, voice) && !String(instruction || "").trim()) {
       return messages.instructionRequired || "instruction is required";
     }
     return "";
@@ -84,7 +84,7 @@
     if (/model_path|model path|\.pth/i.test(message) && /not found|missing|ENOENT|ありません/i.test(message)) return "RVCモデル（.pth）が見つかりません。model_pathを確認してください。";
     if (/index_path|index path|\.index/i.test(message) && /not found|missing|ENOENT|ありません/i.test(message)) return "RVCのindexが見つかりません。index_pathを確認してください。";
     if (/timed? out|timeout/i.test(message)) return "処理が時間切れになりました。サービスの稼働状態と入力内容を確認してください。";
-    if (/ECONNREFUSED|connection refused|fetch failed/i.test(message)) return "音声サービスに接続できません。バックエンドが起動しているか確認してください。";
+    if (/ECONNREFUSED|connection refused|fetch failed|failed to fetch/i.test(message)) return "ローカルTTSサービスに接続できません。local-tts.batを起動したまま、もう一度生成してください。";
     const firstLine = message.split(/(?:Traceback|\bat\s+[A-Za-z]:\\)/i)[0].trim();
     return compactMessage(firstLine || message);
   }

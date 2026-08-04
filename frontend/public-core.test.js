@@ -10,6 +10,7 @@ globalThis.LocalTtsChunking = {
 };
 globalThis.window = globalThis;
 await import("./public/model-catalog.js");
+await import("./public/model-capabilities.js");
 await import("./public/generation-core.js");
 await import("./public/store.js");
 await import("./public/rvc/rvc-form.js");
@@ -22,14 +23,7 @@ await import("./public/rvc/rvc-controller.js");
 
 const core = globalThis.LocalTts.generationCore;
 const modelCatalog = globalThis.LocalTtsModelCatalog;
-const capabilities = {
-  requiresReference: (model) => Boolean(model.requiresReferenceAudio),
-  supportsReference: (model) => Boolean(model.supportsReferenceVoice || model.requiresReferenceAudio),
-  requiresInstruction: (model) => Boolean(model.supportsVoiceDesign && !model.supportsReferenceVoice),
-  supportsInstruction: (model) => Boolean(model.supportsInstruction || model.supportsVoiceDesign),
-  supportsSpeedControl: (model) => Boolean(model.supportsSpeedControl),
-  supportsStyleStrength: (model) => Boolean(model.supportsStyleStrength),
-};
+const capabilities = globalThis.LocalTtsModelCapabilities;
 
 function fakeElement() {
   const listeners = new Map();
@@ -122,6 +116,30 @@ test("validates required, optional, and unsupported reference voice capability",
   assert.equal(core.validateRequest({ model: { available: true }, text: "hello" }, capabilities), "");
 });
 
+test("voice design requires either an instruction or a supported reference voice", () => {
+  const hybrid = {
+    available: true,
+    supportsVoiceDesign: true,
+    supportsInstruction: true,
+    supportsReferenceVoice: true,
+  };
+  assert.equal(core.validateRequest({ model: hybrid, text: "hello" }, capabilities), "instruction is required");
+  assert.equal(core.validateRequest({ model: hybrid, voice: { voiceId: "v" }, text: "hello" }, capabilities), "");
+  assert.equal(core.validateRequest({ model: hybrid, text: "hello", instruction: "calm" }, capabilities), "");
+
+  const designOnly = { ...hybrid, supportsReferenceVoice: false };
+  assert.equal(
+    core.validateRequest({ model: designOnly, voice: { voiceId: "ignored" }, text: "hello" }, capabilities),
+    "instruction is required",
+  );
+});
+
+test("standalone style strength stays usable without an instruction", () => {
+  assert.equal(capabilities.requiresPromptForStyleStrength({ supportsStyleStrength: true }), false);
+  assert.equal(capabilities.requiresPromptForStyleStrength({ supportsStyleStrength: true, supportsInstruction: true }), true);
+  assert.equal(capabilities.requiresPromptForStyleStrength({ supportsStyleStrength: true, supportsCaption: true }), true);
+});
+
 test("builds request body from advertised model capabilities", () => {
   const model = { id: "model", supportsReferenceVoice: true, supportsInstruction: true, supportsSpeedControl: true };
   assert.deepEqual(core.buildRequestBody({ model, voice: { voiceId: "voice" }, text: " hi ", instruction: " calm ", seed: "3", controls: { speedScale: 1.1 } }, capabilities, (item) => item.id), {
@@ -209,7 +227,7 @@ test("normal generation result hides internal-only memo and runtime metadata", a
 
 test("Chatterbox enables standalone expression strength while instructed models still require text", async () => {
   const normalPage = await readFile(new URL("./public/normal-page.js", import.meta.url), "utf-8");
-  assert.match(normalPage, /if \(!supportsInstruction\(model\)\) return true/);
+  assert.match(normalPage, /requiresPromptForStyleStrength\(model\)\) return true/);
   assert.match(normalPage, /return Boolean\(String\(els\.normalInstruction\?\.value \|\| ""\)\.trim\(\)\)/);
 });
 

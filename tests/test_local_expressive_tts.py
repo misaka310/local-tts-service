@@ -8,7 +8,7 @@ import wave
 from local_tts_service.config import load_config
 from local_tts_service.models import SpeakRequest
 from local_tts_service.synthesis.capability_validator import validate_instruction_requirements
-from scripts.local_expressive_tts_infer import load_request
+from scripts.local_expressive_tts_infer import _chatterbox_exaggeration, load_request
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -41,7 +41,7 @@ def test_expressive_models_are_registered_with_native_windows_commands() -> None
     assert cosyvoice.requires_reference_audio is True
     assert cosyvoice.requires_reference_text is False
     assert cosyvoice.supports_instruction is True
-    assert cosyvoice.supports_style_strength is True
+    assert cosyvoice.supports_style_strength is False
     assert cosyvoice.supports_speed_control is True
     assert cosyvoice.default_language == "ja"
 
@@ -67,7 +67,7 @@ def test_chatterbox_request_does_not_require_reference_transcript(tmp_path: Path
                 "modelId": "ResembleAI/chatterbox",
                 "text": "うれしくて、思わず笑っちゃった！",
                 "language": "Japanese",
-                "styleStrength": 0.8,
+                "styleStrength": 3.0,
                 "referenceAudioPath": str(audio),
                 "referenceTextPath": "",
                 "outputPath": str(output),
@@ -84,8 +84,16 @@ def test_chatterbox_request_does_not_require_reference_transcript(tmp_path: Path
     assert request.reference_text_path is None
     assert request.reference_text == ""
     assert request.language == "Japanese"
-    assert request.style_strength == 0.8
+    assert request.style_strength == 3.0
     assert request.seed == 42
+
+
+def test_chatterbox_style_strength_maps_public_range_to_native_exaggeration() -> None:
+    assert _chatterbox_exaggeration(None) == 0.7
+    assert _chatterbox_exaggeration(1.0) == 0.0
+    assert _chatterbox_exaggeration(3.0) == 0.8
+    assert _chatterbox_exaggeration(6.0) == 2.0
+    assert _chatterbox_exaggeration(99.0) == 2.0
 
 
 def test_cosyvoice_request_accepts_normal_japanese_and_instruction(tmp_path: Path) -> None:

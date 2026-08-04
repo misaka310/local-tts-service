@@ -244,7 +244,6 @@ DEFAULT_CONFIG = {
             "supportsLanguage": True,
             "supportsSeed": True,
             "supportsInstruction": True,
-            "supportsStyleStrength": True,
             "supportsSpeedControl": True,
             "defaultLanguage": "ja",
             "externalCommandKey": "cosyvoice",

@@ -264,7 +264,7 @@ Notes:
 - `model` defaults to the configured default model when omitted.
 - Models with `requiresReferenceAudio` require `voiceId`.
 - Models with `requiresReferenceText` require `reference/voices/{voiceId}/voice.txt`.
-- VoiceDesign models require `instruction`.
+- VoiceDesign models require either a resolved `voiceId` or `instruction`. When both are supplied, the model uses the reference speaker and the instruction together.
 - `speedScale` is an independent speed multiplier. Values above `1.0` are faster and values below `1.0` are slower. It is ignored for models without `supportsSpeedControl`.
 - `styleStrength` is an independent style-conditioning strength, not an instruction string. It is ignored for models without `supportsStyleStrength`.
 - `chunking` is optional and is used by normal generation, model comparison, and TTS input before RVC conversion.

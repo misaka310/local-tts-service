@@ -310,7 +310,8 @@ function updateCompareInstructionUi() {
     .filter(Boolean);
   const supportedModels = selectedModels.filter((model) => supportsInstruction(model));
   const instructionSupported = supportedModels.length > 0;
-  const instructionRequired = supportedModels.some((model) => requiresInstruction(model));
+  const voice = selectedVoice(els.compareVoice);
+  const instructionRequired = supportedModels.some((model) => requiresInstruction(model, voice));
 
   if (els.compareInstruction) els.compareInstruction.disabled = !instructionSupported;
   if (els.compareInstructionField) {

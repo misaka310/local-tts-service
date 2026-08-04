@@ -53,6 +53,7 @@ def test_voice_design_instruction_is_optional_with_reference_voice() -> None:
         SpeakRequest(text="hello", model="design", voiceId="person_a"),
         "design",
         _model(supports_voice_design=True),
+        reference_voice=object(),
     )
 
 
@@ -62,6 +63,16 @@ def test_voice_design_instruction_is_required_without_reference_voice() -> None:
             SpeakRequest(text="hello", model="design"),
             "design",
             _model(supports_voice_design=True),
+        )
+
+
+def test_voice_design_cannot_bypass_instruction_with_unresolved_voice_id() -> None:
+    with pytest.raises(RequestValidationError, match="instruction is required for model"):
+        validate_voice_design_instruction(
+            SpeakRequest(text="hello", model="design", voiceId="missing"),
+            "design",
+            _model(supports_voice_design=True),
+            reference_voice=None,
         )
 
 

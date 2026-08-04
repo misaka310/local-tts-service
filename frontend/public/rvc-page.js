@@ -546,7 +546,7 @@ function updateRvcInputSourceUi() {
 
 function updateRvcInstructionUi(model, source = selectedRvcInputSource()) {
   const instructionSupported = source === "tts" && supportsInstruction(model);
-  const instructionRequired = instructionSupported && requiresInstruction(model);
+  const instructionRequired = instructionSupported && requiresInstruction(model, selectedVoice(els.rvcVoice));
 
   if (els.rvcInstruction) els.rvcInstruction.disabled = !instructionSupported;
   if (els.rvcInstructionField) {

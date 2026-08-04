@@ -230,6 +230,13 @@ def _normalize_chatterbox_language(language: str) -> str:
     return aliases.get(normalized, normalized)
 
 
+def _chatterbox_exaggeration(style_strength: float | None) -> float:
+    if style_strength is None:
+        return 0.7
+    normalized = max(1.0, min(6.0, float(style_strength)))
+    return (normalized - 1.0) * 2.0 / 5.0
+
+
 def generate_chatterbox(request: ExpressiveTtsRequest) -> dict[str, object]:
     import soundfile as sf
     import torch
@@ -251,7 +258,7 @@ def generate_chatterbox(request: ExpressiveTtsRequest) -> dict[str, object]:
 
     _apply_seed(request.seed)
     _reset_peak_memory()
-    exaggeration = 0.7 if request.style_strength is None else max(0.0, min(2.0, request.style_strength))
+    exaggeration = _chatterbox_exaggeration(request.style_strength)
     cfg_weight = 0.3 if exaggeration >= 0.7 else 0.5
     model = ChatterboxMultilingualTTS.from_local(model_dir, device=device, t3_model="v3")
     waveform = model.generate(

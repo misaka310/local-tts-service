@@ -19,8 +19,14 @@ def validate_instruction_requirements(payload: SpeakRequest, model_name: str, mo
     if payload.styleStrength is not None and prompt_controls_supported and not (payload.caption or payload.instruction):
         raise RequestValidationError("styleStrength requires instruction or caption")
 
-def validate_voice_design_instruction(payload: SpeakRequest, model_name: str, model_cfg: Any) -> None:
-    has_reference_voice = bool(str(payload.voiceId or payload.referenceVoice or "").strip())
+def validate_voice_design_instruction(
+    payload: SpeakRequest,
+    model_name: str,
+    model_cfg: Any,
+    *,
+    reference_voice: Any | None = None,
+) -> None:
+    has_reference_voice = reference_voice is not None
     if (
         getattr(model_cfg, "supports_voice_design", False)
         and not has_reference_voice
