@@ -3,6 +3,7 @@ param(
   [switch]$ForceSetup,
   [switch]$Check,
   [switch]$PauseOnFailure,
+  [switch]$NoOpenBrowser,
   [string]$WindowTitle = ''
 )
 
@@ -155,7 +156,7 @@ try {
   if (-not $ctrlRequested) {
     $lifecycleState.stage = 'opening-frontend'
     Save-LifecycleState
-    & (Join-Path $PSScriptRoot 'start-tts-frontend.ps1') -ConfigPath $configPath -OpenBrowser -NoInstall
+    & (Join-Path $PSScriptRoot 'start-tts-frontend.ps1') -ConfigPath $configPath -OpenBrowser:(-not $NoOpenBrowser) -NoInstall
     Write-Host ''
     Write-Host '========== local-tts-service is running =========='
     Write-Host 'This terminal owns the backend and frontend.'

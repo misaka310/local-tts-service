@@ -29,9 +29,17 @@ https://github.com/user-attachments/assets/29ad093a-7950-4a17-ba09-8899dabb4828
 
 Python 3.11、Node.js、Gitはセットアップ時にアプリ内へ導入されるため、通常は手動インストール不要です。PyTorchとtorchaudioも、NVIDIA GPU環境ではCUDA 12.8版、GPUがない環境ではCPU版の同一バージョンを導入します。必要ファイルを事前配置した環境では、サービス起動と音声生成をネットワークなしで実行できます。CPUでも起動できますが、音声生成には時間がかかります。
 
-## 起動方法
+## セットアップと起動
 
-リポジトリ直下の`local-tts.bat`をダブルクリックします。
+Gitを利用できる場合は、PowerShellでリポジトリを取得して起動します。
+
+```powershell
+git clone https://github.com/misaka310/local-tts-service.git
+cd local-tts-service
+.\local-tts.bat
+```
+
+Gitを利用しない場合は、GitHubの「Code」からZIPをダウンロードして展開し、リポジトリ直下の`local-tts.bat`をダブルクリックします。
 
 必要なツールやモデルが未配置の場合は自動セットアップしてからブラウザを開きます。この明示的な取得処理ではインターネットを使用し、ダウンロード量によっては**30分〜1時間半程度**かかることがあります。
 

@@ -707,6 +707,26 @@ test("RVC conversion service orchestrates injected TTS, input, and runner bounda
   } finally { rmSync(tempRoot, { recursive: true, force: true }); }
 });
 
+test("RVC conversion reports TTS as the first failed operation before RVC starts", async () => {
+  const tempRoot = mkdtempSync(path.join(os.tmpdir(), "tts-rvc-tts-failure-"));
+  const context = createRvcContext({ repoRoot: tempRoot, outputDir: path.join(tempRoot, "out"), env: { LOCAL_TTS_RVC_MODEL_PATH: path.join(tempRoot, "voice.pth"), LOCAL_TTS_RVC_INDEX_PATH: path.join(tempRoot, "voice.index") } });
+  try {
+    await assert.rejects(
+      () => convertWithDependencies(context, { ttsBaseUrl: "http://tts.local" }, { text: "test", model: "irodori_v4_small", inputSource: "tts" }, {
+        callTtsJson: async () => ({ ok: false, body: { requestId: "req-dead-worker", runtime: "irodori_voicedesign_direct", errorMessage: "Irodori runtimeが停止しました: worker process exited" } }),
+      }),
+      (error) => {
+        assert.equal(error.message, "Irodori runtimeが停止しました: worker process exited");
+        assert.equal(error.partialResult.stage, "tts");
+        assert.equal(error.partialResult.firstFailedOperation, "POST /v1/speak");
+        assert.equal(error.partialResult.rvcStarted, false);
+        assert.equal(error.partialResult.tts.result.requestId, "req-dead-worker");
+        return true;
+      },
+    );
+  } finally { rmSync(tempRoot, { recursive: true, force: true }); }
+});
+
 test("rvcParamStem changes by index_rate for separate output files", () => {
   const base = normalizeRvcParams({
     modelPath: "C:\\models\\sample.pth",
