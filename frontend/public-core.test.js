@@ -62,6 +62,14 @@ test("model lists keep available models first without scrambling their configure
   assert.match(compareSource, /sortModelsAvailableFirst\(desiredModels\)/);
 });
 
+test("copy feedback uses a visible toast", async () => {
+  const sharedUiSource = await readFile(new URL("./public/shared-ui.js", import.meta.url), "utf-8");
+  const styleSource = await readFile(new URL("./public/style.css", import.meta.url), "utf-8");
+  assert.match(sharedUiSource, /showToast\("コピーしました"\)/);
+  assert.match(sharedUiSource, /role", "status"/);
+  assert.match(styleSource, /\.local-tts-toast\.visible/);
+});
+
 test("audio autoplay waits for readiness and retries one interrupted play", async () => {
   const listeners = new Map();
   let playCalls = 0;
@@ -188,6 +196,7 @@ test("generation core owns voice validation, chunk attachment, and user-facing e
     chunking: { softChunkChars: 120 },
   });
   assert.match(core.humanizeError({ message: "CUDA out of memory" }), /GPUメモリ不足/);
+  assert.match(core.humanizeError({ message: "Failed to fetch" }), /local-tts\.bat/);
 });
 
 test("normal controller owns page event binding and binds only once", () => {

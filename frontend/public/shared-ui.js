@@ -1,4 +1,6 @@
 (() => {
+  let toastTimer = null;
+
   function loadList(key, limit = 24) {
     try {
       const parsed = JSON.parse(localStorage.getItem(key) || "[]");
@@ -79,16 +81,42 @@
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
+  function showToast(message, isError = false) {
+    if (typeof document === "undefined" || !document.body) return;
+    let toast = document.querySelector("#localTtsToast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "localTtsToast";
+      toast.className = "local-tts-toast";
+      toast.setAttribute("role", "status");
+      toast.setAttribute("aria-live", "polite");
+      document.body.appendChild(toast);
+    }
+    toast.textContent = String(message || "");
+    toast.classList.toggle("error", isError);
+    toast.classList.remove("visible");
+    void toast.offsetWidth;
+    toast.classList.add("visible");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove("visible"), 1800);
+  }
+
   async function copyText(value) {
-    if (!value) return false;
+    if (!value) {
+      showToast("コピーできませんでした", true);
+      return false;
+    }
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(value);
+        showToast("コピーしました");
         return true;
       }
     } catch {
+      showToast("コピーできませんでした", true);
       return false;
     }
+    showToast("コピーできませんでした", true);
     return false;
   }
 
@@ -102,6 +130,7 @@
     setStatus,
     setServiceState,
     insertAtCursor,
+    showToast,
     copyText
   });
 })();
