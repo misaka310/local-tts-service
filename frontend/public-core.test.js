@@ -10,6 +10,7 @@ globalThis.LocalTtsChunking = {
 };
 globalThis.window = globalThis;
 await import("./public/model-catalog.js");
+await import("./public/model-capabilities.js");
 await import("./public/generation-core.js");
 await import("./public/store.js");
 await import("./public/rvc/rvc-form.js");
@@ -22,14 +23,7 @@ await import("./public/rvc/rvc-controller.js");
 
 const core = globalThis.LocalTts.generationCore;
 const modelCatalog = globalThis.LocalTtsModelCatalog;
-const capabilities = {
-  requiresReference: (model) => Boolean(model.requiresReferenceAudio),
-  supportsReference: (model) => Boolean(model.supportsReferenceVoice || model.requiresReferenceAudio),
-  requiresInstruction: (model) => Boolean(model.supportsVoiceDesign && !model.supportsReferenceVoice),
-  supportsInstruction: (model) => Boolean(model.supportsInstruction || model.supportsVoiceDesign),
-  supportsSpeedControl: (model) => Boolean(model.supportsSpeedControl),
-  supportsStyleStrength: (model) => Boolean(model.supportsStyleStrength),
-};
+const capabilities = globalThis.LocalTtsModelCapabilities;
 
 function fakeElement() {
   const listeners = new Map();
@@ -66,6 +60,14 @@ test("model lists keep available models first without scrambling their configure
   const compareSource = await readFile(new URL("./public/compare-page.js", import.meta.url), "utf-8");
   assert.match(appSource, /sortModelsAvailableFirst\(prioritizedModels\)/);
   assert.match(compareSource, /sortModelsAvailableFirst\(desiredModels\)/);
+});
+
+test("copy feedback uses a visible toast", async () => {
+  const sharedUiSource = await readFile(new URL("./public/shared-ui.js", import.meta.url), "utf-8");
+  const styleSource = await readFile(new URL("./public/style.css", import.meta.url), "utf-8");
+  assert.match(sharedUiSource, /showToast\("コピーしました"\)/);
+  assert.match(sharedUiSource, /role", "status"/);
+  assert.match(styleSource, /\.local-tts-toast\.visible/);
 });
 
 test("audio autoplay waits for readiness and retries one interrupted play", async () => {
@@ -122,6 +124,30 @@ test("validates required, optional, and unsupported reference voice capability",
   assert.equal(core.validateRequest({ model: { available: true }, text: "hello" }, capabilities), "");
 });
 
+test("voice design requires either an instruction or a supported reference voice", () => {
+  const hybrid = {
+    available: true,
+    supportsVoiceDesign: true,
+    supportsInstruction: true,
+    supportsReferenceVoice: true,
+  };
+  assert.equal(core.validateRequest({ model: hybrid, text: "hello" }, capabilities), "instruction is required");
+  assert.equal(core.validateRequest({ model: hybrid, voice: { voiceId: "v" }, text: "hello" }, capabilities), "");
+  assert.equal(core.validateRequest({ model: hybrid, text: "hello", instruction: "calm" }, capabilities), "");
+
+  const designOnly = { ...hybrid, supportsReferenceVoice: false };
+  assert.equal(
+    core.validateRequest({ model: designOnly, voice: { voiceId: "ignored" }, text: "hello" }, capabilities),
+    "instruction is required",
+  );
+});
+
+test("standalone style strength stays usable without an instruction", () => {
+  assert.equal(capabilities.requiresPromptForStyleStrength({ supportsStyleStrength: true }), false);
+  assert.equal(capabilities.requiresPromptForStyleStrength({ supportsStyleStrength: true, supportsInstruction: true }), true);
+  assert.equal(capabilities.requiresPromptForStyleStrength({ supportsStyleStrength: true, supportsCaption: true }), true);
+});
+
 test("builds request body from advertised model capabilities", () => {
   const model = { id: "model", supportsReferenceVoice: true, supportsInstruction: true, supportsSpeedControl: true };
   assert.deepEqual(core.buildRequestBody({ model, voice: { voiceId: "voice" }, text: " hi ", instruction: " calm ", seed: "3", controls: { speedScale: 1.1 } }, capabilities, (item) => item.id), {
@@ -170,6 +196,7 @@ test("generation core owns voice validation, chunk attachment, and user-facing e
     chunking: { softChunkChars: 120 },
   });
   assert.match(core.humanizeError({ message: "CUDA out of memory" }), /GPUメモリ不足/);
+  assert.match(core.humanizeError({ message: "Failed to fetch" }), /local-tts\.bat/);
 });
 
 test("normal controller owns page event binding and binds only once", () => {
@@ -205,6 +232,12 @@ test("normal generation result hides internal-only memo and runtime metadata", a
   assert.doesNotMatch(html, /評価メモ/);
   assert.doesNotMatch(normalPage, /runtime：/);
   assert.doesNotMatch(normalPage, /normalResultMemo/);
+});
+
+test("Chatterbox enables standalone expression strength while instructed models still require text", async () => {
+  const normalPage = await readFile(new URL("./public/normal-page.js", import.meta.url), "utf-8");
+  assert.match(normalPage, /requiresPromptForStyleStrength\(model\)\) return true/);
+  assert.match(normalPage, /return Boolean\(String\(els\.normalInstruction\?\.value \|\| ""\)\.trim\(\)\)/);
 });
 
 test("advanced voice controls and primary seed controls follow the cross-screen hierarchy", async () => {

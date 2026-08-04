@@ -12,7 +12,24 @@ def validate_model_capabilities(payload: SpeakRequest, model_name: str, model_cf
     if payload.styleStrength is not None and not getattr(model_cfg, "supports_style_strength", False): raise RequestValidationError(f"styleStrength is not supported for model: {model_name}")
 
 def validate_instruction_requirements(payload: SpeakRequest, model_name: str, model_cfg: Any) -> None:
-    if payload.styleStrength is not None and not (payload.caption or payload.instruction): raise RequestValidationError("styleStrength requires instruction or caption")
+    prompt_controls_supported = bool(
+        getattr(model_cfg, "supports_caption", False)
+        or getattr(model_cfg, "supports_instruction", False)
+    )
+    if payload.styleStrength is not None and prompt_controls_supported and not (payload.caption or payload.instruction):
+        raise RequestValidationError("styleStrength requires instruction or caption")
 
-def validate_voice_design_instruction(payload: SpeakRequest, model_name: str, model_cfg: Any) -> None:
-    if getattr(model_cfg, "supports_voice_design", False) and not str(payload.instruction or "").strip(): raise RequestValidationError(f"instruction is required for model: {model_name}")
+def validate_voice_design_instruction(
+    payload: SpeakRequest,
+    model_name: str,
+    model_cfg: Any,
+    *,
+    reference_voice: Any | None = None,
+) -> None:
+    has_reference_voice = reference_voice is not None
+    if (
+        getattr(model_cfg, "supports_voice_design", False)
+        and not has_reference_voice
+        and not str(payload.instruction or "").strip()
+    ):
+        raise RequestValidationError(f"instruction is required for model: {model_name}")

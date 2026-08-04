@@ -3,7 +3,10 @@ import pytest
 
 from local_tts_service.errors import RequestValidationError
 from local_tts_service.models import SpeakRequest
-from local_tts_service.synthesis.capability_validator import validate_model_capabilities
+from local_tts_service.synthesis.capability_validator import (
+    validate_model_capabilities,
+    validate_voice_design_instruction,
+)
 from local_tts_service.synthesis.chunking import merge_chunking_override, should_keep_chunk_files, split_text_for_chunks
 from local_tts_service.synthesis.request_normalizer import normalize_request
 from local_tts_service.synthesis_service import SynthesisService
@@ -43,6 +46,35 @@ def test_request_normalizer_maps_style_caption_to_instruction() -> None:
 def test_capability_validator_rejects_unsupported_caption() -> None:
     with pytest.raises(RequestValidationError, match="caption is not supported"):
         validate_model_capabilities(SpeakRequest(text="hello", model="plain", caption="calm"), "plain", _model())
+
+
+def test_voice_design_instruction_is_optional_with_reference_voice() -> None:
+    validate_voice_design_instruction(
+        SpeakRequest(text="hello", model="design", voiceId="person_a"),
+        "design",
+        _model(supports_voice_design=True),
+        reference_voice=object(),
+    )
+
+
+def test_voice_design_instruction_is_required_without_reference_voice() -> None:
+    with pytest.raises(RequestValidationError, match="instruction is required for model"):
+        validate_voice_design_instruction(
+            SpeakRequest(text="hello", model="design"),
+            "design",
+            _model(supports_voice_design=True),
+        )
+
+
+def test_voice_design_cannot_bypass_instruction_with_unresolved_voice_id() -> None:
+    with pytest.raises(RequestValidationError, match="instruction is required for model"):
+        validate_voice_design_instruction(
+            SpeakRequest(text="hello", model="design", voiceId="missing"),
+            "design",
+            _model(supports_voice_design=True),
+            reference_voice=None,
+        )
+
 
 def test_chunk_retention_environment_overrides_config(monkeypatch) -> None:
     monkeypatch.setenv("LOCAL_TTS_KEEP_CHUNKS", "true")

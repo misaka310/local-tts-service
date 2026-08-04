@@ -13,6 +13,8 @@
     fireredtts2: "FireRedTTS-2",
     t5gemma_tts_2b_2b: "T5Gemma-TTS 2B-2B",
     fish_s1_mini: "FishAudio S1-mini",
+    chatterbox_multilingual_v3: "Chatterbox Multilingual V3",
+    fun_cosyvoice3_0_5b: "Fun-CosyVoice 3.0 0.5B",
     mock: "Mock WAV",
   };
 
@@ -20,7 +22,7 @@
     irodori_v4_small: {
       badges: ["最新版", "公式v4", "約0.8B"],
       description: "声寄せと話し方指定を1つに統合した公式Irodori v4。Smallは公式モデル名で、約7.66億パラメータの通常版です。",
-      features: ["参照音声による声寄せ", "話し方メモによる感情・スタイル指定", "参照音声なしでも生成可能", "本文中の絵文字による表現調整", "最大120秒の参照音声に対応"],
+      features: ["参照音声による声寄せ", "話し方メモによる感情・スタイル指定", "参照音声なしでは話し方メモから生成", "本文中の絵文字による表現調整", "最大120秒の参照音声に対応"],
       scores: { 自然さ: "高", 感情表現: "高", 安定性: "高" },
       memo: "量子化版ではない公式チェックポイントです。短い参照1本でも使えますが、声寄せは30秒程度以上のきれいな参照音声で安定しやすくなります。",
       rankReason: "声寄せと表現制御を1モデルで扱え、Irodori系の第一候補です。",
@@ -80,10 +82,30 @@
       rankReason: "表現力は優れるものの、長文での安定性に課題があります。",
       baseScore: 76,
     },
+    chatterbox_multilingual_v3: {
+      badges: ["Multilingual V3", "日本語", "MIT"],
+      description: "参照音声の声質を使いながら、表現強度で感情の出方を調整できる多言語モデルです。",
+      features: ["日本語を含む23言語", "短い参照音声による声寄せ", "表現強度の調整", "Windows上のCUDAで完全ローカル生成"],
+      scores: { 自然さ: "高", 感情表現: "高", 安定性: "高" },
+      memo: "日本語の感情豊かな短い台詞を試す第一候補です。表現強度は上げすぎると誇張が強くなります。",
+      rankReason: "日本語対応・感情制御・16GB VRAMでの実行可能性を両立します。",
+      baseScore: 97,
+    },
+    fun_cosyvoice3_0_5b: {
+      badges: ["日本語", "感情指示", "Apache-2.0"],
+      description: "日本語の通常入力を内部でカタカナへ正規化し、参照音声と感情指示を使って生成する多言語TTSです。",
+      features: ["日本語を含む9言語", "参照音声による声寄せ", "喜び・悲しみ・怒り・話速などの指示", "Windowsの分離環境で完全ローカル生成"],
+      scores: { 自然さ: "高", 感情表現: "高", 安定性: "高" },
+      memo: "日本語本文は内部変換されます。固有名詞の読みが重要な場合はカタカナ表記にすると安定します。",
+      rankReason: "日本語と感情指示に対応し、Chatterboxとは異なる制御方式で比較できます。",
+      baseScore: 96,
+    },
   };
 
   const DESIRED_MODELS = [
     "irodori_v4_small",
+    "chatterbox_multilingual_v3",
+    "fun_cosyvoice3_0_5b",
     "gpt_sovits_zero_shot",
     "qwen3_tts_clone_1_7b",
     "irodori_v3_voicedesign",

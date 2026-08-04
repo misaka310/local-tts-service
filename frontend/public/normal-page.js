@@ -124,12 +124,13 @@ function updateNormalReferenceUi(model = selectedNormalModel()) {
 }
 
 function updateNormalRequirementLabels(model = selectedNormalModel()) {
+  const voice = normalReferenceEnabled(model) ? selectedVoice(els.normalVoice) : null;
   if (requiresReference(model)) setRequirementBadge(els.normalReferenceRequirement, "必須", "required");
   else if (supportsReference(model)) setRequirementBadge(els.normalReferenceRequirement, "任意", "optional");
   else setRequirementBadge(els.normalReferenceRequirement, "未対応", "inactive");
 
   const instructionSupported = supportsInstruction(model);
-  if (requiresInstruction(model)) setRequirementBadge(els.normalInstructionRequirement, "必須", "required");
+  if (requiresInstruction(model, voice)) setRequirementBadge(els.normalInstructionRequirement, "必須", "required");
   else if (instructionSupported) setRequirementBadge(els.normalInstructionRequirement, "任意", "optional");
 
   if (els.normalInstruction) els.normalInstruction.disabled = !instructionSupported;
@@ -151,7 +152,9 @@ function updateNormalRequirementLabels(model = selectedNormalModel()) {
 }
 
 function normalStyleStrengthEnabled(model) {
-  return Boolean(supportsStyleStrength(model) && String(els.normalInstruction?.value || "").trim());
+  if (!supportsStyleStrength(model)) return false;
+  if (!window.LocalTtsModelCapabilities.requiresPromptForStyleStrength(model)) return true;
+  return Boolean(String(els.normalInstruction?.value || "").trim());
 }
 
 function normalSynthesisControls(model) {

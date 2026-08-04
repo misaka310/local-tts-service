@@ -243,6 +243,28 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--blue); }
 .status-line.error { color: var(--red); font-weight: 800; }
 .status-line.warning { color: #9a6700; font-weight: 800; }
 
+.local-tts-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 10000;
+  min-width: 150px;
+  padding: 11px 18px;
+  border-radius: 12px;
+  background: #172033;
+  color: #fff;
+  box-shadow: 0 12px 32px rgba(23, 32, 51, 0.25);
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+.local-tts-toast.visible { opacity: 1; transform: translate(-50%, 0); }
+.local-tts-toast.error { background: var(--red); }
+
 .section-head { margin: 20px 0 10px; }
 .section-head h2 { margin: 0; font-size: 18px; }
 .inline-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
