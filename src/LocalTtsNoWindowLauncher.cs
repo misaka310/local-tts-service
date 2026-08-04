@@ -207,7 +207,9 @@ internal static class LocalTtsNoWindowLauncher
             WindowStyle = ProcessWindowStyle.Hidden,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
-            RedirectStandardError = true
+            RedirectStandardError = true,
+            StandardOutputEncoding = new UTF8Encoding(false),
+            StandardErrorEncoding = new UTF8Encoding(false)
         };
 
         var job = CreateKillOnCloseJob();

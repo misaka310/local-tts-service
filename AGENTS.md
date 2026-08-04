@@ -5,6 +5,9 @@
 ## 利用者向け導線を守る
 
 - 利用者向けの入口はリポジトリ直下の `local-tts.bat` 1つだけにする。初回・通常起動を自動判定し、修復は `-ForceSetup`、診断は `-Check` で同じ入口から実行する。開発・検証用コマンドは `scripts/` と `docs/development.md` に置く。
+- Companionや無人実行は人向け `local-tts.bat` を `cmd.exe /c start` で呼ばず、`scripts/start-local-tts-companion-detached.ps1` から共有no-window launcherへ渡す。人向け入口の表示動作は変えない。
+- Companion起動経路を変えた場合は、実ボタンから停止状態→HTTP 8730/5177復帰を確認し、中央監視で新規の表示ターミナルとフォーカス奪取が0件であることを完了条件にする。
+- ブラウザ検証で利用者が操作中の既存タブ・既存ウィンドウ・メインプロファイルを使わない。E2Eはheadlessまたは専用の新規ウィンドウ／隔離プロファイルだけで実行し、既存タブの選択・移動・再読み込み・URL変更を禁止する。
 - 公開用の初期設定はIrodori v3を既定にし、Qwen3-TTSはVoice Clone 1.7Bだけを標準導入する。Qwen3-TTS Voice Designは標準設定・通常UI・初回ダウンロードへ戻さない。
 - セットアップやモデル追加で、既存の通常生成・比較・RVC・履歴・参照音声のUXを勝手に変更しない。
 - 「使い方」は画面が開いている時点で起動済みとして、最初の生成、目的選択、参照音声、困ったとき、注意事項の順を維持する。起動方法は次回起動などの補足に留め、長文分割の大きな重複説明を戻さない。
@@ -59,3 +62,8 @@ npm run e2e:rvc-tabs
 - Put Node TTS normalization in `frontend/server/tts-request.js` and RVC implementation in `frontend/server/rvc/`.
 - Put FastAPI HTTP boundaries in `src/local_tts_service/api/`, catalog/health logic in `services/`, and synthesis workflow logic in `synthesis/`. Preserve compatibility facades.
 - Run `scripts/cleanup-runtime-artifacts.ps1` without `-Apply` first; its default mode never deletes files.
+
+## 仕様の正本
+
+- 仕様の正本: `README.md`
+- 実装前に意図する仕様を正本へ反映し、仕様変更時は同じ変更で正本と検証を更新する。

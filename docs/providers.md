@@ -49,6 +49,26 @@ payloadには次を含みます。
 
 `referenceTextPath`はランナー側でUTF-8として読み取り、参照文字列とともに公式Zero-shot APIへ渡します。WindowsパスはPowerShellラッパーでWSLパスへ変換します。
 
+### Windows向け感情表現モデル
+
+Chatterbox Multilingual V3とFun-CosyVoice 3.0 0.5Bも`external_cli`を使いますが、WSLではなくWindows上のモデル別venvで実行します。
+
+```text
+/v1/speak
+  -> ExternalCliRuntime
+  -> scripts/run-local-expressive-tts.ps1
+  -> scripts/local_expressive_tts_infer.py
+  -> runtime/venvs/<model> / 固定revisionの公式コード・重み
+  -> 指定outputPathへWAV保存
+```
+
+- Chatterboxは`language=ja`、参照音声、`styleStrength`を`exaggeration`へ渡します
+- CosyVoiceは日本語本文をカタカナへ正規化し、参照音声、感情指示、`speedScale`を`inference_instruct2`へ渡します
+- CosyVoiceのWeTextはセットアップ時に`runtime/models/wetext`へ保存し、生成時は外部更新確認を行わずローカルコピーを使います
+- PyTorch 2.10のWindows音声I/OはTorchCodecへ依存させず、PCM WAVをSoundFileで直接読み書きします
+- GPU空きがモデル別閾値を下回る場合は、既存GPU処理を停止せず、その生成要求だけCPUへ切り替えます
+- 生成結果には実行device、空きVRAM、ピークVRAM、正規化済み日本語、WAVメタデータをJSONで出力します
+
 ### availability
 
 `runtimes.external_cli.availabilityCommands`にモデルごとの確認コマンドを設定できます。WSLモデルでは次を実検査します。

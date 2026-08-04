@@ -746,6 +746,44 @@ def test_voicedesign_maps_instruction_and_native_controls(tmp_path) -> None:
     }
 
 
+def test_voicedesign_allows_reference_voice_without_instruction(tmp_path) -> None:
+    _write_config(tmp_path)
+    app = create_app(tmp_path)
+    client = TestClient(app)
+    captured = {}
+
+    class _VoiceDesignRuntime:
+        name = "irodori_voicedesign_direct"
+
+        def synthesize(self, request):  # noqa: ANN001
+            captured["caption"] = request.caption
+            captured["voice_id"] = request.voice_id
+            captured["reference_audio_path"] = request.reference_audio_path
+            out = tmp_path / "runtime" / "audio" / f"{request.output_basename}.wav"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            write_silence_wav(out, duration_sec=0.05, sample_rate=16000)
+            return SynthesizeResult(runtime=self.name, model=request.model_name, audio_path=out)
+
+    app.state.service.runtimes["irodori_voicedesign_direct"] = _VoiceDesignRuntime()
+    speak = client.post(
+        "/v1/speak",
+        json={
+            "text": "reference only",
+            "model": "irodori_v3_voicedesign",
+            "voiceId": "person_a",
+            "requestId": "reference-only",
+            "format": "wav",
+        },
+    )
+
+    assert speak.status_code == 200
+    assert captured["caption"] is None
+    assert captured["voice_id"] == "person_a"
+    assert str(captured["reference_audio_path"]).replace("/", "\\").endswith(
+        "reference\\voices\\person_a\\voice.wav"
+    )
+
+
 def test_voicedesign_rejects_style_strength_without_instruction(tmp_path) -> None:
     _write_config(tmp_path)
     app = create_app(tmp_path)

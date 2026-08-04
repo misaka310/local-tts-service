@@ -94,6 +94,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-tts.ps
 | Qwen3-TTS Voice Clone 0.6B | 未導入 | 追加モデルと参照音声 |
 | GPT-SoVITS | 無効 | vendorセットアップと設定変更 |
 | RVC | 声モデル未配置 | `.pth` と `.index` を配置 |
+| Chatterbox Multilingual V3 / Fun-CosyVoice 3.0 | 未導入 | Windows向け個別セットアップと参照音声 |
 | WSL追加モデル | 無効 | 個別セットアップ |
 | VoxCPM2互換 | 無効 | ComfyUIと設定追加 |
 
@@ -127,6 +128,23 @@ reference/voices/<voiceId>/voice.txt
 音声内で実際に話している文章を正確に入力してください。目安は3〜10秒、1人の声、BGM・反響・ノイズが少ない音声です。
 
 ## 任意モデルを追加する
+
+### Windows向け感情表現モデル
+
+Chatterbox Multilingual V3とFun-CosyVoice 3.0 0.5Bは、既存環境を変更せずモデル別の専用venvへ導入します。初回のみ公式コード、固定revisionの重み、CosyVoice用WeTextデータを取得します。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-local-expressive-tts.ps1 -Model all
+```
+
+個別に確認する場合は次を実行します。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-expressive-tts.ps1 -Model chatterbox
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-expressive-tts.ps1 -Model cosyvoice
+```
+
+どちらも参照音声が必要です。Chatterboxは日本語`ja`と表現強度を直接使います。CosyVoiceは通常の日本語入力を内部でカタカナへ正規化し、感情指示と話速を推論へ渡します。GPU空きが不足している場合は既存GPU処理を止めず、その要求だけCPUへ切り替えます。セットアップ後の生成はリポジトリ内のモデルとWeTextデータだけを使います。
 
 ### WSLモデル
 

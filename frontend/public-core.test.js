@@ -207,6 +207,12 @@ test("normal generation result hides internal-only memo and runtime metadata", a
   assert.doesNotMatch(normalPage, /normalResultMemo/);
 });
 
+test("Chatterbox enables standalone expression strength while instructed models still require text", async () => {
+  const normalPage = await readFile(new URL("./public/normal-page.js", import.meta.url), "utf-8");
+  assert.match(normalPage, /if \(!supportsInstruction\(model\)\) return true/);
+  assert.match(normalPage, /return Boolean\(String\(els\.normalInstruction\?\.value \|\| ""\)\.trim\(\)\)/);
+});
+
 test("advanced voice controls and primary seed controls follow the cross-screen hierarchy", async () => {
   const html = await readFile(new URL("./public/index.html", import.meta.url), "utf-8");
   for (const scope of ["normal", "compare", "rvc"]) {

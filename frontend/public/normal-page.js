@@ -151,7 +151,9 @@ function updateNormalRequirementLabels(model = selectedNormalModel()) {
 }
 
 function normalStyleStrengthEnabled(model) {
-  return Boolean(supportsStyleStrength(model) && String(els.normalInstruction?.value || "").trim());
+  if (!supportsStyleStrength(model)) return false;
+  if (!supportsInstruction(model)) return true;
+  return Boolean(String(els.normalInstruction?.value || "").trim());
 }
 
 function normalSynthesisControls(model) {
