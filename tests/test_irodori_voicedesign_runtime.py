@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import subprocess
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -25,7 +27,58 @@ class _DeadWorker:
         return self.returncode
 
 
-def _build_runtime(tmp_path: Path) -> IrodoriVoiceDesignDirectRuntime:
+class _WorkerStdin:
+    def __init__(self, worker: "_ControllableWorker") -> None:
+        self.worker = worker
+
+    def write(self, value: str) -> int:
+        payload = json.loads(value)
+        self.worker.requests.append(payload)
+        if payload.get("action") == "shutdown":
+            self.worker.shutdown_requested = True
+        elif self.worker.on_request is not None:
+            self.worker.on_request(payload)
+        return len(value)
+
+    def flush(self) -> None:
+        return None
+
+
+class _ControllableWorker:
+    def __init__(self, on_request=None) -> None:  # noqa: ANN001
+        self.returncode: int | None = None
+        self.requests: list[dict[str, object]] = []
+        self.shutdown_requested = False
+        self.terminated = False
+        self.killed = False
+        self.on_request = on_request
+        self.stdin = _WorkerStdin(self)
+
+    def poll(self) -> int | None:
+        return self.returncode
+
+    def wait(self, timeout: float) -> int:
+        if self.returncode is None and self.shutdown_requested:
+            self.returncode = 0
+        if self.returncode is None:
+            raise subprocess.TimeoutExpired("irodori-worker", timeout)
+        return self.returncode
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.returncode = -15
+
+    def kill(self) -> None:
+        self.killed = True
+        self.returncode = -9
+
+
+def _build_runtime(
+    tmp_path: Path,
+    *,
+    idle_timeout_sec: float = 600,
+    idle_monitor_interval_sec: float = 0.01,
+) -> IrodoriVoiceDesignDirectRuntime:
     python_exe = tmp_path / "python.exe"
     python_exe.write_bytes(b"")
     wrapper_dir = tmp_path / "wrapper"
@@ -62,6 +115,8 @@ def _build_runtime(tmp_path: Path) -> IrodoriVoiceDesignDirectRuntime:
         python_executable=str(python_exe),
         wrapper_dir=wrapper_dir,
         checkpoint="",
+        idle_timeout_sec=idle_timeout_sec,
+        idle_monitor_interval_sec=idle_monitor_interval_sec,
         codec_repo=str(codec_dir),
         text_processor_dir=str(processor_dir),
         model_device="cpu",
@@ -74,13 +129,184 @@ def _build_runtime(tmp_path: Path) -> IrodoriVoiceDesignDirectRuntime:
     return runtime
 
 
+def _wait_until(predicate, timeout_sec: float = 1.0) -> bool:  # noqa: ANN001
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.005)
+    return bool(predicate())
+
+
+def test_idle_worker_stays_alive_before_deadline(tmp_path) -> None:
+    runtime = _build_runtime(tmp_path, idle_timeout_sec=0.2)
+    worker = _ControllableWorker()
+    runtime._worker = worker  # type: ignore[assignment]
+    runtime._last_worker_activity_at = time.monotonic()
+    runtime._ensure_idle_monitor_started()
+
+    time.sleep(0.05)
+
+    assert runtime._worker is worker
+    assert worker.shutdown_requested is False
+    runtime.close()
+
+
+def test_idle_worker_stops_after_deadline_and_resets_state(tmp_path) -> None:
+    runtime = _build_runtime(tmp_path, idle_timeout_sec=0.05)
+    worker = _ControllableWorker()
+    runtime._worker = worker  # type: ignore[assignment]
+    runtime._prepared_models.add("irodori_v3_voicedesign")
+    runtime._worker_events.put({"protocolRequestId": "stale", "ok": True})
+    runtime._last_worker_activity_at = time.monotonic()
+    runtime._ensure_idle_monitor_started()
+
+    assert _wait_until(lambda: runtime._worker is None)
+
+    assert worker.shutdown_requested is True
+    assert not runtime._prepared_models
+    assert runtime._worker_events.empty()
+    idle_log = (tmp_path / "runtime" / "logs" / "irodori-worker.log").read_text(
+        encoding="utf-8"
+    )
+    assert "automatic idle shutdown" in idle_log
+    assert "unused for" in idle_log
+    runtime.close()
+
+
+def test_idle_monitor_does_not_stop_worker_during_request(tmp_path) -> None:
+    runtime = _build_runtime(tmp_path, idle_timeout_sec=0.05)
+    worker = _ControllableWorker()
+    runtime._worker = worker  # type: ignore[assignment]
+    runtime._last_worker_activity_at = time.monotonic() - 1
+    payload: dict[str, object] = {"action": "synthesize"}
+    result: dict[str, object] = {}
+
+    def request_worker() -> None:
+        result.update(runtime._request_worker(payload, 2))
+
+    request_thread = threading.Thread(target=request_worker)
+    request_thread.start()
+    assert _wait_until(lambda: bool(worker.requests))
+    runtime._ensure_idle_monitor_started()
+
+    time.sleep(0.1)
+
+    assert runtime._worker is worker
+    request_id = str(payload["protocolRequestId"])
+    runtime._worker_events.put({"protocolRequestId": request_id, "ok": True})
+    request_thread.join(timeout=1)
+    assert request_thread.is_alive() is False
+    assert result["ok"] is True
+    assert _wait_until(lambda: runtime._worker is None)
+    runtime.close()
+
+
+def test_request_restarts_worker_after_idle_shutdown(tmp_path, monkeypatch) -> None:
+    runtime = _build_runtime(tmp_path, idle_timeout_sec=0.05)
+    first_worker = _ControllableWorker()
+    runtime._worker = first_worker  # type: ignore[assignment]
+    runtime._last_worker_activity_at = time.monotonic()
+    runtime._ensure_idle_monitor_started()
+    assert _wait_until(lambda: runtime._worker is None)
+
+    output_wav = tmp_path / "runtime" / "audio" / "idle-restart.wav"
+    started_workers: list[_ControllableWorker] = []
+
+    def start_worker() -> None:
+        if runtime._worker_is_alive():
+            return
+
+        def respond(payload: dict[str, object]) -> None:
+            request_id = str(payload["protocolRequestId"])
+            if payload["action"] == "preload":
+                runtime._worker_events.put(
+                    {"protocolRequestId": request_id, "ok": True, "externalNetworkAttempts": 0}
+                )
+                return
+            output_wav.parent.mkdir(parents=True, exist_ok=True)
+            output_wav.write_bytes(b"RIFF\x24\x00\x00\x00WAVEdata")
+            runtime._worker_events.put(
+                {
+                    "protocolRequestId": request_id,
+                    "ok": True,
+                    "outputPath": str(output_wav),
+                    "captionInjectionMode": "separate_target",
+                    "externalNetworkAttempts": 0,
+                }
+            )
+
+        worker = _ControllableWorker(on_request=respond)
+        started_workers.append(worker)
+        runtime._worker = worker  # type: ignore[assignment]
+        runtime._last_worker_activity_at = time.monotonic()
+        runtime._ensure_idle_monitor_started()
+
+    monkeypatch.setattr(runtime, "_start_worker", start_worker)
+
+    result = runtime.synthesize(
+        SynthesizeRequest(
+            text="自動再起動後の生成です。",
+            request_id="idle-restart",
+            model_name="irodori_v3_voicedesign",
+            output_basename="idle-restart",
+        )
+    )
+
+    assert len(started_workers) == 1
+    assert [request["action"] for request in started_workers[0].requests] == [
+        "preload",
+        "synthesize",
+    ]
+    assert result.audio_path == output_wav.resolve()
+    runtime.close()
+
+
+def test_non_positive_idle_timeout_disables_auto_shutdown(tmp_path) -> None:
+    runtime = _build_runtime(tmp_path, idle_timeout_sec=0)
+    worker = _ControllableWorker()
+    runtime._worker = worker  # type: ignore[assignment]
+    runtime._last_worker_activity_at = time.monotonic() - 10
+    runtime._ensure_idle_monitor_started()
+
+    time.sleep(0.08)
+
+    assert runtime._worker is worker
+    assert runtime._idle_monitor_thread is None
+    runtime.close()
+
+
+def test_close_stops_idle_monitor_thread(tmp_path) -> None:
+    runtime = _build_runtime(tmp_path, idle_timeout_sec=60)
+    worker = _ControllableWorker()
+    runtime._worker = worker  # type: ignore[assignment]
+    runtime._last_worker_activity_at = time.monotonic()
+    runtime._ensure_idle_monitor_started()
+    monitor = runtime._idle_monitor_thread
+    assert monitor is not None and monitor.is_alive()
+
+    runtime.close()
+
+    assert monitor.is_alive() is False
+    assert runtime._idle_monitor_thread is None
+
+
 def test_runtime_metadata_warns_when_cuda_falls_back_to_cpu(tmp_path, monkeypatch) -> None:
     runtime = _build_runtime(tmp_path)
     runtime.model_device = "cuda"
     calls = []
 
-    def fake_run(cmd, cwd, capture_output, text, timeout, check, env):  # noqa: ANN001
-        calls.append(cmd)
+    def fake_run(  # noqa: ANN001
+        cmd,
+        cwd,
+        capture_output,
+        text,
+        timeout,
+        check,
+        env,
+        creationflags,
+    ):
+        calls.append({"cmd": cmd, "creationflags": creationflags})
         return subprocess.CompletedProcess(
             cmd,
             0,
@@ -97,6 +323,7 @@ def test_runtime_metadata_warns_when_cuda_falls_back_to_cpu(tmp_path, monkeypatc
     assert "CPU" in str(metadata["performanceWarning"])
     assert runtime.get_runtime_metadata() == metadata
     assert len(calls) == 1
+    assert calls[0]["creationflags"] == runtime._no_window_creationflags()
 
 
 def test_voicedesign_runtime_preloads_newly_selected_model_before_generation(tmp_path, monkeypatch) -> None:

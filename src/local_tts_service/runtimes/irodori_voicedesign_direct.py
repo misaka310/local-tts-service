@@ -43,6 +43,8 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         checkpoint: str,
         timeout_sec: int = 1800,
         startup_timeout_sec: int = 1800,
+        idle_timeout_sec: float = 600,
+        idle_monitor_interval_sec: float = 1.0,
         model_device: str = "auto",
         model_precision: str = "auto",
         codec_device: str = "auto",
@@ -61,6 +63,8 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         self.checkpoint = str(checkpoint).strip()
         self.timeout_sec = int(timeout_sec)
         self.startup_timeout_sec = int(startup_timeout_sec)
+        self.idle_timeout_sec = float(idle_timeout_sec)
+        self._idle_monitor_interval_sec = max(0.01, float(idle_monitor_interval_sec))
         self.model_device = str(model_device).strip() or "auto"
         self.model_precision = str(model_precision).strip() or "auto"
         self.codec_device = str(codec_device).strip() or self.model_device
@@ -72,9 +76,17 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         self._worker: subprocess.Popen[str] | None = None
         self._worker_events: queue.Queue[dict[str, Any]] = queue.Queue()
         self._worker_lock = threading.Lock()
+        self._pending_requests_lock = threading.Lock()
+        self._pending_requests = 0
         self._stderr_lines: deque[str] = deque(maxlen=60)
         self._prepared_models: set[str] = set()
         self._startup_errors: dict[str, str] = {}
+        self._worker_reader_threads: list[threading.Thread] = []
+        self._last_worker_activity_at: float | None = None
+        self._idle_monitor_stop = threading.Event()
+        self._idle_monitor_lock = threading.Lock()
+        self._idle_monitor_thread: threading.Thread | None = None
+        self._closed = False
 
     @staticmethod
     def _resolved_device(requested_device: str, cuda_available: bool) -> str:
@@ -84,6 +96,12 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         if requested.startswith("cuda") and not cuda_available:
             return "cpu"
         return requested
+
+    @staticmethod
+    def _no_window_creationflags() -> int:
+        if os.name == "nt" and hasattr(subprocess, "CREATE_NO_WINDOW"):
+            return int(subprocess.CREATE_NO_WINDOW)
+        return 0
 
     def get_runtime_metadata(self) -> dict[str, Any]:
         if self._runtime_metadata_cache is not None:
@@ -113,6 +131,7 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
                 timeout=30,
                 check=False,
                 env=self._offline_environment(),
+                creationflags=self._no_window_creationflags(),
             )
             if completed.returncode == 0:
                 output = (completed.stdout or "").strip().splitlines()
@@ -275,6 +294,15 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
             except queue.Empty:
                 return
 
+    def _join_worker_reader_threads(self) -> None:
+        threads = self._worker_reader_threads
+        self._worker_reader_threads = []
+        current = threading.current_thread()
+        for thread in threads:
+            if thread is current:
+                continue
+            thread.join(timeout=1)
+
     def _stop_worker_process(self, worker: subprocess.Popen[str]) -> None:
         if worker.poll() is not None:
             return
@@ -284,6 +312,101 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         except subprocess.TimeoutExpired:
             worker.kill()
             worker.wait(timeout=5)
+
+    def _shutdown_worker_process(self, worker: subprocess.Popen[str]) -> None:
+        if worker.poll() is not None:
+            return
+        try:
+            if worker.stdin is None:
+                raise OSError("worker stdin is unavailable")
+            worker.stdin.write(
+                json.dumps(
+                    {"action": "shutdown", "protocolRequestId": uuid4().hex},
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+            worker.stdin.flush()
+            worker.wait(timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            self._stop_worker_process(worker)
+
+    def _reset_worker_state(self, worker: subprocess.Popen[str] | None = None) -> None:
+        if worker is not None and self._worker is not worker:
+            return
+        self._worker = None
+        self._prepared_models.clear()
+        self._last_worker_activity_at = None
+        self._join_worker_reader_threads()
+        self._drain_worker_events()
+        self._stderr_lines.clear()
+
+    def _ensure_idle_monitor_started(self) -> None:
+        if self.idle_timeout_sec <= 0:
+            return
+        with self._idle_monitor_lock:
+            if self._closed:
+                return
+            if self._idle_monitor_thread is not None and self._idle_monitor_thread.is_alive():
+                return
+            self._idle_monitor_stop.clear()
+            monitor = threading.Thread(
+                target=self._idle_monitor_loop,
+                daemon=True,
+                name="irodori-worker-idle-monitor",
+            )
+            self._idle_monitor_thread = monitor
+            monitor.start()
+
+    def _idle_monitor_loop(self) -> None:
+        try:
+            while not self._idle_monitor_stop.wait(self._idle_monitor_interval_sec):
+                timeout_sec = self.idle_timeout_sec
+                worker = self._worker
+                last_activity_at = self._last_worker_activity_at
+                if (
+                    timeout_sec <= 0
+                    or worker is None
+                    or worker.poll() is not None
+                    or last_activity_at is None
+                ):
+                    continue
+                idle_sec = time.monotonic() - last_activity_at
+                if idle_sec < timeout_sec:
+                    continue
+                with self._pending_requests_lock:
+                    if self._pending_requests > 0:
+                        continue
+                if not self._worker_lock.acquire(blocking=False):
+                    continue
+                try:
+                    with self._pending_requests_lock:
+                        if self._pending_requests > 0:
+                            continue
+                        worker = self._worker
+                        last_activity_at = self._last_worker_activity_at
+                        if (
+                            worker is None
+                            or worker.poll() is not None
+                            or last_activity_at is None
+                        ):
+                            continue
+                        idle_sec = time.monotonic() - last_activity_at
+                        if idle_sec < timeout_sec:
+                            continue
+                        self._record_worker_failure(
+                            "automatic idle shutdown: "
+                            f"Irodori worker was unused for {idle_sec:.3f}s "
+                            f"(timeout {timeout_sec:.3f}s)"
+                        )
+                        self._shutdown_worker_process(worker)
+                        self._reset_worker_state(worker)
+                finally:
+                    self._worker_lock.release()
+        finally:
+            with self._idle_monitor_lock:
+                if self._idle_monitor_thread is threading.current_thread():
+                    self._idle_monitor_thread = None
 
     def _mark_worker_failed(
         self,
@@ -297,8 +420,6 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
             return
         prepared_models = tuple(self._prepared_models)
         self._record_worker_failure(reason)
-        self._worker = None
-        self._prepared_models.clear()
         message = (
             f"Irodori runtimeが停止しました: {reason}. "
             "次の生成で自動再起動します。もう一度生成してください"
@@ -307,7 +428,7 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
             self._startup_errors[model_name] = message
         if terminate and affected_worker is not None:
             self._stop_worker_process(affected_worker)
-        self._drain_worker_events()
+        self._reset_worker_state(affected_worker)
 
     def _start_worker(self) -> None:
         if self._worker_is_alive():
@@ -320,9 +441,6 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
             )
         self._stderr_lines.clear()
         helper_script = (self.root_dir / "scripts" / "run_irodori_voicedesign.py").resolve()
-        creationflags = 0
-        if os.name == "nt" and hasattr(subprocess, "CREATE_NO_WINDOW"):
-            creationflags = int(subprocess.CREATE_NO_WINDOW)
         try:
             self._worker = subprocess.Popen(
                 [self.python_executable, str(helper_script), "--worker"],
@@ -335,63 +453,78 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
                 errors="replace",
                 bufsize=1,
                 env=self._offline_environment(),
-                creationflags=creationflags,
+                creationflags=self._no_window_creationflags(),
             )
         except OSError as exc:
             raise ProviderError(f"Irodori runtimeを起動できません: {exc}") from exc
         assert self._worker.stdout is not None
         assert self._worker.stderr is not None
-        threading.Thread(
+        stdout_thread = threading.Thread(
             target=self._read_worker_stdout,
             args=(self._worker.stdout,),
             daemon=True,
             name="irodori-worker-stdout",
-        ).start()
-        threading.Thread(
+        )
+        stderr_thread = threading.Thread(
             target=self._read_worker_stderr,
             args=(self._worker.stderr,),
             daemon=True,
             name="irodori-worker-stderr",
-        ).start()
+        )
+        self._worker_reader_threads = [stdout_thread, stderr_thread]
+        stdout_thread.start()
+        stderr_thread.start()
+        self._last_worker_activity_at = time.monotonic()
+        self._ensure_idle_monitor_started()
 
     def _request_worker(self, payload: dict[str, Any], timeout_sec: int) -> dict[str, Any]:
         request_id = str(payload.get("protocolRequestId") or uuid4().hex)
         payload["protocolRequestId"] = request_id
-        with self._worker_lock:
-            self._start_worker()
-            worker = self._worker
-            if worker is None or worker.stdin is None or worker.poll() is not None:
-                raise ProviderError("Irodori runtimeが起動していません")
-            try:
-                worker.stdin.write(json.dumps(payload, ensure_ascii=False) + "\n")
-                worker.stdin.flush()
-            except (BrokenPipeError, OSError) as exc:
-                self._mark_worker_failed(str(exc), worker=worker, terminate=True)
-                raise ProviderError(f"Irodori runtimeへ要求を送信できません: {exc}") from exc
-            deadline = time.monotonic() + max(1, int(timeout_sec))
-            while True:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    self._mark_worker_failed(
-                        f"request timed out after {timeout_sec}s",
-                        worker=worker,
-                        terminate=True,
-                    )
-                    raise ProviderError(f"Irodori runtime timed out after {timeout_sec}s")
+        with self._pending_requests_lock:
+            self._pending_requests += 1
+        try:
+            with self._worker_lock:
+                self._start_worker()
+                worker = self._worker
+                if worker is None or worker.stdin is None or worker.poll() is not None:
+                    raise ProviderError("Irodori runtimeが起動していません")
                 try:
-                    event = self._worker_events.get(timeout=min(remaining, 1.0))
-                except queue.Empty:
-                    if worker.poll() is not None:
-                        detail = "\n".join(self._stderr_lines) or f"exit code {worker.returncode}"
-                        self._mark_worker_failed(detail, worker=worker)
-                        raise ProviderError(f"Irodori runtimeが終了しました: {detail}")
-                    continue
-                if str(event.get("protocolRequestId") or "") != request_id:
-                    continue
-                if not bool(event.get("ok")):
-                    detail = str(event.get("error") or "unknown Irodori worker error")
-                    raise ProviderError(detail)
-                return event
+                    try:
+                        worker.stdin.write(json.dumps(payload, ensure_ascii=False) + "\n")
+                        worker.stdin.flush()
+                    except (BrokenPipeError, OSError) as exc:
+                        self._mark_worker_failed(str(exc), worker=worker, terminate=True)
+                        raise ProviderError(f"Irodori runtimeへ要求を送信できません: {exc}") from exc
+                    deadline = time.monotonic() + max(1, int(timeout_sec))
+                    while True:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            self._mark_worker_failed(
+                                f"request timed out after {timeout_sec}s",
+                                worker=worker,
+                                terminate=True,
+                            )
+                            raise ProviderError(f"Irodori runtime timed out after {timeout_sec}s")
+                        try:
+                            event = self._worker_events.get(timeout=min(remaining, 1.0))
+                        except queue.Empty:
+                            if worker.poll() is not None:
+                                detail = "\n".join(self._stderr_lines) or f"exit code {worker.returncode}"
+                                self._mark_worker_failed(detail, worker=worker)
+                                raise ProviderError(f"Irodori runtimeが終了しました: {detail}")
+                            continue
+                        if str(event.get("protocolRequestId") or "") != request_id:
+                            continue
+                        if not bool(event.get("ok")):
+                            detail = str(event.get("error") or "unknown Irodori worker error")
+                            raise ProviderError(detail)
+                        return event
+                finally:
+                    if self._worker is worker and worker.poll() is None:
+                        self._last_worker_activity_at = time.monotonic()
+        finally:
+            with self._pending_requests_lock:
+                self._pending_requests -= 1
 
     def _runtime_payload(self, model_name: str, model_cfg: ModelConfig) -> dict[str, Any]:
         return {
@@ -512,21 +645,14 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         )
 
     def close(self) -> None:
-        worker = self._worker
-        self._worker = None
-        self._prepared_models.clear()
-        if worker is None:
-            return
-        try:
-            if worker.poll() is None and worker.stdin is not None:
-                worker.stdin.write(
-                    json.dumps(
-                        {"action": "shutdown", "protocolRequestId": uuid4().hex},
-                        ensure_ascii=False,
-                    )
-                    + "\n"
-                )
-                worker.stdin.flush()
-                worker.wait(timeout=10)
-        except (OSError, subprocess.TimeoutExpired):
-            self._stop_worker_process(worker)
+        with self._idle_monitor_lock:
+            self._closed = True
+            self._idle_monitor_stop.set()
+            monitor = self._idle_monitor_thread
+        if monitor is not None and monitor is not threading.current_thread():
+            monitor.join()
+        with self._worker_lock:
+            worker = self._worker
+            if worker is not None:
+                self._shutdown_worker_process(worker)
+            self._reset_worker_state(worker)

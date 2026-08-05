@@ -332,6 +332,7 @@ DEFAULT_CONFIG = {
             "checkpoint": "",
             "timeoutSec": 1800,
             "startupTimeoutSec": 1800,
+            "idleTimeoutSec": 600,
             "modelDevice": "auto",
             "modelPrecision": "auto",
             "codecDevice": "auto",
@@ -518,6 +519,15 @@ def _apply_env_overrides(raw: dict[str, Any]) -> dict[str, Any]:
         value = os.getenv(env_name)
         if value is not None and str(value).strip() != "":
             voxcpm2[field] = caster(value)
+
+    irodori = data.setdefault("runtimes", {}).setdefault("irodori_voicedesign_direct", {})
+    irodori_map: dict[str, tuple[str, type]] = {
+        "LOCAL_TTS_IRODORI_IDLE_TIMEOUT_SEC": ("idleTimeoutSec", float),
+    }
+    for env_name, (field, caster) in irodori_map.items():
+        value = os.getenv(env_name)
+        if value is not None and str(value).strip() != "":
+            irodori[field] = caster(value)
 
     qwen3_tts = data.setdefault("runtimes", {}).setdefault("qwen3_tts", {})
     qwen3_tts_map: dict[str, tuple[str, type]] = {
