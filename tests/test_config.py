@@ -209,6 +209,31 @@ def test_load_config_voxcpm2_env_override(tmp_path, monkeypatch) -> None:
     assert cfg.runtimes["comfyui_voxcpm2"]["timeoutSec"] == 123
 
 
+def test_load_config_irodori_idle_timeout_env_override(tmp_path, monkeypatch) -> None:
+    (tmp_path / "config.example.json").write_text(
+        json.dumps(
+            {
+                "defaultModel": "irodori_v3",
+                "models": {
+                    "irodori_v3": {
+                        "runtime": "irodori_voicedesign_direct",
+                        "requiresReferenceAudio": False,
+                    }
+                },
+                "runtimes": {
+                    "irodori_voicedesign_direct": {"idleTimeoutSec": 600}
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("LOCAL_TTS_IRODORI_IDLE_TIMEOUT_SEC", "0")
+    cfg = load_config(tmp_path)
+
+    assert cfg.runtimes["irodori_voicedesign_direct"]["idleTimeoutSec"] == 0.0
+
+
 def test_load_config_comfyui_auto_launch_settings(tmp_path) -> None:
     (tmp_path / "config.example.json").write_text(
         json.dumps(

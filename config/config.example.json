@@ -148,6 +148,7 @@
       "checkpoint": "",
       "timeoutSec": 1800,
       "startupTimeoutSec": 1800,
+      "idleTimeoutSec": 600,
       "modelDevice": "auto",
       "modelPrecision": "auto",
       "codecDevice": "auto",
