@@ -7,6 +7,12 @@ Windows PC上で複数の音声合成モデルをまとめて使うためのロ�
 > **非公式・非提携について**
 > このプロジェクトは独立して開発された非公式ツールであり、READMEに記載する各音声合成モデル、音声変換技術、外部ツールの開発元・配布元による公式製品、提携製品、承認製品、スポンサー製品ではありません。各名称・商標・モデル・配布物の権利と利用条件は各権利者・配布元に帰属します。
 
+<p align="center">
+  <img src="docs/assets/system-overview.png" alt="local-tts-serviceの処理フロー概要" width="100%">
+</p>
+
+文章・参照音声からTTSを実行し、必要な場合だけRVCを通して再生・保存する流れを示しています。
+
 https://github.com/user-attachments/assets/29ad093a-7950-4a17-ba09-8899dabb4828
 
 ## できること
