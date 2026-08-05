@@ -11,7 +11,7 @@ Windows PC上で複数の音声合成モデルをまとめて使うためのロ�
   <img src="docs/assets/system-overview.png" alt="local-tts-serviceの処理フロー概要" width="100%">
 </p>
 
-文章・参照音声からTTSを実行し、必要な場合だけRVCを通して再生・保存する流れを示しています。
+通常のTTS生成と、生成済み音声などへ必要なときだけ使うRVC声質変換を、独立した機能として示しています。
 
 https://github.com/user-attachments/assets/29ad093a-7950-4a17-ba09-8899dabb4828
 
