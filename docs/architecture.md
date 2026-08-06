@@ -46,6 +46,10 @@ Browser DOM
 
 新しいAPIでは、`server.js`にファイル処理や外部コマンド実行を追加せず、対応するサービスへ置きます。
 
+## 永続RVCサービス
+
+`scripts/persistent_rvc_service.py` は、低遅延の連続利用向けにRVCモデル、HuBERT、RMVPEを1プロセスへ保持する汎用HTTPサービスです。設定はGit対象外の `config/rvc-persistent.local.json`、公開例は `config/rvc-persistent.example.json` に置きます。利用先固有のChatGPT、ブラウザ、再生デバイス、マイク制御は持ちません。詳細は `docs/persistent-rvc-service.md` を参照してください。
+
 ## ブラウザ画面
 
 ビルドツールを使わず、`frontend/public/index.html`で依存順を明示しています。
