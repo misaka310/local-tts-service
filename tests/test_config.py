@@ -12,6 +12,7 @@ def test_default_irodori_capabilities_match_official_models() -> None:
     models = DEFAULT_CONFIG["models"]
     v2 = models["irodori_v2"]
     v3 = models["irodori_v3"]
+    low_latency = models["irodori_v3_low_latency"]
     voice_design = models["irodori_v3_voicedesign"]
     v4 = models["irodori_v4_small"]
 
@@ -24,6 +25,12 @@ def test_default_irodori_capabilities_match_official_models() -> None:
     assert v3["requiresReferenceAudio"] is False
     assert v3["supportsInstruction"] is False
     assert v3["supportsSpeedControl"] is True
+
+    assert low_latency["modelId"] == v3["modelId"]
+    assert low_latency["runtimeOptions"] == {
+        "optimizationProfile": "low_latency_8",
+        "codecPrecision": "bf16",
+    }
 
     assert voice_design["supportsReferenceVoice"] is True
     assert voice_design["requiresReferenceAudio"] is False
@@ -500,3 +507,52 @@ def test_stack_ports_are_sanitized_to_valid_integers(tmp_path) -> None:
 
     cfg = load_config(tmp_path)
     assert cfg.stack["portsToKill"] == [8730, 8288]
+
+
+def test_load_config_preserves_model_runtime_options(tmp_path) -> None:
+    (tmp_path / "config.example.json").write_text(
+        json.dumps(
+            {
+                "defaultModel": "irodori_v3_low_latency",
+                "models": {
+                    "irodori_v3_low_latency": {
+                        "runtime": "irodori_voicedesign_direct",
+                        "runtimeOptions": {
+                            "optimizationProfile": "low_latency_8",
+                            "codecPrecision": "bf16",
+                        },
+                    }
+                },
+                "runtimes": {"irodori_voicedesign_direct": {"pythonExecutable": "python.exe"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    cfg = load_config(tmp_path)
+
+    assert cfg.models["irodori_v3_low_latency"].runtime_options == {
+        "optimizationProfile": "low_latency_8",
+        "codecPrecision": "bf16",
+    }
+
+
+def test_load_config_rejects_non_object_model_runtime_options(tmp_path) -> None:
+    (tmp_path / "config.example.json").write_text(
+        json.dumps(
+            {
+                "defaultModel": "bad",
+                "models": {
+                    "bad": {
+                        "runtime": "mock_wav",
+                        "runtimeOptions": "low_latency_8",
+                    }
+                },
+                "runtimes": {"mock_wav": {}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigError, match="models.bad.runtimeOptions must be object"):
+        load_config(tmp_path)

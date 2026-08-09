@@ -237,6 +237,7 @@ class ModelConfig:
     requires_trained_checkpoint: bool = False
     chunking: dict[str, Any] | None = None
     text_split_method: str | None = None
+    runtime_options: dict[str, Any] | None = None
     workflow_targets: WorkflowTargetsConfig | None = None
 
 

@@ -12,6 +12,7 @@ import pytest
 from local_tts_service.errors import ProviderError
 from local_tts_service.models import ModelConfig
 from local_tts_service.runtimes.base import SynthesizeRequest
+from local_tts_service.runtimes import irodori_voicedesign_direct as irodori_module
 from local_tts_service.runtimes.irodori_voicedesign_direct import IrodoriVoiceDesignDirectRuntime
 
 
@@ -71,6 +72,15 @@ class _ControllableWorker:
     def kill(self) -> None:
         self.killed = True
         self.returncode = -9
+
+
+def test_no_console_python_uses_pythonw_on_windows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    python = tmp_path / "python.exe"
+    pythonw = tmp_path / "pythonw.exe"
+    python.write_bytes(b"")
+    pythonw.write_bytes(b"")
+    monkeypatch.setattr(irodori_module.os, "name", "nt")
+    assert IrodoriVoiceDesignDirectRuntime._no_console_python_executable(str(python)) == str(pythonw.resolve())
 
 
 def _build_runtime(
@@ -691,3 +701,101 @@ def test_irodori_helper_imports_dataclass_fields_used_by_config_patch() -> None:
     assert '"HF_HUB_OFFLINE"' in source
     assert 'action == "preload"' in source
     assert 'action == "synthesize"' in source
+    assert "_optimization_settings" in source
+    assert "_reference_latent_cache" in source
+    assert '"numSteps": 8' in source
+    assert '"schedule": "sway"' in source
+
+
+def test_low_latency_model_runtime_options_reach_worker_payload(tmp_path) -> None:
+    runtime = _build_runtime(tmp_path)
+    checkpoint = next(iter(runtime.models.values())).checkpoint
+    assert checkpoint is not None
+    runtime.models["irodori_v3_low_latency"] = ModelConfig(
+        runtime="irodori_voicedesign_direct",
+        checkpoint=checkpoint,
+        supports_seed=True,
+        supports_speed_control=True,
+        supports_reference_voice=True,
+        runtime_options={
+            "optimizationProfile": "low_latency_8",
+            "codecPrecision": "bf16",
+        },
+    )
+
+    payload = runtime._runtime_payload(
+        "irodori_v3_low_latency",
+        runtime.models["irodori_v3_low_latency"],
+    )
+
+    assert payload["optimizationProfile"] == "low_latency_8"
+    assert payload["codecPrecision"] == "bf16"
+    assert Path(str(payload["referenceCacheDir"])) == runtime.reference_cache_dir
+
+
+def test_irodori_helper_low_latency_profile_is_exact_and_opt_in() -> None:
+    helper = Path(__file__).parents[1] / "scripts" / "run_irodori_voicedesign.py"
+    spec = importlib.util.spec_from_file_location("local_tts_irodori_low_latency_helper", helper)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert module._optimization_settings({}) is None
+    settings = module._optimization_settings({"optimizationProfile": "low_latency_8"})
+    assert settings == {
+        "profile": "low_latency_8",
+        "numSteps": 8,
+        "referenceMode": "latent",
+        "schedule": "sway",
+        "swayCoeff": -1.0,
+        "contextKvCache": True,
+        "watermark": True,
+        "cfgScaleText": 3.0,
+        "cfgScaleSpeaker": 6.0,
+        "decodeMode": "sequential",
+        "trimTail": True,
+    }
+    with pytest.raises(ValueError, match="unknown optimization profile"):
+        module._optimization_settings({"optimizationProfile": "unknown"})
+
+
+def test_irodori_runtime_propagates_worker_timings(tmp_path, monkeypatch) -> None:
+    runtime = _build_runtime(tmp_path)
+    model = next(iter(runtime.models.values()))
+    runtime.models["irodori_v3_low_latency"] = ModelConfig(
+        runtime="irodori_voicedesign_direct",
+        checkpoint=model.checkpoint,
+        runtime_options={"optimizationProfile": "low_latency_8", "codecPrecision": "bf16"},
+    )
+    runtime._prepared_models.add("irodori_v3_low_latency")
+    output_wav = tmp_path / "runtime" / "audio" / "low-latency.wav"
+
+    def fake_request(payload, timeout_sec):  # noqa: ANN001
+        del payload, timeout_sec
+        output_wav.parent.mkdir(parents=True, exist_ok=True)
+        output_wav.write_bytes(b"RIFF\x24\x00\x00\x00WAVEdata")
+        return {
+            "ok": True,
+            "outputPath": str(output_wav),
+            "captionInjectionMode": "none",
+            "externalNetworkAttempts": 0,
+            "timings": {
+                "profile": "low_latency_8",
+                "inferenceSec": 0.5,
+                "settings": {"numSteps": 8, "schedule": "sway"},
+            },
+        }
+
+    monkeypatch.setattr(runtime, "_request_worker", fake_request)
+    result = runtime.synthesize(
+        SynthesizeRequest(
+            text="低遅延モデルの確認です。",
+            request_id="low-latency",
+            model_name="irodori_v3_low_latency",
+            output_basename="low-latency",
+        )
+    )
+
+    assert result.timings is not None
+    assert result.timings["profile"] == "low_latency_8"
+    assert result.timings["settings"]["numSteps"] == 8

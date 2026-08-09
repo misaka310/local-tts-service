@@ -52,6 +52,7 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         codec_repo: str = "./runtime/models/irodori/Semantic-DACVAE-Japanese-32dim",
         text_processor_repo: str = "llm-jp/llm-jp-3-150m",
         text_processor_dir: str | Path = "./runtime/models/irodori/tokenizers/llm-jp-3-150m",
+        reference_cache_dir: str | Path = "./runtime/cache/irodori-reference-latents",
     ) -> None:
         self.output_dir = output_dir
         self.models = models
@@ -72,6 +73,7 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         self.codec_repo = str(self._resolve_repo_path(codec_repo))
         self.text_processor_repo = str(text_processor_repo).strip() or "llm-jp/llm-jp-3-150m"
         self.text_processor_dir = self._resolve_repo_path(text_processor_dir)
+        self.reference_cache_dir = self._resolve_repo_path(reference_cache_dir)
         self._runtime_metadata_cache: dict[str, Any] | None = None
         self._worker: subprocess.Popen[str] | None = None
         self._worker_events: queue.Queue[dict[str, Any]] = queue.Queue()
@@ -103,6 +105,15 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
             return int(subprocess.CREATE_NO_WINDOW)
         return 0
 
+    @staticmethod
+    def _no_console_python_executable(executable: str) -> str:
+        resolved = Path(executable).resolve()
+        if os.name == "nt" and resolved.name.lower() == "python.exe":
+            pythonw = resolved.with_name("pythonw.exe")
+            if pythonw.is_file():
+                return str(pythonw)
+        return str(resolved)
+
     def get_runtime_metadata(self) -> dict[str, Any]:
         if self._runtime_metadata_cache is not None:
             return dict(self._runtime_metadata_cache)
@@ -124,7 +135,7 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         )
         try:
             completed = subprocess.run(
-                [self.python_executable, "-c", probe],
+                [self._no_console_python_executable(self.python_executable), "-c", probe],
                 cwd=str(self.root_dir),
                 capture_output=True,
                 text=True,
@@ -443,7 +454,7 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         helper_script = (self.root_dir / "scripts" / "run_irodori_voicedesign.py").resolve()
         try:
             self._worker = subprocess.Popen(
-                [self.python_executable, str(helper_script), "--worker"],
+                [self._no_console_python_executable(self.python_executable), str(helper_script), "--worker"],
                 cwd=str(self.root_dir),
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -526,19 +537,36 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
             with self._pending_requests_lock:
                 self._pending_requests -= 1
 
+    @staticmethod
+    def _model_runtime_options(model_cfg: ModelConfig) -> dict[str, Any]:
+        options = dict(model_cfg.runtime_options or {})
+        allowed = {"optimizationProfile", "codecPrecision"}
+        unknown = sorted(set(options) - allowed)
+        if unknown:
+            raise ProviderError(
+                "unsupported Irodori runtimeOptions: " + ", ".join(unknown)
+            )
+        return options
+
     def _runtime_payload(self, model_name: str, model_cfg: ModelConfig) -> dict[str, Any]:
-        return {
+        options = self._model_runtime_options(model_cfg)
+        payload: dict[str, Any] = {
             "modelName": model_name,
             "checkpoint": self._checkpoint_for(model_cfg),
             "wrapperDir": str(self.wrapper_dir),
             "modelDevice": self.model_device,
             "modelPrecision": self.model_precision,
             "codecDevice": self.codec_device,
-            "codecPrecision": self.codec_precision,
+            "codecPrecision": str(options.get("codecPrecision") or self.codec_precision),
             "codecRepo": self.codec_repo,
             "textProcessorRepo": self.text_processor_repo,
             "textProcessorDir": str(self.text_processor_dir),
+            "referenceCacheDir": str(self.reference_cache_dir),
         }
+        optimization_profile = str(options.get("optimizationProfile") or "").strip()
+        if optimization_profile:
+            payload["optimizationProfile"] = optimization_profile
+        return payload
 
     def prepare_model(self, model_name: str) -> IrodoriDirectAvailability:
         model_cfg = self.models.get(model_name)
@@ -637,11 +665,14 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         caption_injection_mode = (
             str(result_payload.get("captionInjectionMode") or "").strip() or "none"
         )
+        timings_raw = result_payload.get("timings")
+        timings = dict(timings_raw) if isinstance(timings_raw, dict) else None
         return SynthesizeResult(
             runtime=self.name,
             model=request.model_name,
             audio_path=output_path,
             caption_injection_mode=caption_injection_mode,
+            timings=timings,
         )
 
     def release_model(self, model_name: str) -> bool:
