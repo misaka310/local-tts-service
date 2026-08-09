@@ -6,21 +6,38 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) { $ConfigPath = Join-Path $repo 'config\rvc-persistent.local.json' }
 $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+function Assert-LoopbackHost {
+    param([Parameter(Mandatory = $true)][string]$EndpointHost)
+    if ($EndpointHost.Trim().ToLowerInvariant() -eq 'localhost') { return }
+    $address = $null
+    if (-not [Net.IPAddress]::TryParse($EndpointHost, [ref]$address) -or -not [Net.IPAddress]::IsLoopback($address)) {
+        throw "Persistent RVC endpoints must use loopback addresses: $EndpointHost"
+    }
+}
+function Assert-LoopbackUri {
+    param([Parameter(Mandatory = $true)][string]$Value)
+    $uri = $null
+    if (-not [Uri]::TryCreate($Value, [UriKind]::Absolute, [ref]$uri) -or $uri.Scheme -notin @('http', 'https')) {
+        throw "Persistent RVC upstreamBaseUrl must be an absolute HTTP(S) URL: $Value"
+    }
+    Assert-LoopbackHost -EndpointHost $uri.Host
+}
+Assert-LoopbackHost -EndpointHost ([string]$config.host)
+Assert-LoopbackUri -Value ([string]$config.upstreamBaseUrl)
 $python = [string]$config.rvcPythonPath
 $service = Join-Path $repo 'scripts\persistent_rvc_service.py'
 $storagePreflight = Join-Path $repo 'scripts\rvc_storage_preflight.py'
-$launcher = 'C:\00_dev\74_windows-gui-ci-runner\scripts\host\Start-NoWindowDetached.ps1'
+$detachedHelper = Join-Path $repo 'scripts\start_detached_process.py'
 $stopService = Join-Path $repo 'scripts\stop-persistent-rvc-service.ps1'
 $stateRoot = Join-Path $repo 'runtime\persistent-rvc'
 $logRoot = Join-Path $stateRoot 'logs'
-$detachState = Join-Path $stateRoot 'detached.json'
 $stdout = Join-Path $logRoot 'service.stdout.log'
 $stderrPath = Join-Path $logRoot 'service.stderr.log'
 $healthUrl = "http://$([string]$config.host):$([int]$config.port)/health"
 $upstreamHealthUrl = ([string]$config.upstreamBaseUrl).TrimEnd('/') + [string]$config.upstreamHealthPath
 $upstreamStartScript = [string]$config.upstreamStartScript
 
-foreach ($path in @($ConfigPath, $python, $service, $storagePreflight, $launcher, $stopService, $upstreamStartScript)) {
+foreach ($path in @($ConfigPath, $python, $service, $storagePreflight, $detachedHelper, $stopService)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Required persistent RVC component not found: $path" }
 }
 
@@ -64,6 +81,9 @@ function Test-UpstreamReady {
     } catch { return $false }
 }
 if (-not (Test-UpstreamReady)) {
+    if ([string]::IsNullOrWhiteSpace($upstreamStartScript) -or -not (Test-Path -LiteralPath $upstreamStartScript -PathType Leaf)) {
+        throw "Local TTS Service is not ready and upstreamStartScript was not found: $upstreamStartScript"
+    }
     & $upstreamStartScript -NoOpenBrowser | Out-Null
     $deadline = [DateTime]::UtcNow.AddSeconds([int]$config.upstreamStartupTimeoutSeconds)
     do { Start-Sleep -Milliseconds 500 } while (-not (Test-UpstreamReady) -and [DateTime]::UtcNow -lt $deadline)
@@ -80,30 +100,24 @@ try {
 } catch { }
 
 New-Item -ItemType Directory -Force -Path $stateRoot, $logRoot | Out-Null
-function Quote-NativeArgument {
-    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Value)
-    if ($Value.Length -gt 0 -and $Value -notmatch '[\s"]') { return $Value }
-    return '"' + $Value.Replace('"', '\"') + '"'
-}
-$argumentText = (@($service, '--config', $ConfigPath) | ForEach-Object { Quote-NativeArgument ([string]$_) }) -join ' '
-$launchJson = & $launcher -FilePath $python -Arguments $argumentText -WorkingDirectory $repo -StatePath $detachState -StdoutPath $stdout -StderrPath $stderrPath -StartupTimeoutSeconds 15
+$launchJson = & $python -X utf8 $detachedHelper --file $python --working-directory $repo --stdout $stdout --stderr $stderrPath $service --config $ConfigPath
+if ($LASTEXITCODE -ne 0) { throw "Persistent RVC service did not detach. See $stderrPath" }
 $launch = $launchJson | Select-Object -Last 1 | ConvertFrom-Json
 if (-not [bool]$launch.started) { throw "Persistent RVC service did not detach. See $stderrPath" }
+$childProcessId = [int]$launch.childProcessId
 $deadline = [DateTime]::UtcNow.AddSeconds([int]$config.startupTimeoutSeconds)
 do {
     Start-Sleep -Milliseconds 300
     try {
         $health = Invoke-RestMethod -Uri $healthUrl -TimeoutSec 5
         if ([bool]$health.ok) {
-            [pscustomobject]@{ status='ready'; launchId=$launch.launchId; processId=$launch.childProcessId; healthUrl=$healthUrl; health=$health } | ConvertTo-Json -Depth 18 -Compress
+            [pscustomobject]@{ status='ready'; launchId=$launch.launchId; processId=$childProcessId; healthUrl=$healthUrl; health=$health } | ConvertTo-Json -Depth 18 -Compress
             return
         }
     } catch { }
-    if (Test-Path -LiteralPath $detachState -PathType Leaf) {
-        try {
-            $state = Get-Content -LiteralPath $detachState -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ([string]$state.status -eq 'failed') { throw "Persistent RVC service exited during startup. See $stderrPath" }
-        } catch [System.Management.Automation.RuntimeException] { throw } catch { }
+    if ($null -eq (Get-Process -Id $childProcessId -ErrorAction SilentlyContinue)) {
+        $detail = if (Test-Path -LiteralPath $stderrPath -PathType Leaf) { (Get-Content -LiteralPath $stderrPath -Tail 20 -ErrorAction SilentlyContinue) -join "`n" } else { '' }
+        throw "Persistent RVC service exited during startup. $detail"
     }
 } while ([DateTime]::UtcNow -lt $deadline)
 throw "Persistent RVC service did not become healthy. See $stderrPath"

@@ -16,7 +16,7 @@ Copy `config/rvc-persistent.example.json` to the ignored `config/rvc-persistent.
 - model and index paths
 - RVC parameters
 
-Model weights, the local config, converted audio, logs, and runtime state are not committed.
+Model weights, the local config, converted audio, logs, and runtime state are not committed. The service is intentionally loopback-only: both `host` and `upstreamBaseUrl` must resolve to loopback endpoints because the HTTP contract has no remote authentication. Request state and events record the request ID and text length, but not the full text body.
 
 ## Entrypoints
 

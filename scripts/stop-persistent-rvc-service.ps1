@@ -6,6 +6,15 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) { $ConfigPath = Join-Path $repo 'config\rvc-persistent.local.json' }
 $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+function Assert-LoopbackHost {
+    param([Parameter(Mandatory = $true)][string]$EndpointHost)
+    if ($EndpointHost.Trim().ToLowerInvariant() -eq 'localhost') { return }
+    $address = $null
+    if (-not [Net.IPAddress]::TryParse($EndpointHost, [ref]$address) -or -not [Net.IPAddress]::IsLoopback($address)) {
+        throw "Persistent RVC endpoints must use loopback addresses: $EndpointHost"
+    }
+}
+Assert-LoopbackHost -EndpointHost ([string]$config.host)
 $baseUrl = "http://$([string]$config.host):$([int]$config.port)"
 $statePath = Join-Path $repo 'runtime\persistent-rvc\state.json'
 $requested = $false

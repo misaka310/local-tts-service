@@ -5,7 +5,7 @@
   "upstreamHealthPath": "/health",
   "upstreamSpeakPath": "/v1/speak",
   "defaultModel": "irodori_v3",
-  "defaultVoiceId": "suguha",
+  "defaultVoiceId": "sample_voice",
   "rvcPythonPath": "C:\\path\\to\\rvc-python.exe",
   "rvcCwd": "C:\\path\\to\\rvc",
   "rvcModelPath": "C:\\path\\to\\voice.pth",

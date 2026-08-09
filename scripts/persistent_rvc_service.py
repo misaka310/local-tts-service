@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 import re
@@ -49,6 +50,23 @@ def append_event(event: str, **fields: Any) -> None:
         handle.write(json.dumps({"timestamp": utc_now(), "event": event, **fields}, ensure_ascii=False) + "\n")
 
 
+def _is_loopback_host(host: str) -> bool:
+    normalized = str(host or "").strip().lower()
+    if normalized == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
+
+
+def _require_loopback_url(value: str, *, field: str) -> urllib.parse.ParseResult:
+    parsed = urllib.parse.urlparse(str(value or "").strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname or not _is_loopback_host(parsed.hostname):
+        raise ValueError(f"{field} must use a loopback HTTP(S) URL")
+    return parsed
+
+
 def load_config(path: Path) -> dict[str, Any]:
     config = json.loads(path.read_text(encoding="utf-8-sig"))
     required = (
@@ -68,6 +86,9 @@ def load_config(path: Path) -> dict[str, Any]:
     missing = [name for name in required if config.get(name) in (None, "")]
     if missing:
         raise ValueError(f"missing persistent RVC config values: {', '.join(missing)}")
+    if not _is_loopback_host(str(config["host"])):
+        raise ValueError("host must be a loopback address for the unauthenticated persistent RVC service")
+    _require_loopback_url(str(config["upstreamBaseUrl"]), field="upstreamBaseUrl")
     return config
 
 
@@ -76,6 +97,31 @@ def join_url(base: str, path_or_url: str) -> str:
     if value.startswith(("http://", "https://")):
         return value
     return urllib.parse.urljoin(base.rstrip("/") + "/", value.lstrip("/"))
+
+
+def resolve_upstream_audio_url(base: str, path_or_url: str) -> str:
+    base_parsed = _require_loopback_url(base, field="upstreamBaseUrl")
+    resolved = join_url(base, path_or_url)
+    resolved_parsed = _require_loopback_url(resolved, field="upstream audio URL")
+    if (
+        resolved_parsed.scheme.lower(),
+        resolved_parsed.hostname.lower() if resolved_parsed.hostname else "",
+        resolved_parsed.port,
+    ) != (
+        base_parsed.scheme.lower(),
+        base_parsed.hostname.lower() if base_parsed.hostname else "",
+        base_parsed.port,
+    ):
+        raise ValueError("upstream audio URL must stay on the configured upstream origin")
+    return resolved
+
+
+def request_log_summary(request_id: str, text: str, started_at: str | None = None) -> dict[str, Any]:
+    return {
+        "requestId": request_id,
+        "textLength": len(text),
+        "startedAt": started_at or utc_now(),
+    }
 
 
 def request_json(url: str, *, payload: dict[str, Any] | None = None, timeout: float = 15.0) -> dict[str, Any]:
@@ -326,11 +372,12 @@ class PersistentRvcService:
         if not text:
             raise ValueError("text is required")
         started = time.perf_counter()
+        request_summary = request_log_summary(request_id, text)
         with self.lock:
-            self.last_request = {"requestId": request_id, "text": text, "startedAt": utc_now()}
+            self.last_request = request_summary
             self.last_error = ""
         self.persist()
-        append_event("speak_started", requestId=request_id, text=text)
+        append_event("speak_started", **request_summary)
         try:
             upstream = request_json(
                 join_url(str(self.config["upstreamBaseUrl"]), str(self.config["upstreamSpeakPath"])),
@@ -339,7 +386,9 @@ class PersistentRvcService:
             )
             if not upstream.get("ok") or not upstream.get("audioUrl"):
                 raise RuntimeError(f"upstream TTS generation failed: {upstream!r}")
-            source_url = join_url(str(self.config["upstreamBaseUrl"]), str(upstream["audioUrl"]))
+            source_url = resolve_upstream_audio_url(
+                str(self.config["upstreamBaseUrl"]), str(upstream["audioUrl"])
+            )
             source_path = self._download(source_url, request_id)
             conversion_started = time.perf_counter()
             CONVERTED_ROOT.mkdir(parents=True, exist_ok=True)
