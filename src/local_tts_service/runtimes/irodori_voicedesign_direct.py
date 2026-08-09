@@ -644,6 +644,24 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
             caption_injection_mode=caption_injection_mode,
         )
 
+    def release_model(self, model_name: str) -> bool:
+        model_cfg = self.models.get(model_name)
+        if model_cfg is None or model_cfg.runtime != self.name:
+            raise ProviderError(f"model is not configured for Irodori: {model_name}")
+        with self._pending_requests_lock:
+            if self._pending_requests > 0:
+                raise ProviderError("Irodori runtime is busy")
+        with self._worker_lock:
+            with self._pending_requests_lock:
+                if self._pending_requests > 0:
+                    raise ProviderError("Irodori runtime is busy")
+            worker = self._worker
+            released = worker is not None or bool(self._prepared_models)
+            if worker is not None:
+                self._shutdown_worker_process(worker)
+            self._reset_worker_state(worker)
+            return released
+
     def close(self) -> None:
         with self._idle_monitor_lock:
             self._closed = True

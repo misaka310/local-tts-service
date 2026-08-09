@@ -25,5 +25,14 @@ class LocalTTSService:
             raise RequestValidationError(f"reference voice is not usable: {chosen} ({voice.error_reason})")
         return voice
 
+    def unload_model(self, model_name: str) -> dict[str, Any]:
+        chosen, cfg = self.pick_model(model_name)
+        runtime = self.runtimes.get(cfg.runtime)
+        release_model = getattr(runtime, "release_model", None)
+        if not callable(release_model):
+            raise RequestValidationError(f"model runtime does not support unload: {chosen}")
+        released = bool(release_model(chosen))
+        return {"model": chosen, "runtime": cfg.runtime, "released": released}
+
 def serialize_voice(voice: Any) -> dict[str, Any]:
     return {"voiceId": voice.voice_id, "displayName": voice.display_name, "hasReferenceAudio": voice.has_reference_audio, "hasReferenceText": voice.has_reference_text, "enabled": voice.enabled, "audioDurationSec": voice.duration_sec, "minReferenceDurationSec": voice.min_duration_sec, "maxReferenceDurationSec": voice.max_duration_sec, "errorReason": voice.error_reason}
