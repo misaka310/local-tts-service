@@ -106,6 +106,26 @@
       "supportsVoiceDesign": false,
       "supportsReferenceVoice": true
     },
+    "irodori_v3_low_latency": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v3 低遅延 (8-step)",
+      "family": "irodori",
+      "modelId": "Aratako/Irodori-TTS-500M-v3",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-500M-v3/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsCaption": false,
+      "supportsInstruction": false,
+      "supportsSeed": true,
+      "supportsSpeedControl": true,
+      "supportsStyleStrength": false,
+      "supportsVoiceDesign": false,
+      "supportsReferenceVoice": true,
+      "notes": "8-step / sway / reference latent cache の低遅延プロファイル。通常のIrodori v3とは別モデルとして選択します。",
+      "runtimeOptions": {
+        "optimizationProfile": "low_latency_8",
+        "codecPrecision": "bf16"
+      }
+    },
     "irodori_v3_voicedesign": {
       "runtime": "irodori_voicedesign_direct",
       "label": "Irodori v3 VoiceDesign",

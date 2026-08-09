@@ -90,6 +90,26 @@ DEFAULT_CONFIG = {
             "supportsReferenceVoice": True,
             "chunking": {"softChunkChars": 160, "maxChunkChars": 220, "hardLimitChars": 280, "pauseBetweenChunksMs": 250},
         },
+        "irodori_v3_low_latency": {
+            "runtime": "irodori_voicedesign_direct",
+            "label": "Irodori v3 低遅延 (8-step)",
+            "modelId": "Aratako/Irodori-TTS-500M-v3",
+            "checkpoint": "./runtime/models/irodori/Irodori-TTS-500M-v3/model.safetensors",
+            "family": "irodori",
+            "requiresReferenceAudio": False,
+            "supportsSeed": True,
+            "supportsInstruction": False,
+            "supportsStyleStrength": False,
+            "supportsVoiceDesign": False,
+            "supportsSpeedControl": True,
+            "supportsReferenceVoice": True,
+            "chunking": {"softChunkChars": 160, "maxChunkChars": 220, "hardLimitChars": 280, "pauseBetweenChunksMs": 250},
+            "notes": "8-step / sway / reference latent cache の低遅延プロファイル。",
+            "runtimeOptions": {
+                "optimizationProfile": "low_latency_8",
+                "codecPrecision": "bf16",
+            },
+        },
         "irodori_v3_voicedesign": {
             "runtime": "irodori_voicedesign_direct",
             "label": "Irodori v3 VoiceDesign",
@@ -682,6 +702,13 @@ def load_config(root_dir: Path | None = None) -> AppConfig:
         model_chunking = _parse_chunking_config(payload.get("chunking"), default_chunking) if "chunking" in payload else None
         text_split_method_raw = payload.get("textSplitMethod")
         text_split_method = str(text_split_method_raw).strip() if text_split_method_raw is not None and str(text_split_method_raw).strip() else None
+        runtime_options_raw = payload.get("runtimeOptions")
+        if runtime_options_raw is None:
+            runtime_options = None
+        elif not isinstance(runtime_options_raw, dict):
+            raise ConfigError(f"models.{name}.runtimeOptions must be object")
+        else:
+            runtime_options = dict(runtime_options_raw)
 
         if runtime in {"comfyui", "comfyui_voxcpm2"} and not workflow_path:
             raise ConfigError(f"models.{name}.workflowPath is required for runtime={runtime}")
@@ -715,6 +742,7 @@ def load_config(root_dir: Path | None = None) -> AppConfig:
             requires_trained_checkpoint=requires_trained_checkpoint,
             chunking=model_chunking,
             text_split_method=text_split_method,
+            runtime_options=runtime_options,
             workflow_targets=_parse_workflow_targets(payload.get("workflowTargets"), name),
         )
 

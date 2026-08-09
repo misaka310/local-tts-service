@@ -2,6 +2,7 @@
   const MODEL_LABELS = {
     irodori_v4_small: "Irodori v4 Small",
     irodori_v3: "Irodori v3",
+    irodori_v3_low_latency: "Irodori v3 低遅延 (8-step)",
     irodori_v3_voicedesign: "Irodori v3 VoiceDesign",
     irodori_v2: "Irodori v2",
     f5_tts_zero_shot: "F5-TTS Zero-shot",
@@ -36,6 +37,15 @@
       memo: "自然で聞き取りやすい。感情の起伏が穏やかで、全体的なバランスが良い。",
       rankReason: "自然で表現力が高く、全体のバランスが最も優れています。",
       baseScore: 96,
+    },
+    irodori_v3_low_latency: {
+      badges: ["低遅延", "8-step", "実験"],
+      description: "Irodori v3を8-step・sway・参照latentキャッシュで動かす低遅延モデルです。通常版とは別に選べます。",
+      features: ["ウォーム後の短文生成を高速化", "参照音声のlatentを再利用", "Irodori v3と同じチェックポイントを使用", "通常版Irodori v3へいつでも切り替え可能"],
+      scores: { 自然さ: "中〜高", 感情表現: "高", 安定性: "中" },
+      memo: "文章によっては通常版より発音の安定性が下がる可能性があります。初回はモデル読込と参照キャッシュ作成の時間が加わります。",
+      rankReason: "返答速度を優先する短文読み上げに向いています。音質や長文安定性を優先する場合は通常版を選んでください。",
+      baseScore: 91,
     },
     gpt_sovits_zero_shot: {
       badges: ["高品質", "自然さ重視", "多言語対応"],
@@ -109,6 +119,7 @@
     "gpt_sovits_zero_shot",
     "qwen3_tts_clone_1_7b",
     "irodori_v3_voicedesign",
+    "irodori_v3_low_latency",
     "irodori_v3",
     "sarashina2_2_tts",
     "fireredtts2",

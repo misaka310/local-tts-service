@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import socket
 import sys
+import time
 import traceback
 from dataclasses import fields
 from pathlib import Path
@@ -311,6 +313,70 @@ def _get_runtime(payload: dict[str, object]):
     return runtime, inference_runtime_module
 
 
+def _optimization_settings(payload: dict[str, object]) -> dict[str, object] | None:
+    profile = str(payload.get("optimizationProfile") or "").strip().lower()
+    if not profile:
+        return None
+    if profile != "low_latency_8":
+        raise ValueError(f"unknown optimization profile: {profile}")
+    return {
+        "profile": profile,
+        "numSteps": 8,
+        "referenceMode": "latent",
+        "schedule": "sway",
+        "swayCoeff": -1.0,
+        "contextKvCache": True,
+        "watermark": True,
+        "cfgScaleText": 3.0,
+        "cfgScaleSpeaker": 6.0,
+        "decodeMode": "sequential",
+        "trimTail": True,
+    }
+
+
+def _reference_latent_cache(
+    payload: dict[str, object],
+    runtime,
+    inference_runtime_module,
+    reference_audio_path: str | None,
+) -> tuple[str | None, bool]:
+    if not reference_audio_path:
+        return None, False
+    source = Path(reference_audio_path).resolve()
+    if not source.is_file():
+        raise ValueError(f"referenceAudioPath not found: {source}")
+    cache_dir = Path(str(payload.get("referenceCacheDir") or "")).resolve()
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    stat = source.stat()
+    fingerprint = "\n".join(
+        (
+            str(source),
+            str(stat.st_size),
+            str(stat.st_mtime_ns),
+            str(payload.get("codecRepo") or ""),
+            str(payload.get("codecPrecision") or ""),
+            "normalize_db=-16.0",
+            "ensure_max=true",
+        )
+    )
+    digest = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:24]
+    cache_path = cache_dir / f"{source.stem}-{digest}.pt"
+    if cache_path.is_file():
+        return str(cache_path), True
+
+    wav, sample_rate = inference_runtime_module._load_audio(str(source))
+    latent = runtime.codec.encode_waveform(
+        wav.unsqueeze(0),
+        sample_rate=int(sample_rate),
+        normalize_db=-16.0,
+        ensure_max=True,
+    ).cpu()
+    temporary = cache_path.with_name(f".{cache_path.name}.{os.getpid()}.tmp")
+    torch.save(latent, temporary)
+    temporary.replace(cache_path)
+    return str(cache_path), False
+
+
 def _synthesize(payload: dict[str, object]) -> dict[str, object]:
     runtime, inference_runtime_module = _get_runtime(payload)
     setattr(runtime.model_cfg, "force_dual_condition", bool(payload.get("enableReferenceWithCaption")))
@@ -318,24 +384,108 @@ def _synthesize(payload: dict[str, object]) -> dict[str, object]:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     reference_audio_path = str(payload.get("referenceAudioPath") or "").strip() or None
     caption = str(payload.get("caption") or "").strip() or None
-    request = inference_runtime_module.SamplingRequest(
-        text=str(payload.get("text") or ""),
-        caption=caption,
-        ref_wav=reference_audio_path,
-        no_ref=reference_audio_path is None,
-        seed=payload.get("seed"),
-        duration_scale=float(payload.get("durationScale") or 1.0),
-        cfg_scale_caption=float(payload.get("cfgScaleCaption") or 3.0),
-    )
-    result = runtime.synthesize(request)
+    settings = _optimization_settings(payload)
+
+    reference_latent_path = None
+    reference_cache_hit = False
+    use_reference_latent = bool(settings and settings["referenceMode"] == "latent")
+    if use_reference_latent:
+        reference_latent_path, reference_cache_hit = _reference_latent_cache(
+            payload,
+            runtime,
+            inference_runtime_module,
+            reference_audio_path,
+        )
+
+    request_kwargs: dict[str, object] = {
+        "text": str(payload.get("text") or ""),
+        "caption": caption,
+        "ref_wav": None if use_reference_latent else reference_audio_path,
+        "ref_latent": reference_latent_path,
+        "no_ref": not bool(reference_latent_path or reference_audio_path),
+        "seed": payload.get("seed"),
+        "duration_scale": float(payload.get("durationScale") or 1.0),
+        "cfg_scale_caption": float(payload.get("cfgScaleCaption") or 3.0),
+    }
+    if settings:
+        request_kwargs.update(
+            {
+                "cfg_scale_text": float(settings["cfgScaleText"]),
+                "cfg_scale_speaker": float(settings["cfgScaleSpeaker"]),
+                "num_steps": int(settings["numSteps"]),
+                "t_schedule_mode": str(settings["schedule"]),
+                "sway_coeff": float(settings["swayCoeff"]),
+                "context_kv_cache": bool(settings["contextKvCache"]),
+                "decode_mode": str(settings["decodeMode"]),
+                "trim_tail": bool(settings["trimTail"]),
+            }
+        )
+    request = inference_runtime_module.SamplingRequest(**request_kwargs)
+
+    watermarker = getattr(runtime, "watermarker", None)
+    watermark_model = getattr(watermarker, "model", None)
+    original_measure_start = getattr(inference_runtime_module, "_measure_start", None)
+    original_measure_end = getattr(inference_runtime_module, "_measure_end", None)
+    low_latency = settings is not None
+    if low_latency and watermarker is not None and not bool(settings["watermark"]):
+        watermarker.model = None
+    if low_latency and callable(original_measure_start) and callable(original_measure_end):
+        inference_runtime_module._measure_start = lambda _device, *_extra: time.perf_counter()
+        inference_runtime_module._measure_end = (
+            lambda _device, started, *_extra: time.perf_counter() - started
+        )
+    try:
+        if low_latency and torch.cuda.is_available():
+            torch.cuda.synchronize()
+        inference_started = time.perf_counter()
+        result = runtime.synthesize(request)
+        if low_latency and torch.cuda.is_available():
+            torch.cuda.synchronize()
+        inference_wall_sec = time.perf_counter() - inference_started
+    finally:
+        if callable(original_measure_start) and callable(original_measure_end):
+            inference_runtime_module._measure_start = original_measure_start
+            inference_runtime_module._measure_end = original_measure_end
+        if watermarker is not None:
+            watermarker.model = watermark_model
+
+    serialization_started = time.perf_counter()
     _write_wav(output_path, result.audio.to(torch.float32), int(result.sample_rate))
-    return {
+    serialization_sec = time.perf_counter() - serialization_started
+    response: dict[str, object] = {
         "ok": True,
         "outputPath": str(output_path),
         "captionInjectionMode": "separate_target" if caption else "none",
         "usedSeed": int(result.used_seed),
         "externalNetworkAttempts": len(_EXTERNAL_NETWORK_ATTEMPTS),
     }
+    if settings:
+        audio_sec = float(result.audio.shape[-1]) / float(result.sample_rate)
+        response["timings"] = {
+            "profile": str(settings["profile"]),
+            "inferenceSec": inference_wall_sec,
+            "serializationSec": serialization_sec,
+            "totalSec": inference_wall_sec + serialization_sec,
+            "audioSec": audio_sec,
+            "rtf": inference_wall_sec / audio_sec if audio_sec > 0 else None,
+            "stageTimingMode": "disabled_low_latency_path",
+            "referenceCacheHit": reference_cache_hit,
+            "settings": {
+                "numSteps": int(settings["numSteps"]),
+                "schedule": str(settings["schedule"]),
+                "contextKvCache": bool(settings["contextKvCache"]),
+                "gpuStageSync": False,
+                "watermark": bool(settings["watermark"]),
+                "referenceMode": str(settings["referenceMode"]),
+                "cfgScaleText": float(settings["cfgScaleText"]),
+                "cfgScaleSpeaker": float(settings["cfgScaleSpeaker"]),
+                "decodeMode": str(settings["decodeMode"]),
+                "trimTail": bool(settings["trimTail"]),
+                "modelPrecision": str(payload.get("modelPrecision") or ""),
+                "codecPrecision": str(payload.get("codecPrecision") or ""),
+            },
+        }
+    return response
 
 
 def _emit(payload: dict[str, object]) -> None:

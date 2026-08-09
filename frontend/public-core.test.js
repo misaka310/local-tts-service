@@ -44,6 +44,12 @@ function fakeElement() {
   };
 }
 
+test("low latency Irodori v3 is a named selectable catalog model", () => {
+  assert.equal(modelCatalog.modelLabel("irodori_v3_low_latency"), "Irodori v3 低遅延 (8-step)");
+  assert.ok(modelCatalog.DESIRED_MODELS.includes("irodori_v3_low_latency"));
+  assert.deepEqual(modelCatalog.profileFor("irodori_v3_low_latency").badges, ["低遅延", "8-step", "実験"]);
+});
+
 test("model lists keep available models first without scrambling their configured order", async () => {
   const models = [
     { id: "unavailable-a", available: false, enabled: true },

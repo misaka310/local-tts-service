@@ -12,6 +12,7 @@ htmlcov/
 # Local config
 config.local.json
 config/config.local.json
+config/rvc-persistent.local.json
 .env
 .env.*
 !.env.example
@@ -42,6 +43,7 @@ frontend/.npmrc
 *.pt
 *.pth
 *.index
+models/rvc/*/
 !models/rvc/README.md
 
 # IDE
@@ -51,6 +53,7 @@ frontend/.npmrc
 
 # Local agent/tool scratch
 .ai-bridge/
+.playwright-cli/
 docs/superpowers/
 NUL
 =/

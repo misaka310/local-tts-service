@@ -27,6 +27,8 @@
 
 Irodoriは`local-tts.bat`の標準セットアップでリポジトリ内の`runtime/`へ導入し、`irodori_voicedesign_direct` runtimeから直接実行します。通常起動は既定モデルをローカルcheckpoint・codec・Tokenizerから事前ロードし、生成要求では同じ常駐ワーカーへ本文と生成条件だけを送ります。常駐ワーカーは最後の処理完了から既定600秒（10分）使われないと正常終了し、次の生成要求でモデルを含めて自動再起動します。`idleTimeoutSec`で秒数を変更でき、0以下では自動終了しません。環境変数`LOCAL_TTS_IRODORI_IDLE_TIMEOUT_SEC`でも上書きできます。v2・v3は参照音声なしでも生成でき、参照音声を指定した場合だけ話者条件として使います。v3 VoiceDesign・v4 Smallは参照音声またはcaption（画面上の「話し方メモ」）のどちらかが必要で、両方を指定すると話者条件と話し方条件を同時に使用します。v2は`seed`、v3は`seed`と`speedScale`、v3 VoiceDesignとv4 Smallはさらにcaptionと`styleStrength`へ対応します。v2にはduration predictorがないため、このリポジトリでは話速設定を表示・送信しません。
 
+`irodori_v3_low_latency`は通常のIrodori v3と同じcheckpointを使う別選択肢です。`runtimeOptions`で8-step、sway schedule、context K/V cache、参照音声latent cache、bf16 codecを有効にします。初回はモデル読込と参照latent作成が加わり、同じ参照音声を使うウォーム後の短文生成で低遅延になります。8-stepは文章によって通常版より発音安定性が下がる可能性があるため、音質・長文安定性を優先する場合は`irodori_v3`を選択します。参照音声から作成したlatentキャッシュは`runtime/cache/irodori-reference-latents/`に保存され、不要になった場合はサービス停止後に削除できます。
+
 ```json
 {
   "models": {

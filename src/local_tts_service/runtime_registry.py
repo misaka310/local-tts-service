@@ -148,6 +148,12 @@ def build_runtime_registry(config: Any) -> dict[str, Any]:
                     "./runtime/models/irodori/tokenizers/llm-jp-3-150m",
                 )
             ),
+            reference_cache_dir=str(
+                voicedesign_cfg.get(
+                    "referenceCacheDir",
+                    "./runtime/cache/irodori-reference-latents",
+                )
+            ),
         )
 
     qwen3_tts_cfg = config.runtimes.get("qwen3_tts", {})
