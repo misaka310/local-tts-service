@@ -276,6 +276,38 @@ def test_non_positive_idle_timeout_disables_auto_shutdown(tmp_path) -> None:
     runtime.close()
 
 
+def test_explicit_release_stops_worker_and_resets_prepared_state(tmp_path) -> None:
+    runtime = _build_runtime(tmp_path, idle_timeout_sec=0)
+    worker = _ControllableWorker()
+    runtime._worker = worker  # type: ignore[assignment]
+    runtime._last_worker_activity_at = time.monotonic()
+
+    released = runtime.release_model("irodori_v3_voicedesign")
+
+    assert released is True
+    assert worker.shutdown_requested is True
+    assert runtime._worker is None
+    assert not runtime._prepared_models
+    assert runtime._last_worker_activity_at is None
+    assert runtime.release_model("irodori_v3_voicedesign") is False
+    runtime.close()
+
+
+def test_explicit_release_refuses_to_stop_busy_worker(tmp_path) -> None:
+    runtime = _build_runtime(tmp_path, idle_timeout_sec=0)
+    worker = _ControllableWorker()
+    runtime._worker = worker  # type: ignore[assignment]
+    runtime._pending_requests = 1
+
+    with pytest.raises(ProviderError, match="busy"):
+        runtime.release_model("irodori_v3_voicedesign")
+
+    assert runtime._worker is worker
+    assert worker.shutdown_requested is False
+    runtime._pending_requests = 0
+    runtime.close()
+
+
 def test_close_stops_idle_monitor_thread(tmp_path) -> None:
     runtime = _build_runtime(tmp_path, idle_timeout_sec=60)
     worker = _ControllableWorker()

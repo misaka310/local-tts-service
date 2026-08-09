@@ -6,6 +6,7 @@ import wave
 
 from fastapi.testclient import TestClient
 
+import local_tts_service.server as server_module
 from local_tts_service.runtimes.base import SynthesizeResult
 from local_tts_service.server import create_app
 from local_tts_service.storage import write_silence_wav
@@ -166,6 +167,20 @@ def _write_config(tmp_path) -> None:
     (disabled_dir / "text.txt").write_text("missing wav", encoding="utf-8")
 
 
+def test_server_main_runs_prebuilt_app_without_module_reimport(monkeypatch) -> None:
+    config = type("Config", (), {"host": "127.0.0.1", "port": 8730})()
+    calls: list[object] = []
+    monkeypatch.setattr(server_module, "load_config", lambda _root: config)
+    monkeypatch.setattr(
+        "uvicorn.run",
+        lambda application, **kwargs: calls.append((application, kwargs)),
+    )
+
+    server_module.main()
+
+    assert calls == [(server_module.app, {"host": "127.0.0.1", "port": 8730, "reload": False})]
+
+
 def test_api_smoke(tmp_path) -> None:
     _write_config(tmp_path)
     app = create_app(tmp_path)
@@ -205,6 +220,19 @@ def test_api_smoke(tmp_path) -> None:
         and item["supportsStyleStrength"] is True
         for item in models.json()["models"]
     )
+
+    direct_runtime = app.state.service.runtimes["irodori_voicedesign_direct"]
+    released_models: list[str] = []
+    direct_runtime.release_model = lambda model_name: released_models.append(model_name) or True
+    unload = client.post("/v1/models/irodori_v3_voicedesign/unload")
+    assert unload.status_code == 200
+    assert unload.json() == {
+        "ok": True,
+        "model": "irodori_v3_voicedesign",
+        "runtime": "irodori_voicedesign_direct",
+        "released": True,
+    }
+    assert released_models == ["irodori_v3_voicedesign"]
 
     speak = client.post(
         "/v1/speak",

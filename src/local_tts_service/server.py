@@ -9,7 +9,13 @@ from .services.health_service import check_http_health as _check_http_health, he
 __all__=["LocalTTSService","create_app","app"]
 app=create_app()
 
-if __name__ == "__main__":
+
+def main() -> None:
     import uvicorn
-    cfg=load_config(Path.cwd())
-    uvicorn.run("local_tts_service.server:app", host=cfg.host, port=cfg.port, reload=False)
+
+    cfg = load_config(Path.cwd())
+    uvicorn.run(app, host=cfg.host, port=cfg.port, reload=False)
+
+
+if __name__ == "__main__":
+    main()
