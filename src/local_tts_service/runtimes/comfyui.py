@@ -501,7 +501,13 @@ class ComfyUIRuntime(BaseRuntime):
             str(destination),
         ]
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=False,
+                creationflags=int(getattr(subprocess, "CREATE_NO_WINDOW", 0)),
+            )
         except FileNotFoundError as exc:
             raise ProviderError("ffmpeg command was not found; cannot convert audio to wav") from exc
 
@@ -581,6 +587,7 @@ class ComfyUIRuntime(BaseRuntime):
                     env=env,
                     stdout=stdout_fp,
                     stderr=stderr_fp,
+                    creationflags=int(getattr(subprocess, "CREATE_NO_WINDOW", 0)),
                 )
             except OSError as exc:
                 raise ProviderError(

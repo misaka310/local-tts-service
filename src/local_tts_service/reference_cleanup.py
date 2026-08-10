@@ -56,6 +56,7 @@ def detect_cleanup_method() -> dict[str, object]:
             text=True,
             timeout=20,
             check=False,
+            creationflags=int(getattr(subprocess, "CREATE_NO_WINDOW", 0)),
         )
     except FileNotFoundError:
         return {
@@ -97,6 +98,7 @@ def run_demucs_cleanup(*, input_path: Path, output_path: Path, work_dir: Path) -
         text=True,
         timeout=3600,
         check=False,
+        creationflags=int(getattr(subprocess, "CREATE_NO_WINDOW", 0)),
     )
     if proc.returncode != 0:
         raise RuntimeError((proc.stderr or proc.stdout or "").strip() or "BGM・伴奏除去に失敗しました")
