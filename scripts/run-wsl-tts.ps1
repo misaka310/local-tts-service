@@ -4,6 +4,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'no-window-process.ps1')
 $Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = $Utf8NoBom
 $OutputEncoding = $Utf8NoBom
@@ -57,7 +58,9 @@ $ConvertedJsonWsl = Convert-ToWslPath $ConvertedJson
 
 try {
   $RawArgs = @('--exec', 'bash', $ShellWsl, $Model, $RepoWsl, $CliWsl, $ConvertedJsonWsl, $OutputWsl)
-  $Process = Start-Process -FilePath 'wsl.exe' -ArgumentList $RawArgs -RedirectStandardOutput $StdoutLog -RedirectStandardError $StderrLog -WindowStyle Hidden -PassThru -Wait
+  $WslExe = (Get-Command wsl.exe -ErrorAction Stop).Source
+  $Process = Start-LocalTtsNoWindowProcess -FilePath $WslExe -ArgumentList $RawArgs -WorkingDirectory $RepoRoot -StandardOutputPath $StdoutLog -StandardErrorPath $StderrLog -RepoRoot $RepoRoot
+  $Process.WaitForExit()
   $Stdout = if (Test-Path -LiteralPath $StdoutLog) { [string](Get-Content -LiteralPath $StdoutLog -Raw -Encoding UTF8) } else { '' }
   $Stderr = if (Test-Path -LiteralPath $StderrLog) { [string](Get-Content -LiteralPath $StderrLog -Raw -Encoding UTF8) } else { '' }
   if ($Stdout) { Write-Output $Stdout.TrimEnd() }

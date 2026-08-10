@@ -32,6 +32,7 @@ def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
             encoding="utf-8",
             errors="replace",
             check=False,
+            creationflags=int(getattr(subprocess, "CREATE_NO_WINDOW", 0)),
         )
         if completed.returncode == 0:
             return
@@ -61,11 +62,13 @@ def _run_external_command(
         "encoding": "utf-8",
         "errors": "replace",
     }
-    if os.name == "nt":
-        popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-    else:
+    if os.name != "nt":
         popen_kwargs["start_new_session"] = True
-    process = subprocess.Popen(command, **popen_kwargs)
+    process = subprocess.Popen(
+        command,
+        creationflags=int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)) | int(getattr(subprocess, "CREATE_NO_WINDOW", 0)),
+        **popen_kwargs,
+    )
     try:
         stdout, stderr = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:

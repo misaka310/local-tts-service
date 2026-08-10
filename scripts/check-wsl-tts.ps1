@@ -5,6 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'no-window-process.ps1')
 $Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = $Utf8NoBom
 $OutputEncoding = $Utf8NoBom
@@ -35,7 +36,9 @@ $StdoutLog = [System.IO.Path]::GetTempFileName()
 $StderrLog = [System.IO.Path]::GetTempFileName()
 try {
   $Arguments = @('--exec', 'bash', $CheckScriptWsl, $Model)
-  $Process = Start-Process -FilePath 'wsl.exe' -ArgumentList $Arguments -RedirectStandardOutput $StdoutLog -RedirectStandardError $StderrLog -WindowStyle Hidden -PassThru -Wait
+  $WslExe = (Get-Command wsl.exe -ErrorAction Stop).Source
+  $Process = Start-LocalTtsNoWindowProcess -FilePath $WslExe -ArgumentList $Arguments -WorkingDirectory $PSScriptRoot -StandardOutputPath $StdoutLog -StandardErrorPath $StderrLog -RepoRoot (Resolve-Path (Join-Path $PSScriptRoot '..'))
+  $Process.WaitForExit()
   [string]$Stdout = if (Test-Path -LiteralPath $StdoutLog) { Get-Content -LiteralPath $StdoutLog -Raw -Encoding UTF8 } else { '' }
   [string]$Stderr = if (Test-Path -LiteralPath $StderrLog) { Get-Content -LiteralPath $StderrLog -Raw -Encoding UTF8 } else { '' }
   if ($Stdout.Trim()) { Write-Output $Stdout.Trim() }
