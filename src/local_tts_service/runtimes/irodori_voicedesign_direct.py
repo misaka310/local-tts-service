@@ -16,6 +16,7 @@ from uuid import uuid4
 from ..errors import ProviderError
 from ..models import ModelConfig
 from .base import BaseRuntime, SynthesizeRequest, SynthesizeResult
+from .process_utils import no_console_python_executable, terminate_process
 
 
 _RESPONSE_PREFIX = "LOCAL_TTS_JSON:"
@@ -107,12 +108,7 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
 
     @staticmethod
     def _no_console_python_executable(executable: str) -> str:
-        resolved = Path(executable).resolve()
-        if os.name == "nt" and resolved.name.lower() == "python.exe":
-            pythonw = resolved.with_name("pythonw.exe")
-            if pythonw.is_file():
-                return str(pythonw)
-        return str(resolved)
+        return no_console_python_executable(executable)
 
     def get_runtime_metadata(self) -> dict[str, Any]:
         if self._runtime_metadata_cache is not None:
@@ -135,14 +131,14 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         )
         try:
             completed = subprocess.run(
-                [self._no_console_python_executable(self.python_executable), "-c", probe],
+                [no_console_python_executable(self.python_executable), "-c", probe],
                 cwd=str(self.root_dir),
                 capture_output=True,
                 text=True,
                 timeout=30,
                 check=False,
                 env=self._offline_environment(),
-                creationflags=self._no_window_creationflags(),
+                creationflags=int(getattr(subprocess, "CREATE_NO_WINDOW", 0)),
             )
             if completed.returncode == 0:
                 output = (completed.stdout or "").strip().splitlines()
@@ -315,14 +311,7 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
             thread.join(timeout=1)
 
     def _stop_worker_process(self, worker: subprocess.Popen[str]) -> None:
-        if worker.poll() is not None:
-            return
-        worker.terminate()
-        try:
-            worker.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            worker.kill()
-            worker.wait(timeout=5)
+        terminate_process(worker, timeout=5)
 
     def _shutdown_worker_process(self, worker: subprocess.Popen[str]) -> None:
         if worker.poll() is not None:
@@ -454,7 +443,7 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
         helper_script = (self.root_dir / "scripts" / "run_irodori_voicedesign.py").resolve()
         try:
             self._worker = subprocess.Popen(
-                [self._no_console_python_executable(self.python_executable), str(helper_script), "--worker"],
+                [no_console_python_executable(self.python_executable), str(helper_script), "--worker"],
                 cwd=str(self.root_dir),
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -464,7 +453,7 @@ class IrodoriVoiceDesignDirectRuntime(BaseRuntime):
                 errors="replace",
                 bufsize=1,
                 env=self._offline_environment(),
-                creationflags=self._no_window_creationflags(),
+                creationflags=int(getattr(subprocess, "CREATE_NO_WINDOW", 0)),
             )
         except OSError as exc:
             raise ProviderError(f"Irodori runtimeを起動できません: {exc}") from exc
