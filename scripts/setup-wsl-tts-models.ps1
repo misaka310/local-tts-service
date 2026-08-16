@@ -1,5 +1,5 @@
 param(
-  [ValidateSet('all', 'sarashina', 'fireredtts2', 't5gemma', 'fish_s1_mini')]
+  [ValidateSet('all', 'asmr', 'sarashina', 'fireredtts2', 't5gemma', 'fish_s1_mini', 'orpheus_asmr', 'ming_omni_tts')]
   [string[]]$Model = @('all'),
   [switch]$Background
 )
