@@ -31,12 +31,12 @@ if (-not (Test-Path -LiteralPath $RequestJson -PathType Leaf)) {
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $Req = Get-Content -LiteralPath $RequestJson -Raw -Encoding UTF8 | ConvertFrom-Json
 $Model = [string]$Req.model
-if ($Model -notin @('sarashina2_2_tts', 'fireredtts2', 't5gemma_tts_2b_2b', 'fish_s1_mini')) {
+if ($Model -notin @('sarashina2_2_tts', 'fireredtts2', 't5gemma_tts_2b_2b', 'fish_s1_mini', 'orpheus_3b_asmr', 'ming_omni_tts_0_5b')) {
   throw "unsupported WSL TTS model: $Model"
 }
 
-$ReferenceAudioWsl = Convert-ToWslPath ([string]$Req.referenceAudioPath)
-$ReferenceTextWsl = Convert-ToWslPath ([string]$Req.referenceTextPath)
+$ReferenceAudioWsl = if ([string]$Req.referenceAudioPath) { Convert-ToWslPath ([string]$Req.referenceAudioPath) } else { '' }
+$ReferenceTextWsl = if ([string]$Req.referenceTextPath) { Convert-ToWslPath ([string]$Req.referenceTextPath) } else { '' }
 $OutputFull = [System.IO.Path]::GetFullPath($OutputPath)
 $OutputParent = Split-Path -Parent $OutputFull
 if (-not (Test-Path -LiteralPath $OutputParent -PathType Container)) {
@@ -47,9 +47,9 @@ $CliWsl = Convert-ToWslPath (Join-Path $RepoRoot 'scripts/wsl_tts_cli.py')
 $ShellWsl = Convert-ToWslPath (Join-Path $RepoRoot 'scripts/run_wsl_tts.sh')
 $RepoWsl = Convert-ToWslPath ([string]$RepoRoot)
 
-$Req.referenceAudioPath = $ReferenceAudioWsl
-$Req.referenceTextPath = $ReferenceTextWsl
-$Req.outputPath = $OutputWsl
+$Req | Add-Member -NotePropertyName referenceAudioPath -NotePropertyValue $ReferenceAudioWsl -Force
+$Req | Add-Member -NotePropertyName referenceTextPath -NotePropertyValue $ReferenceTextWsl -Force
+$Req | Add-Member -NotePropertyName outputPath -NotePropertyValue $OutputWsl -Force
 $ConvertedJson = "$RequestJson.wsl.json"
 $StdoutLog = "$RequestJson.wsl.stdout.log"
 $StderrLog = "$RequestJson.wsl.stderr.log"
