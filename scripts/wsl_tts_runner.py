@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Callable
 import wave
 
+from scripts.wsl_asmr_tts_adapters import generate_ming_omni_tts, generate_orpheus_asmr
 from scripts.wsl_fish_s1_adapter import generate_fish_s1
 from scripts.wsl_tts_adapters import generate_firered, generate_sarashina, generate_t5gemma
 from scripts.wsl_tts_infer import WslTtsRequest
@@ -13,6 +14,8 @@ GENERATORS: dict[str, Callable[[WslTtsRequest], None]] = {
     "fireredtts2": generate_firered,
     "t5gemma_tts_2b_2b": generate_t5gemma,
     "fish_s1_mini": generate_fish_s1,
+    "orpheus_3b_asmr": generate_orpheus_asmr,
+    "ming_omni_tts_0_5b": generate_ming_omni_tts,
 }
 
 

@@ -44,6 +44,22 @@ case "$MODEL" in
     REQUIRED_MODEL="model.pth"
     IMPORT_MODULE="fish_speech"
     ;;
+  orpheus_3b_asmr)
+    ENV_KEY="orpheus_asmr"
+    CODE_REV="e64661fe6d02c414fc77c53578c9d64082614861"
+    MODEL_REV="b6c3f2a25273a33a7e866ad04865fc6ceb5b127e"
+    REQUIRED_VENDOR="orpheus_tts_pypi/orpheus_tts/engine_class.py"
+    REQUIRED_MODEL="config.json"
+    IMPORT_MODULE="orpheus_tts"
+    ;;
+  ming_omni_tts_0_5b)
+    ENV_KEY="ming_omni_tts"
+    CODE_REV="200a1562e33492e786c23174985bb14f8e012cc6"
+    MODEL_REV="9154772e7fbc585907b6237e3190790676f28975"
+    REQUIRED_VENDOR="cookbooks/test.py"
+    REQUIRED_MODEL="model.safetensors"
+    IMPORT_MODULE="transformers"
+    ;;
   *)
     echo "未対応のWSL TTSモデルです: $MODEL" >&2
     exit 2
