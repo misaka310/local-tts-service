@@ -197,3 +197,16 @@ def test_orpheus_constructor_uses_local_cpu_snac_session_from_start() -> None:
         "lang": "en",
     }
     assert FakeOnnxRuntime.InferenceSession is original_inference_session
+
+
+def test_real_verifier_supports_optional_asmr_models_without_forced_reference() -> None:
+    verify_py = (ROOT / "scripts" / "verify_wsl_tts_models.py").read_text(encoding="utf-8")
+    verify_ps1 = (ROOT / "scripts" / "verify-wsl-tts-models.ps1").read_text(encoding="utf-8")
+
+    assert '"orpheus_3b_asmr"' in verify_py
+    assert '"ming_omni_tts_0_5b"' in verify_py
+    assert 'REFERENCE_MODELS = set(MODELS) - {"orpheus_3b_asmr"}' in verify_py
+    assert "MODEL_TEXT = {" in verify_py
+    assert '"orpheus_3b_asmr": "You can relax now while I speak softly beside you.' in verify_py
+    assert "orpheus_3b_asmr" in verify_ps1
+    assert "ming_omni_tts_0_5b" in verify_ps1
