@@ -65,6 +65,7 @@ case "$MODEL" in
     REQUIRED_VENDOR="cookbooks/test.py"
     REQUIRED_MODEL="model.safetensors"
     IMPORT_MODULE="transformers"
+    IMPORT_MODULE_EXTRA="torchaudio yaml numpy loguru huggingface_hub onnxruntime"
     ;;
   *)
     echo "未対応のWSL TTSモデルです: $MODEL" >&2
