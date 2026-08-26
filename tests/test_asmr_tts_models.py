@@ -225,7 +225,7 @@ def test_real_verifier_supports_optional_asmr_models_without_forced_reference() 
 
     assert '"orpheus_3b_asmr"' in verify_py
     assert '"ming_omni_tts_0_5b"' in verify_py
-    assert 'REFERENCE_MODELS = set(MODELS) - {"orpheus_3b_asmr"}' in verify_py
+    assert 'REFERENCE_MODELS = set(MODELS) - {"orpheus_3b_asmr", "ming_omni_tts_0_5b"}' in verify_py
     assert "MODEL_TEXT = {" in verify_py
     assert '"orpheus_3b_asmr": "You can relax now while I speak softly beside you.' in verify_py
     assert "orpheus_3b_asmr" in verify_ps1
