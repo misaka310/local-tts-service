@@ -109,6 +109,7 @@ def test_orpheus_setup_uses_cpu_orpheus_cpp_and_local_asmr_gguf() -> None:
     assert 'REQUIRED_MODEL="orpheus-3b-asmr-q4_k_m.gguf"' in check_source
     assert 'REQUIRED_MODEL_EXTRA="snac-decoder_model.onnx"' in check_source
     assert 'IMPORT_MODULE="orpheus_cpp"' in check_source
+    assert 'IMPORT_MODULE_EXTRA="llama_cpp onnxruntime"' in check_source
     assert 'REQUIRE_TORCH="0"' in check_source
 
     assert "OrpheusCpp" in adapter_source
