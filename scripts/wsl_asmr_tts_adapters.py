@@ -23,49 +23,59 @@ def _working_directory(path: Path):
         os.chdir(previous)
 
 
-def _load_orpheus_model_class():
-    os.environ.setdefault("VLLM_USE_V2_MODEL_RUNNER", "0")
-    os.environ.setdefault("VLLM_USE_FLASHINFER_SAMPLER", "0")
-    vendor_dir = _vendor_dir("orpheus_asmr")
-    package_root = vendor_dir / "orpheus_tts_pypi"
-    if not package_root.is_dir():
-        raise FileNotFoundError(f"Orpheus package directory not found: {package_root}")
-    package_root_text = str(package_root)
-    if package_root_text not in sys.path:
-        sys.path.insert(0, package_root_text)
-    from orpheus_tts import OrpheusModel
-    return OrpheusModel
+def _load_orpheus_model():
+    model_dir = _model_dir("orpheus_asmr")
+    model_file = model_dir / "orpheus-3b-asmr-q4_k_m.gguf"
+    snac_file = model_dir / "snac-decoder_model.onnx"
+    if not model_file.is_file():
+        raise FileNotFoundError(f"Orpheus ASMR GGUF model not found: {model_file}")
+    if not snac_file.is_file():
+        raise FileNotFoundError(f"Orpheus SNAC decoder not found: {snac_file}")
+
+    from orpheus_cpp import OrpheusCpp
+    import orpheus_cpp.model as orpheus_cpp_model
+
+    asmr_repo = "HummingbirdCake/Orpheus-3B-ASMR-Q4_K_M-GGUF"
+    snac_repo = "onnx-community/snac_24khz-ONNX"
+    original_repo = OrpheusCpp.lang_to_model["en"]
+    original_download = orpheus_cpp_model.hf_hub_download
+
+    def _local_download(repo_id, *args, **kwargs):
+        filename = kwargs.get("filename")
+        if filename is None and args:
+            filename = args[0]
+        if repo_id == asmr_repo and filename == model_file.name:
+            return str(model_file)
+        if repo_id == snac_repo and filename == "decoder_model.onnx":
+            return str(snac_file)
+        return original_download(repo_id, *args, **kwargs)
+
+    OrpheusCpp.lang_to_model["en"] = asmr_repo
+    orpheus_cpp_model.hf_hub_download = _local_download
+    try:
+        return OrpheusCpp(n_gpu_layers=0, n_threads=0, verbose=False, lang="en")
+    finally:
+        OrpheusCpp.lang_to_model["en"] = original_repo
+        orpheus_cpp_model.hf_hub_download = original_download
 
 
 def generate_orpheus_asmr(request: WslTtsRequest) -> None:
     model_dir = _model_dir("orpheus_asmr")
     if not model_dir.is_dir():
         raise FileNotFoundError(f"Orpheus ASMR model directory not found: {model_dir}")
-    OrpheusModel = _load_orpheus_model_class()
-    model = OrpheusModel(
-        model_name=str(model_dir),
-        tokenizer=str(model_dir),
-        max_model_len=2048,
-        gpu_memory_utilization=0.50,
-        enforce_eager=True,
-        disable_custom_all_reduce=True,
-    )
-    chunks = model.generate_speech(prompt=request.text, voice="tara")
-    request.output_path.parent.mkdir(parents=True, exist_ok=True)
-    total_bytes = 0
-    with wave.open(str(request.output_path), "wb") as wav:
-        wav.setnchannels(1)
-        wav.setsampwidth(2)
-        wav.setframerate(24000)
-        for chunk in chunks:
-            if not chunk:
-                continue
-            wav.writeframes(chunk)
-            total_bytes += len(chunk)
-    if total_bytes <= 0:
+    model = _load_orpheus_model()
+    sample_rate, audio = model.tts(request.text, options={"voice_id": "tara"})
+    if int(getattr(audio, "size", 0)) <= 0:
         raise RuntimeError(
             "Orpheus ASMR produced no audio. Try a longer English sentence; upstream currently has a short-prompt trailing-buffer limitation."
         )
+    pcm16 = audio.astype("int16", copy=False).reshape(-1).tobytes()
+    request.output_path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(request.output_path), "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(int(sample_rate))
+        wav.writeframes(pcm16)
 
 
 def _install_ming_attention_fallback() -> None:
