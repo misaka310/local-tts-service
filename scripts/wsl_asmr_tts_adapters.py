@@ -13,6 +13,9 @@ import wave
 from scripts.wsl_tts_infer import WslTtsRequest, _model_dir, _vendor_dir
 
 
+ORPHEUS_LLAMA_CONTEXT = 4096
+
+
 @contextmanager
 def _working_directory(path: Path):
     previous = Path.cwd()
@@ -39,8 +42,18 @@ def _create_orpheus_snac_session(
     )
 
 
-def _construct_orpheus_model_with_local_snac(OrpheusCpp, orpheus_cpp_model, snac_file: Path):
+def _construct_orpheus_model_with_local_snac(
+    OrpheusCpp,
+    orpheus_cpp_model,
+    snac_file: Path,
+    *,
+    llama_cpp_module=None,
+):
+    if llama_cpp_module is None:
+        import llama_cpp as llama_cpp_module
+
     original_inference_session = orpheus_cpp_model.onnxruntime.InferenceSession
+    original_llama = llama_cpp_module.Llama
 
     def _local_snac_inference_session(model_path, *args, **kwargs):
         if str(model_path) == str(snac_file):
@@ -51,10 +64,17 @@ def _construct_orpheus_model_with_local_snac(OrpheusCpp, orpheus_cpp_model, snac
             )
         return original_inference_session(model_path, *args, **kwargs)
 
+    def _bounded_llama(*args, **kwargs):
+        if int(kwargs.get("n_ctx", 0) or 0) == 0:
+            kwargs["n_ctx"] = ORPHEUS_LLAMA_CONTEXT
+        return original_llama(*args, **kwargs)
+
     orpheus_cpp_model.onnxruntime.InferenceSession = _local_snac_inference_session
+    llama_cpp_module.Llama = _bounded_llama
     try:
         return OrpheusCpp(n_gpu_layers=0, n_threads=0, verbose=False, lang="en")
     finally:
+        llama_cpp_module.Llama = original_llama
         orpheus_cpp_model.onnxruntime.InferenceSession = original_inference_session
 
 
@@ -67,6 +87,7 @@ def _load_orpheus_model():
     if not snac_file.is_file():
         raise FileNotFoundError(f"Orpheus SNAC decoder not found: {snac_file}")
 
+    import llama_cpp
     from orpheus_cpp import OrpheusCpp
     import orpheus_cpp.model as orpheus_cpp_model
 
@@ -92,6 +113,7 @@ def _load_orpheus_model():
             OrpheusCpp,
             orpheus_cpp_model,
             snac_file,
+            llama_cpp_module=llama_cpp,
         )
     finally:
         OrpheusCpp.lang_to_model["en"] = original_repo
@@ -108,7 +130,11 @@ def generate_orpheus_asmr(request: WslTtsRequest) -> None:
     snac_session = getattr(model, "_snac_session", None)
     if snac_session is not None and hasattr(snac_session, "get_providers"):
         providers = snac_session.get_providers()
-    print(f"[TRACE] orpheus:model-load:done providers={providers}", file=sys.stderr, flush=True)
+    print(
+        f"[TRACE] orpheus:model-load:done providers={providers} n_ctx={ORPHEUS_LLAMA_CONTEXT}",
+        file=sys.stderr,
+        flush=True,
+    )
     print("[TRACE] orpheus:tts:start", file=sys.stderr, flush=True)
     sample_rate, audio = model.tts(request.text, options={"voice_id": "tara"})
     audio_size = int(getattr(audio, "size", 0))
