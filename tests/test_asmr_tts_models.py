@@ -116,3 +116,32 @@ def test_orpheus_setup_uses_cpu_orpheus_cpp_and_local_asmr_gguf() -> None:
     assert "snac-decoder_model.onnx" in adapter_source
     assert "VLLM_USE_V2_MODEL_RUNNER" not in adapter_source
     assert "OrpheusModel" not in adapter_source
+
+
+def test_orpheus_snac_session_disables_onnx_memory_reuse() -> None:
+    from scripts.wsl_asmr_tts_adapters import _create_orpheus_snac_session
+
+    calls: dict[str, object] = {}
+
+    class FakeSessionOptions:
+        def __init__(self) -> None:
+            self.enable_mem_reuse = True
+
+    class FakeOnnxRuntime:
+        SessionOptions = FakeSessionOptions
+
+        @staticmethod
+        def InferenceSession(path, *, sess_options, providers):
+            calls["path"] = path
+            calls["enable_mem_reuse"] = sess_options.enable_mem_reuse
+            calls["providers"] = providers
+            return "session"
+
+    session = _create_orpheus_snac_session(FakeOnnxRuntime, Path("decoder.onnx"))
+
+    assert session == "session"
+    assert calls == {
+        "path": "decoder.onnx",
+        "enable_mem_reuse": False,
+        "providers": ["CPUExecutionProvider"],
+    }
