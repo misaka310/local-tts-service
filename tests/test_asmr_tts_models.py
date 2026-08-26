@@ -88,3 +88,27 @@ def test_asmr_dispatch_and_setup_targets_are_wired() -> None:
     assert "want_asmr orpheus_asmr" in setup_source
     assert "want_asmr ming_omni_tts" in setup_source
     assert "onnxruntime-gpu" in setup_source
+
+
+def test_orpheus_setup_uses_cpu_orpheus_cpp_and_local_asmr_gguf() -> None:
+    setup_source = (ROOT / "scripts" / "setup_wsl_tts_models.sh").read_text(encoding="utf-8")
+    check_source = (ROOT / "scripts" / "check_wsl_tts.sh").read_text(encoding="utf-8")
+    adapter_source = (ROOT / "scripts" / "wsl_asmr_tts_adapters.py").read_text(encoding="utf-8")
+
+    assert "https://github.com/freddyaboulton/orpheus-cpp.git" in setup_source
+    assert "ed126bea531ea9d53ef7564b00e8bc23f8f9aebe" in setup_source
+    assert "HummingbirdCake/Orpheus-3B-ASMR-Q4_K_M-GGUF" in setup_source
+    assert "orpheus-3b-asmr-q4_k_m.gguf" in setup_source
+    assert "llama-cpp-python" in setup_source
+    assert "https://abetlen.github.io/llama-cpp-python/whl/cpu" in setup_source
+    assert "canopyai/Orpheus-TTS.git" not in setup_source
+
+    assert 'REQUIRED_MODEL="orpheus-3b-asmr-q4_k_m.gguf"' in check_source
+    assert 'IMPORT_MODULE="orpheus_cpp"' in check_source
+    assert 'REQUIRE_TORCH="0"' in check_source
+
+    assert "OrpheusCpp" in adapter_source
+    assert "n_gpu_layers=0" in adapter_source
+    assert "HummingbirdCake/Orpheus-3B-ASMR-Q4_K_M-GGUF" in adapter_source
+    assert "VLLM_USE_V2_MODEL_RUNNER" not in adapter_source
+    assert "OrpheusModel" not in adapter_source
