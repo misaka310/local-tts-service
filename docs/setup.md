@@ -148,11 +148,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-expres
 
 ### WSLモデル
 
-Sarashina2.2-TTS、FireRedTTS-2、T5Gemma-TTS、FishAudio S1-miniはWSL内の個別環境へ導入します。
+Sarashina2.2-TTS、FireRedTTS-2、T5Gemma-TTS、FishAudio S1-miniはWSL内の個別環境へ導入します。これら4モデルはまとめて導入できます。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model all
 ```
+
+ASMR向けのOrpheus 3BとMing Omni TTSは大容量の任意モデルなので標準セットアップには含めません。両方まとめて、または個別に導入します。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model asmr
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model orpheus_asmr
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model ming_omni_tts
+```
+
+Orpheusは参照音声不要・英語優先で、`orpheus-cpp`とCPU版`llama-cpp-python`、Q4_K_M GGUF、SNAC ONNX decoderを専用環境へ固定配置します。Mingは話し方メモだけでも生成でき、任意で参照音声を併用できます。どちらもセットアップ完了後の通常生成ではモデルやdecoderを外部取得しません。
 
 詳細は [wsl-tts-models.md](./wsl-tts-models.md) を参照してください。
 
