@@ -29,4 +29,11 @@ if [[ ! -x "$PYTHON" ]]; then
 fi
 
 export PYTHONPATH="$REPO_ROOT"
-exec "$PYTHON" "$CLI" --request-json "$REQUEST_JSON" --output-path "$OUTPUT_PATH"
+set +e
+"$PYTHON" "$CLI" --request-json "$REQUEST_JSON" --output-path "$OUTPUT_PATH"
+STATUS=$?
+set -e
+if [[ "$STATUS" -ne 0 ]]; then
+  echo "[ERROR] $MODEL python exited with status $STATUS" >&2
+fi
+exit "$STATUS"
