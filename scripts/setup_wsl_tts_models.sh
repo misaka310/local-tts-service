@@ -124,7 +124,7 @@ Path(sys.argv[2]).write_text("\n".join(kept) + "\n", encoding="utf-8")
 PY
   install_torch_28 "$python"
   uv pip install --python "$python" --no-build-isolation -r "$filtered"
-  uv pip install --python "$python" inflect onnxruntime-gpu
+  uv pip install --python "$python" inflect onnxruntime-gpu loguru
   rm -f "$filtered"
 }
 
