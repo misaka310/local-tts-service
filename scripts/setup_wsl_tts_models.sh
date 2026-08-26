@@ -264,7 +264,7 @@ setup_orpheus_asmr() {
     --revision "$ORPHEUS_MODEL_REV" --local-dir "$model"
   log "Downloading $ORPHEUS_SNAC_REPO at $ORPHEUS_SNAC_REV"
   local snac_source
-  snac_source="$(HF_HUB_DISABLE_XET=1 hf download "$ORPHEUS_SNAC_REPO" "$ORPHEUS_SNAC_FILE" --revision "$ORPHEUS_SNAC_REV")"
+  snac_source="$(HF_HUB_DISABLE_XET=1 hf download "$ORPHEUS_SNAC_REPO" "$ORPHEUS_SNAC_FILE" --revision "$ORPHEUS_SNAC_REV" --quiet)"
   cp "$snac_source" "$model/snac-decoder_model.onnx"
   write_manifest "$key" "$repo" "$ORPHEUS_CPP_REV" "$ORPHEUS_MODEL_REPO" "$ORPHEUS_MODEL_REV" "$model" "$python"
 }
