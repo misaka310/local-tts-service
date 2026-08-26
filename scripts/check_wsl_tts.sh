@@ -10,6 +10,8 @@ fi
 
 MODEL="$1"
 BASE="${LOCAL_TTS_WSL_HOME:-$HOME/.local/share/local-tts-service}"
+REQUIRE_TORCH="1"
+REQUIRED_MODEL_EXTRA=""
 
 case "$MODEL" in
   sarashina2_2_tts)
@@ -46,11 +48,13 @@ case "$MODEL" in
     ;;
   orpheus_3b_asmr)
     ENV_KEY="orpheus_asmr"
-    CODE_REV="e64661fe6d02c414fc77c53578c9d64082614861"
-    MODEL_REV="b6c3f2a25273a33a7e866ad04865fc6ceb5b127e"
-    REQUIRED_VENDOR="orpheus_tts_pypi/orpheus_tts/engine_class.py"
-    REQUIRED_MODEL="config.json"
-    IMPORT_MODULE="orpheus_tts"
+    CODE_REV="ed126bea531ea9d53ef7564b00e8bc23f8f9aebe"
+    MODEL_REV="22892bc82fc22d5db827b005db658e778dcf7847"
+    REQUIRED_VENDOR="src/orpheus_cpp/model.py"
+    REQUIRED_MODEL="orpheus-3b-asmr-q4_k_m.gguf"
+    REQUIRED_MODEL_EXTRA="snac-decoder_model.onnx"
+    IMPORT_MODULE="orpheus_cpp"
+    REQUIRE_TORCH="0"
     ;;
   ming_omni_tts_0_5b)
     ENV_KEY="ming_omni_tts"
@@ -74,6 +78,10 @@ MANIFEST="$BASE/manifests/$ENV_KEY.json"
 [[ -x "$PYTHON" ]] || { echo "WSLの専用Python環境が未導入です: $PYTHON" >&2; exit 3; }
 [[ -f "$VENDOR/$REQUIRED_VENDOR" ]] || { echo "公式コードの実行入口がありません: $VENDOR/$REQUIRED_VENDOR" >&2; exit 4; }
 [[ -f "$MODEL_DIR/$REQUIRED_MODEL" ]] || { echo "モデル重みがありません: $MODEL_DIR/$REQUIRED_MODEL" >&2; exit 5; }
+if [[ -n "$REQUIRED_MODEL_EXTRA" && ! -f "$MODEL_DIR/$REQUIRED_MODEL_EXTRA" ]]; then
+  echo "モデル依存ファイルがありません: $MODEL_DIR/$REQUIRED_MODEL_EXTRA" >&2
+  exit 5
+fi
 [[ -f "$MANIFEST" ]] || { echo "固定revisionの導入記録がありません: $MANIFEST" >&2; exit 6; }
 
 ACTUAL_CODE_REV="$(git -C "$VENDOR" rev-parse HEAD 2>/dev/null || true)"
@@ -82,7 +90,7 @@ ACTUAL_CODE_REV="$(git -C "$VENDOR" rev-parse HEAD 2>/dev/null || true)"
   exit 7
 }
 
-"$PYTHON" - "$MANIFEST" "$MODEL_REV" "$IMPORT_MODULE" <<'PY'
+"$PYTHON" - "$MANIFEST" "$MODEL_REV" "$IMPORT_MODULE" "$REQUIRE_TORCH" <<'PY'
 import importlib.util
 import json
 from pathlib import Path
@@ -91,13 +99,14 @@ import sys
 manifest_path = Path(sys.argv[1])
 expected_model_revision = sys.argv[2]
 module_name = sys.argv[3]
+require_torch = sys.argv[4] == "1"
 payload = json.loads(manifest_path.read_text(encoding="utf-8"))
 actual_model_revision = str(payload.get("modelRevision") or "")
 if actual_model_revision != expected_model_revision:
     raise SystemExit(
         f"モデルrevisionが不一致です: expected={expected_model_revision} actual={actual_model_revision or '未記録'}"
     )
-if importlib.util.find_spec("torch") is None:
+if require_torch and importlib.util.find_spec("torch") is None:
     raise SystemExit("専用Python環境にtorchがありません")
 if importlib.util.find_spec(module_name) is None:
     raise SystemExit(f"専用Python環境に必要なモジュールがありません: {module_name}")
