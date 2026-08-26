@@ -13,13 +13,18 @@ SARASHINA_REV="e0ac9c99160ea4bf8dde46892892c945e66fcc13"
 FIRERED_REV="404f3f61d25bb4804859b588a6a734bf8468090c"
 T5GEMMA_REV="c8722b37e1aca0e21f85185188755e164c316828"
 FISH_REV="23a4beb06952a6cc29813851309184ec1c498cac"
-ORPHEUS_REV="e64661fe6d02c414fc77c53578c9d64082614861"
+ORPHEUS_CPP_REV="ed126bea531ea9d53ef7564b00e8bc23f8f9aebe"
 MING_REV="200a1562e33492e786c23174985bb14f8e012cc6"
 SARASHINA_MODEL_REV="8d30bd523b1fa217ab0b4cd32c9275d4f222fbcd"
 FIRERED_MODEL_REV="4af3f5cc4963373b86b52d750220d4de85261f05"
 T5GEMMA_MODEL_REV="e548f8358891975e61d2107e3d7ccc47b1b7294e"
 FISH_MODEL_REV="f4b445029346701e082b60bb63fcc2d1bb17a0e2"
-ORPHEUS_MODEL_REV="b6c3f2a25273a33a7e866ad04865fc6ceb5b127e"
+ORPHEUS_MODEL_REV="22892bc82fc22d5db827b005db658e778dcf7847"
+ORPHEUS_MODEL_REPO="HummingbirdCake/Orpheus-3B-ASMR-Q4_K_M-GGUF"
+ORPHEUS_MODEL_FILE="orpheus-3b-asmr-q4_k_m.gguf"
+ORPHEUS_SNAC_REV="e0b0016bc39c9d144e51aba2f275f59b7a6874d6"
+ORPHEUS_SNAC_REPO="onnx-community/snac_24khz-ONNX"
+ORPHEUS_SNAC_FILE="onnx/decoder_model.onnx"
 MING_MODEL_REV="9154772e7fbc585907b6237e3190790676f28975"
 
 mkdir -p "$VENV_ROOT" "$VENDOR_ROOT" "$MODEL_ROOT" "$LOG_ROOT" "$MANIFEST_ROOT"
@@ -57,7 +62,7 @@ if ! command -v uv >/dev/null 2>&1; then
   curl -LsSf https://astral.sh/uv/install.sh | sh
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 fi
-uv python install 3.11 3.12
+uv python install 3.11
 
 clone_pinned() {
   local name="$1" url="$2" revision="$3"
@@ -162,7 +167,15 @@ PY
 write_manifest() {
   local key="$1" repo="$2" code_revision="$3" model_id="$4" model_revision="$5" model_dir="$6" python="$7"
   local torch_version
-  torch_version="$($python -c 'import torch; print(torch.__version__)')"
+  torch_version="$($python - <<'PY'
+import importlib.util
+if importlib.util.find_spec("torch") is None:
+    print("not-installed")
+else:
+    import torch
+    print(torch.__version__)
+PY
+)"
   cat > "$MANIFEST_ROOT/$key.json" <<EOF
 {
   "model": "$key",
@@ -227,11 +240,33 @@ setup_fish() {
 
 setup_orpheus_asmr() {
   local key="orpheus_asmr" vendor="$VENDOR_ROOT/orpheus_asmr" model="$MODEL_ROOT/orpheus_asmr"
-  clone_pinned "$key" "https://github.com/canopyai/Orpheus-TTS.git" "$ORPHEUS_REV"
-  local python; python="$(create_env_for_python "$key" 3.12)"
-  uv pip install --python "$python" -e "$vendor/orpheus_tts_pypi"
-  download_model "nyuuzyou/Orpheus-3B-ASMR" "$ORPHEUS_MODEL_REV" "$model"
-  write_manifest "$key" "https://github.com/canopyai/Orpheus-TTS.git" "$ORPHEUS_REV" "nyuuzyou/Orpheus-3B-ASMR" "$ORPHEUS_MODEL_REV" "$model" "$python"
+  local repo="https://github.com/freddyaboulton/orpheus-cpp.git"
+  if [[ -d "$vendor/.git" ]]; then
+    local current_origin
+    current_origin="$(git -C "$vendor" remote get-url origin 2>/dev/null || true)"
+    if [[ "$current_origin" != "$repo" ]]; then
+      log "Replacing legacy Orpheus vendor: ${current_origin:-unknown}"
+      rm -rf "$vendor"
+    fi
+  fi
+  clone_pinned "$key" "$repo" "$ORPHEUS_CPP_REV"
+  local python; python="$(create_env_for_python "$key" 3.11)"
+  uv pip install --python "$python" -e "$vendor"
+  uv pip install --python "$python" llama-cpp-python \
+    --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+  if [[ -d "$model" && ! -f "$model/$ORPHEUS_MODEL_FILE" ]]; then
+    log "Replacing legacy Orpheus model directory with GGUF runtime files"
+    rm -rf "$model"
+  fi
+  mkdir -p "$model"
+  log "Downloading $ORPHEUS_MODEL_REPO at $ORPHEUS_MODEL_REV"
+  HF_HUB_DISABLE_XET=1 hf download "$ORPHEUS_MODEL_REPO" "$ORPHEUS_MODEL_FILE" \
+    --revision "$ORPHEUS_MODEL_REV" --local-dir "$model"
+  log "Downloading $ORPHEUS_SNAC_REPO at $ORPHEUS_SNAC_REV"
+  local snac_source
+  snac_source="$(HF_HUB_DISABLE_XET=1 hf download "$ORPHEUS_SNAC_REPO" "$ORPHEUS_SNAC_FILE" --revision "$ORPHEUS_SNAC_REV")"
+  cp "$snac_source" "$model/snac-decoder_model.onnx"
+  write_manifest "$key" "$repo" "$ORPHEUS_CPP_REV" "$ORPHEUS_MODEL_REPO" "$ORPHEUS_MODEL_REV" "$model" "$python"
 }
 
 setup_ming_omni_tts() {
