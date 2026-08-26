@@ -23,14 +23,39 @@ def _working_directory(path: Path):
         os.chdir(previous)
 
 
-def _create_orpheus_snac_session(onnxruntime_module, snac_file: Path):
+def _create_orpheus_snac_session(
+    onnxruntime_module,
+    snac_file: Path,
+    *,
+    inference_session_factory=None,
+):
     session_options = onnxruntime_module.SessionOptions()
     session_options.enable_mem_reuse = False
-    return onnxruntime_module.InferenceSession(
+    factory = inference_session_factory or onnxruntime_module.InferenceSession
+    return factory(
         str(snac_file),
         sess_options=session_options,
         providers=["CPUExecutionProvider"],
     )
+
+
+def _construct_orpheus_model_with_local_snac(OrpheusCpp, orpheus_cpp_model, snac_file: Path):
+    original_inference_session = orpheus_cpp_model.onnxruntime.InferenceSession
+
+    def _local_snac_inference_session(model_path, *args, **kwargs):
+        if str(model_path) == str(snac_file):
+            return _create_orpheus_snac_session(
+                orpheus_cpp_model.onnxruntime,
+                snac_file,
+                inference_session_factory=original_inference_session,
+            )
+        return original_inference_session(model_path, *args, **kwargs)
+
+    orpheus_cpp_model.onnxruntime.InferenceSession = _local_snac_inference_session
+    try:
+        return OrpheusCpp(n_gpu_layers=0, n_threads=0, verbose=False, lang="en")
+    finally:
+        orpheus_cpp_model.onnxruntime.InferenceSession = original_inference_session
 
 
 def _load_orpheus_model():
@@ -63,9 +88,11 @@ def _load_orpheus_model():
     OrpheusCpp.lang_to_model["en"] = asmr_repo
     orpheus_cpp_model.hf_hub_download = _local_download
     try:
-        model = OrpheusCpp(n_gpu_layers=0, n_threads=0, verbose=False, lang="en")
-        model._snac_session = _create_orpheus_snac_session(orpheus_cpp_model.onnxruntime, snac_file)
-        return model
+        return _construct_orpheus_model_with_local_snac(
+            OrpheusCpp,
+            orpheus_cpp_model,
+            snac_file,
+        )
     finally:
         OrpheusCpp.lang_to_model["en"] = original_repo
         orpheus_cpp_model.hf_hub_download = original_download
