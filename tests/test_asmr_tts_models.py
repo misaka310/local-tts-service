@@ -101,6 +101,7 @@ def test_orpheus_setup_uses_cpu_orpheus_cpp_and_local_asmr_gguf() -> None:
     assert "orpheus-3b-asmr-q4_k_m.gguf" in setup_source
     assert "onnx-community/snac_24khz-ONNX" in setup_source
     assert "snac-decoder_model.onnx" in setup_source
+    assert 'hf download "$ORPHEUS_SNAC_REPO" "$ORPHEUS_SNAC_FILE" --revision "$ORPHEUS_SNAC_REV" --quiet' in setup_source
     assert "llama-cpp-python" in setup_source
     assert "https://abetlen.github.io/llama-cpp-python/whl/cpu" in setup_source
     assert "canopyai/Orpheus-TTS.git" not in setup_source
