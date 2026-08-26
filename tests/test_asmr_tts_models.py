@@ -146,3 +146,54 @@ def test_orpheus_snac_session_disables_onnx_memory_reuse() -> None:
         "enable_mem_reuse": False,
         "providers": ["CPUExecutionProvider"],
     }
+
+
+def test_orpheus_constructor_uses_local_cpu_snac_session_from_start() -> None:
+    from scripts.wsl_asmr_tts_adapters import _construct_orpheus_model_with_local_snac
+
+    calls: dict[str, object] = {}
+
+    class FakeSessionOptions:
+        def __init__(self) -> None:
+            self.enable_mem_reuse = True
+
+    class FakeOnnxRuntime:
+        SessionOptions = FakeSessionOptions
+
+        @staticmethod
+        def InferenceSession(path, *args, **kwargs):
+            calls["path"] = str(path)
+            session_options = kwargs.get("sess_options")
+            calls["enable_mem_reuse"] = getattr(session_options, "enable_mem_reuse", None)
+            calls["providers"] = kwargs.get("providers")
+            return "cpu-session"
+
+    original_inference_session = FakeOnnxRuntime.InferenceSession
+
+    class FakeModule:
+        onnxruntime = FakeOnnxRuntime
+
+    class FakeOrpheus:
+        def __init__(self, **kwargs) -> None:
+            calls["constructor_kwargs"] = kwargs
+            self._snac_session = FakeModule.onnxruntime.InferenceSession(
+                "decoder.onnx",
+                providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+            )
+
+    model = _construct_orpheus_model_with_local_snac(
+        FakeOrpheus,
+        FakeModule,
+        Path("decoder.onnx"),
+    )
+
+    assert model._snac_session == "cpu-session"
+    assert calls["enable_mem_reuse"] is False
+    assert calls["providers"] == ["CPUExecutionProvider"]
+    assert calls["constructor_kwargs"] == {
+        "n_gpu_layers": 0,
+        "n_threads": 0,
+        "verbose": False,
+        "lang": "en",
+    }
+    assert FakeOnnxRuntime.InferenceSession is original_inference_session
