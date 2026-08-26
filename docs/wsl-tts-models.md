@@ -191,3 +191,54 @@ npm run e2e:wsl-models-live
 - 4件すべての`audio`要素で新規生成WAVを読み込める
 - FireRedTTS-2の空生成時フォールバックと、T5Gemma-TTSのoffline・eager実行が実際のAPI/UI経路で機能する
 - 一括生成の実測時間は271.1秒
+
+## Optional ASMR models
+
+Orpheus 3B ASMRとMing Omni TTS 0.5Bは大容量の任意モデルです。通常の`-Model all`には含めず、明示したときだけ導入します。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model asmr
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model orpheus_asmr
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model ming_omni_tts
+```
+
+### Orpheus 3B ASMR
+
+- モデルID: `orpheus_3b_asmr`
+- 参照音声: 不要
+- 既定言語: 英語
+- 実行コード: `freddyaboulton/orpheus-cpp`、revision `ed126bea531ea9d53ef7564b00e8bc23f8f9aebe`
+- 音声モデル: `HummingbirdCake/Orpheus-3B-ASMR-Q4_K_M-GGUF` の `orpheus-3b-asmr-q4_k_m.gguf`、revision `22892bc82fc22d5db827b005db658e778dcf7847`
+- デコーダ: `onnx-community/snac_24khz-ONNX` の `onnx/decoder_model.onnx`、revision `e0b0016bc39c9d144e51aba2f275f59b7a6874d6`
+- 推論: CPU版`llama-cpp-python`、`n_gpu_layers=0`
+- セットアップ後はGGUFとSNAC decoderを専用モデルディレクトリから読み、通常生成中にHugging Faceへ取得要求を出さない
+- 旧`canopyai/Orpheus-TTS` + vLLM環境が存在する場合は、Orpheus専用vendor/model/venvだけを新経路へ置き換える
+- TorchはOrpheusのavailability条件にしない
+
+確認:
+
+```powershell
+powershell -NoProfile -File .\scripts\check-wsl-tts.ps1 -Model orpheus_3b_asmr
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-wsl-tts-models.ps1 -Model orpheus_3b_asmr
+```
+
+WAVが作成されただけでは完了にしません。実機受入では、新規WAVの長さ・RMS・sample rate・channelsに加え、聞き取りまたはASRで入力文の内容が実際に読まれていることを確認します。
+
+### Ming Omni TTS 0.5B
+
+- モデルID: `ming_omni_tts_0_5b`
+- 話し方メモだけで生成可能
+- 任意で参照音声を追加し、style指示と併用可能
+- 実行コード: `inclusionAI/Ming-omni-tts`
+- モデル: `inclusionAI/Ming-omni-tts-0.5B`
+
+確認:
+
+```powershell
+powershell -NoProfile -File .\scripts\check-wsl-tts.ps1 -Model ming_omni_tts_0_5b
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-wsl-tts-models.ps1 -Model ming_omni_tts_0_5b
+```
+
+### 利用条件
+
+OrpheusのGGUF配布ページはApache-2.0表示ですが、モデル系譜にはLlama 3.2が含まれます。商用を含む利用・配布では、GGUF配布ページだけでなく元モデルとLlama 3.2の適用条件も確認してください。`orpheus-cpp`のコードはMITです。MingのモデルページはApache-2.0、公式コードはMITですが、入力音声や生成物に関する権利は別途確認が必要です。
