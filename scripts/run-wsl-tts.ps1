@@ -55,6 +55,7 @@ $StdoutLog = "$RequestJson.wsl.stdout.log"
 $StderrLog = "$RequestJson.wsl.stderr.log"
 [System.IO.File]::WriteAllText($ConvertedJson, ($Req | ConvertTo-Json -Depth 12), $Utf8NoBom)
 $ConvertedJsonWsl = Convert-ToWslPath $ConvertedJson
+$Succeeded = $false
 
 try {
   $RawArgs = @('--exec', 'bash', $ShellWsl, $Model, $RepoWsl, $CliWsl, $ConvertedJsonWsl, $OutputWsl)
@@ -66,12 +67,15 @@ try {
   if ($Stdout) { Write-Output $Stdout.TrimEnd() }
   if ($Process.ExitCode -ne 0) {
     $Details = if ($Stderr.Trim()) { $Stderr.Trim() } elseif ($Stdout.Trim()) { $Stdout.Trim() } else { "exit code $($Process.ExitCode)" }
-    throw "WSL TTS inference failed for $Model`: $Details"
+    throw "WSL TTS inference failed for $Model. Diagnostics retained: request=$ConvertedJson stdout=$StdoutLog stderr=$StderrLog`n$Details"
   }
+  $Succeeded = $true
 } finally {
-  Remove-Item -LiteralPath $ConvertedJson -Force -ErrorAction SilentlyContinue
-  Remove-Item -LiteralPath $StdoutLog -Force -ErrorAction SilentlyContinue
-  Remove-Item -LiteralPath $StderrLog -Force -ErrorAction SilentlyContinue
+  if ($Succeeded) {
+    Remove-Item -LiteralPath $ConvertedJson -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $StdoutLog -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $StderrLog -Force -ErrorAction SilentlyContinue
+  }
 }
 
 if (-not (Test-Path -LiteralPath $OutputFull -PathType Leaf) -or ((Get-Item -LiteralPath $OutputFull).Length -le 44)) {
