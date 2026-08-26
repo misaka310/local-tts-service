@@ -216,6 +216,7 @@ def test_wsl_failure_path_keeps_actionable_diagnostics() -> None:
     cli_source = (ROOT / "scripts" / "wsl_tts_cli.py").read_text(encoding="utf-8")
     shell_source = (ROOT / "scripts" / "run_wsl_tts.sh").read_text(encoding="utf-8")
     powershell_source = (ROOT / "scripts" / "run-wsl-tts.ps1").read_text(encoding="utf-8")
+    adapter_source = (ROOT / "scripts" / "wsl_asmr_tts_adapters.py").read_text(encoding="utf-8")
 
     assert "faulthandler.enable(all_threads=True)" in cli_source
     assert "except SystemExit as exc" in cli_source
@@ -225,3 +226,8 @@ def test_wsl_failure_path_keeps_actionable_diagnostics() -> None:
     assert "if ($Succeeded)" in powershell_source
     assert "Remove-Item -LiteralPath $StdoutLog" in powershell_source
     assert "Remove-Item -LiteralPath $StderrLog" in powershell_source
+    assert "[TRACE] orpheus:model-load:start" in adapter_source
+    assert "[TRACE] orpheus:model-load:done" in adapter_source
+    assert "[TRACE] orpheus:tts:start" in adapter_source
+    assert "[TRACE] orpheus:tts:done" in adapter_source
+    assert "[TRACE] orpheus:wav:done" in adapter_source
