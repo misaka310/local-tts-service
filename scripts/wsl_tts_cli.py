@@ -3,11 +3,19 @@ from __future__ import annotations
 import argparse
 from dataclasses import replace
 import faulthandler
+import importlib.metadata
 from pathlib import Path
 import sys
 
 from scripts.wsl_tts_infer import load_request, resolve_reference_prompt
 from scripts.wsl_tts_runner import GENERATORS, validate_output
+
+
+def _package_version(name: str) -> str:
+    try:
+        return importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:
+        return "not-installed"
 
 
 def main() -> int:
@@ -24,6 +32,15 @@ def main() -> int:
             request.output_path.parent.mkdir(parents=True, exist_ok=True)
         if request.output_path.exists():
             request.output_path.unlink()
+        if request.model == "orpheus_3b_asmr":
+            print(
+                "[TRACE] orpheus:runtime "
+                f"orpheus-cpp={_package_version('orpheus-cpp')} "
+                f"llama-cpp-python={_package_version('llama-cpp-python')} "
+                f"onnxruntime={_package_version('onnxruntime')}",
+                file=sys.stderr,
+                flush=True,
+            )
         GENERATORS[request.model](request)
         validate_output(request.output_path)
         print(f"[DONE] {request.model}: {request.output_path}", flush=True)
