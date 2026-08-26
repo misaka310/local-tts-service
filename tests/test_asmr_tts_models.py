@@ -148,7 +148,7 @@ def test_orpheus_snac_session_disables_onnx_memory_reuse() -> None:
     }
 
 
-def test_orpheus_constructor_uses_local_cpu_snac_session_from_start() -> None:
+def test_orpheus_constructor_uses_local_cpu_snac_and_bounded_llama_context() -> None:
     from scripts.wsl_asmr_tts_adapters import _construct_orpheus_model_with_local_snac
 
     calls: dict[str, object] = {}
@@ -168,7 +168,14 @@ def test_orpheus_constructor_uses_local_cpu_snac_session_from_start() -> None:
             calls["providers"] = kwargs.get("providers")
             return "cpu-session"
 
+    class FakeLlamaModule:
+        class Llama:
+            def __init__(self, *args, **kwargs) -> None:
+                calls["llama_args"] = args
+                calls["llama_kwargs"] = dict(kwargs)
+
     original_inference_session = FakeOnnxRuntime.InferenceSession
+    original_llama = FakeLlamaModule.Llama
 
     class FakeModule:
         onnxruntime = FakeOnnxRuntime
@@ -176,6 +183,11 @@ def test_orpheus_constructor_uses_local_cpu_snac_session_from_start() -> None:
     class FakeOrpheus:
         def __init__(self, **kwargs) -> None:
             calls["constructor_kwargs"] = kwargs
+            self._model = FakeLlamaModule.Llama(
+                model_path="model.gguf",
+                n_ctx=0,
+                n_gpu_layers=kwargs["n_gpu_layers"],
+            )
             self._snac_session = FakeModule.onnxruntime.InferenceSession(
                 "decoder.onnx",
                 providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
@@ -185,11 +197,17 @@ def test_orpheus_constructor_uses_local_cpu_snac_session_from_start() -> None:
         FakeOrpheus,
         FakeModule,
         Path("decoder.onnx"),
+        llama_cpp_module=FakeLlamaModule,
     )
 
     assert model._snac_session == "cpu-session"
     assert calls["enable_mem_reuse"] is False
     assert calls["providers"] == ["CPUExecutionProvider"]
+    assert calls["llama_kwargs"] == {
+        "model_path": "model.gguf",
+        "n_ctx": 4096,
+        "n_gpu_layers": 0,
+    }
     assert calls["constructor_kwargs"] == {
         "n_gpu_layers": 0,
         "n_threads": 0,
@@ -197,6 +215,7 @@ def test_orpheus_constructor_uses_local_cpu_snac_session_from_start() -> None:
         "lang": "en",
     }
     assert FakeOnnxRuntime.InferenceSession is original_inference_session
+    assert FakeLlamaModule.Llama is original_llama
 
 
 def test_real_verifier_supports_optional_asmr_models_without_forced_reference() -> None:
