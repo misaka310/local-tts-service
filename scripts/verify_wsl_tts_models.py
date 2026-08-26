@@ -50,7 +50,7 @@ MODEL_LANGUAGE = {
 MODEL_INSTRUCTION = {
     "ming_omni_tts_0_5b": "ASMR whisper, very low volume, close microphone, slow and breathy, gentle and relaxed",
 }
-REFERENCE_MODELS = set(MODELS) - {"orpheus_3b_asmr"}
+REFERENCE_MODELS = set(MODELS) - {"orpheus_3b_asmr", "ming_omni_tts_0_5b"}
 OUTPUT_DIR = ROOT / "runtime" / "audio" / "model-smoke"
 
 MODEL_SPECS: dict[str, dict[str, object]] = {
