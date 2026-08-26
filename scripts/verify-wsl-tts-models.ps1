@@ -1,5 +1,5 @@
 param(
-  [ValidateSet('sarashina2_2_tts', 'fireredtts2', 't5gemma_tts_2b_2b', 'fish_s1_mini', 'qwen3_tts_clone_0_6b', 'qwen3_tts_clone_1_7b')]
+  [ValidateSet('sarashina2_2_tts', 'fireredtts2', 't5gemma_tts_2b_2b', 'fish_s1_mini', 'orpheus_3b_asmr', 'ming_omni_tts_0_5b', 'qwen3_tts_clone_0_6b', 'qwen3_tts_clone_1_7b')]
   [string[]]$Model = @(),
   [string]$VoiceId = '',
   [switch]$Background
