@@ -102,9 +102,18 @@ def generate_orpheus_asmr(request: WslTtsRequest) -> None:
     model_dir = _model_dir("orpheus_asmr")
     if not model_dir.is_dir():
         raise FileNotFoundError(f"Orpheus ASMR model directory not found: {model_dir}")
+    print("[TRACE] orpheus:model-load:start", file=sys.stderr, flush=True)
     model = _load_orpheus_model()
+    providers = None
+    snac_session = getattr(model, "_snac_session", None)
+    if snac_session is not None and hasattr(snac_session, "get_providers"):
+        providers = snac_session.get_providers()
+    print(f"[TRACE] orpheus:model-load:done providers={providers}", file=sys.stderr, flush=True)
+    print("[TRACE] orpheus:tts:start", file=sys.stderr, flush=True)
     sample_rate, audio = model.tts(request.text, options={"voice_id": "tara"})
-    if int(getattr(audio, "size", 0)) <= 0:
+    audio_size = int(getattr(audio, "size", 0))
+    print(f"[TRACE] orpheus:tts:done sample_rate={sample_rate} samples={audio_size}", file=sys.stderr, flush=True)
+    if audio_size <= 0:
         raise RuntimeError(
             "Orpheus ASMR produced no audio. Try a longer English sentence; upstream currently has a short-prompt trailing-buffer limitation."
         )
@@ -115,6 +124,7 @@ def generate_orpheus_asmr(request: WslTtsRequest) -> None:
         wav.setsampwidth(2)
         wav.setframerate(int(sample_rate))
         wav.writeframes(pcm16)
+    print(f"[TRACE] orpheus:wav:done bytes={request.output_path.stat().st_size}", file=sys.stderr, flush=True)
 
 
 def _install_ming_attention_fallback() -> None:
