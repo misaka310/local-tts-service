@@ -12,6 +12,7 @@ MODEL="$1"
 BASE="${LOCAL_TTS_WSL_HOME:-$HOME/.local/share/local-tts-service}"
 REQUIRE_TORCH="1"
 REQUIRED_MODEL_EXTRA=""
+IMPORT_MODULE_EXTRA=""
 
 case "$MODEL" in
   sarashina2_2_tts)
@@ -54,6 +55,7 @@ case "$MODEL" in
     REQUIRED_MODEL="orpheus-3b-asmr-q4_k_m.gguf"
     REQUIRED_MODEL_EXTRA="snac-decoder_model.onnx"
     IMPORT_MODULE="orpheus_cpp"
+    IMPORT_MODULE_EXTRA="llama_cpp onnxruntime"
     REQUIRE_TORCH="0"
     ;;
   ming_omni_tts_0_5b)
@@ -90,7 +92,7 @@ ACTUAL_CODE_REV="$(git -C "$VENDOR" rev-parse HEAD 2>/dev/null || true)"
   exit 7
 }
 
-"$PYTHON" - "$MANIFEST" "$MODEL_REV" "$IMPORT_MODULE" "$REQUIRE_TORCH" <<'PY'
+"$PYTHON" - "$MANIFEST" "$MODEL_REV" "$IMPORT_MODULE" "$REQUIRE_TORCH" "$IMPORT_MODULE_EXTRA" <<'PY'
 import importlib.util
 import json
 from pathlib import Path
@@ -100,6 +102,7 @@ manifest_path = Path(sys.argv[1])
 expected_model_revision = sys.argv[2]
 module_name = sys.argv[3]
 require_torch = sys.argv[4] == "1"
+extra_module_names = sys.argv[5].split()
 payload = json.loads(manifest_path.read_text(encoding="utf-8"))
 actual_model_revision = str(payload.get("modelRevision") or "")
 if actual_model_revision != expected_model_revision:
@@ -108,8 +111,9 @@ if actual_model_revision != expected_model_revision:
     )
 if require_torch and importlib.util.find_spec("torch") is None:
     raise SystemExit("専用Python環境にtorchがありません")
-if importlib.util.find_spec(module_name) is None:
-    raise SystemExit(f"専用Python環境に必要なモジュールがありません: {module_name}")
+for required_module in [module_name, *extra_module_names]:
+    if importlib.util.find_spec(required_module) is None:
+        raise SystemExit(f"専用Python環境に必要なモジュールがありません: {required_module}")
 PY
 
 if [[ "$MODEL" == "t5gemma_tts_2b_2b" ]]; then
