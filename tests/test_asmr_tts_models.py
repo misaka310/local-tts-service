@@ -210,3 +210,18 @@ def test_real_verifier_supports_optional_asmr_models_without_forced_reference() 
     assert '"orpheus_3b_asmr": "You can relax now while I speak softly beside you.' in verify_py
     assert "orpheus_3b_asmr" in verify_ps1
     assert "ming_omni_tts_0_5b" in verify_ps1
+
+
+def test_wsl_failure_path_keeps_actionable_diagnostics() -> None:
+    cli_source = (ROOT / "scripts" / "wsl_tts_cli.py").read_text(encoding="utf-8")
+    shell_source = (ROOT / "scripts" / "run_wsl_tts.sh").read_text(encoding="utf-8")
+    powershell_source = (ROOT / "scripts" / "run-wsl-tts.ps1").read_text(encoding="utf-8")
+
+    assert "faulthandler.enable(all_threads=True)" in cli_source
+    assert "except SystemExit as exc" in cli_source
+    assert "SystemExit(code=" in cli_source
+    assert "python exited with status" in shell_source
+    assert "$Succeeded = $false" in powershell_source
+    assert "if ($Succeeded)" in powershell_source
+    assert "Remove-Item -LiteralPath $StdoutLog" in powershell_source
+    assert "Remove-Item -LiteralPath $StderrLog" in powershell_source
