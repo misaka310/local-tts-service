@@ -69,7 +69,7 @@ def create_app(root_dir: Path | None = None) -> FastAPI:
         runtimes,
         service.pick_model,
         service.resolve_reference_voice,
-        catalog.availability,
+        catalog.synthesis_availability,
     )
     health_service = HealthService(
         config,

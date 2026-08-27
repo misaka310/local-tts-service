@@ -51,6 +51,8 @@ Important fields:
 
 通常起動など、登録情報とローカルの静的状態だけを短時間で確認する場合は`GET /v1/models?probe=false`を使います。この場合もモデルID、表示名、runtime、機能フラグ、`available`、`unavailableReason`は返りますが、WSLコマンドなどの外部プローブは実行しません。frontendの`/api/models`も`/health`内の軽量モデル情報を使用します。
 
+モデル一覧のライブprobe結果は診断・表示用です。`POST /v1/speak` は、`prepare_model()` を持つ自己復旧可能なruntimeについて、一時的なworker停止を事前に固定エラーにせず、静的な前提を確認してruntimeの再準備へ進みます。再準備にも失敗した場合だけ、そのruntimeのエラーを返します。
+
 ### `POST /v1/models/{model_name}/unload`
 
 対応runtimeの常駐モデルworkerだけを明示的に終了し、GPUメモリを解放します。FastAPIサービス自体は停止しません。現在は`irodori_voicedesign_direct`が対応し、次の生成要求では同じモデルを自動的に再ロードします。

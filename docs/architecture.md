@@ -98,6 +98,24 @@ Local TTS Serviceは、モデル、参照音声、推論runtime、汎用TTS API�
 | `src/local_tts_service/services/model_catalog_service.py` | モデル利用可否とAPI表示情報 |
 | `src/local_tts_service/server.py` | `server:app`と`create_app()`の互換入口 |
 
+### Voice Buttons Siteとの責務境界
+
+Local TTS Serviceが所有するのは、任意テキストをモデル・reference voice・runtime・GPUなどの実行条件からWAVへ変換する再利用可能なHTTP API、runtime、no-window起動・管理契約です。特定の利用Siteの商品仕様には依存しません。
+
+次の情報はVoice Buttons Site側の所有です。
+
+- 固定40本のセリフ、話者レーン、カテゴリ、会話セット
+- accepted SHA-256とSite向けrelease contract
+- `audio:update`、Siteの表示文言、`public/audio/`の固定資産
+
+Voice Buttons Siteは保有するmanifestとrelease contractに従って保守時だけ`POST /v1/speak`を呼びます。Local TTS Serviceはそのmanifest、会話構造、accepted SHA、Site資産をcanonical treeへ持ち込まず、別のSiteや任意テキスト生成からも利用できる汎用境界を維持します。
+
+### 生成時の可用性と復旧
+
+`GET /v1/models` や deep health は、モデル一覧を正確に表示するためruntimeのライブ可用性を確認できます。一方、`POST /v1/speak` の事前確認では、`prepare_model()` と静的必須ファイル検査を持つruntimeの一時的なworker失敗を最終的な不可用として固定しません。静的前提だけを確認して実生成へ進み、runtime自身の再準備・再起動契約へ委譲します。
+
+この分離により、workerが生成中に終了した場合でも、次の生成要求が自己復旧を試せます。モデル一覧のprobe失敗をそのまま生成APIの再試行不能状態へ持ち込まないことが責務境界です。サービスを終了せずにGPUメモリを解放したい場合は、`POST /v1/models/{model_name}/unload` を使い、次の生成時の再ロードをruntimeへ任せます。
+
 ## 音声生成
 
 `src/local_tts_service/synthesis/`へ次を分離しています。

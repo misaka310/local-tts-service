@@ -45,6 +45,9 @@ class FakeCatalog:
     def availability(self, *_args):
         return {"available": True}
 
+    def synthesis_availability(self, *_args):
+        return {"available": True}
+
 
 class FakeSynthesis:
     def __init__(self, *args) -> None:
