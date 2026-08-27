@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from local_tts_service.config import load_config
@@ -217,6 +218,62 @@ def test_orpheus_constructor_uses_local_cpu_snac_and_bounded_llama_context() -> 
     }
     assert FakeOnnxRuntime.InferenceSession is original_inference_session
     assert FakeLlamaModule.Llama is original_llama
+
+
+def test_ming_attention_fallback_matches_flash_attention_lower_right_causal_mask(monkeypatch) -> None:
+    import torch
+
+    from scripts import wsl_asmr_tts_adapters as adapters
+
+    flash_module_names = (
+        "flash_attn",
+        "flash_attn.bert_padding",
+        "flash_attn.layers",
+        "flash_attn.layers.rotary",
+    )
+    previous_modules = {name: sys.modules.get(name) for name in flash_module_names}
+    original_find_spec = adapters.importlib.util.find_spec
+
+    def find_spec_without_flash(name: str, *args, **kwargs):
+        if name == "flash_attn":
+            return None
+        return original_find_spec(name, *args, **kwargs)
+
+    monkeypatch.setattr(adapters.importlib.util, "find_spec", find_spec_without_flash)
+    try:
+        for name in flash_module_names:
+            sys.modules.pop(name, None)
+        adapters._install_ming_attention_fallback()
+        flash_attn_func = sys.modules["flash_attn"].flash_attn_func
+
+        q = torch.tensor([[[[1.0, 0.0]], [[0.0, 1.0]]]])
+        k = torch.tensor(
+            [[[[1.0, 0.0]], [[0.0, 1.0]], [[1.0, 1.0]], [[2.0, 0.0]], [[0.0, 2.0]]]]
+        )
+        v = torch.tensor(
+            [[[[1.0, 10.0]], [[2.0, 20.0]], [[3.0, 30.0]], [[4.0, 40.0]], [[5.0, 50.0]]]]
+        )
+
+        actual = flash_attn_func(q, k, v, causal=True)
+        q_heads = q.transpose(1, 2)
+        k_heads = k.transpose(1, 2)
+        v_heads = v.transpose(1, 2)
+        from torch.nn.attention.bias import causal_lower_right
+
+        expected = torch.nn.functional.scaled_dot_product_attention(
+            q_heads,
+            k_heads,
+            v_heads,
+            attn_mask=causal_lower_right(q.shape[1], k.shape[1]),
+        ).transpose(1, 2)
+
+        assert torch.allclose(actual, expected)
+    finally:
+        for name in flash_module_names:
+            sys.modules.pop(name, None)
+            previous = previous_modules[name]
+            if previous is not None:
+                sys.modules[name] = previous
 
 
 def test_real_verifier_supports_optional_asmr_models_without_forced_reference() -> None:

@@ -173,12 +173,21 @@ def _install_ming_attention_fallback() -> None:
         q_heads = q.transpose(1, 2)
         k_heads = k.transpose(1, 2)
         v_heads = v.transpose(1, 2)
+        attention_mask = None
+        if causal:
+            query_length = q_heads.size(-2)
+            key_length = k_heads.size(-2)
+            attention_mask = torch.tril(
+                torch.ones((query_length, key_length), dtype=torch.bool, device=q_heads.device),
+                diagonal=key_length - query_length,
+            )
         output = torch.nn.functional.scaled_dot_product_attention(
             q_heads,
             k_heads,
             v_heads,
+            attn_mask=attention_mask,
             dropout_p=dropout_p,
-            is_causal=causal,
+            is_causal=False,
             scale=softmax_scale,
             enable_gqa=q_heads.size(1) != k_heads.size(1),
         )
