@@ -177,6 +177,10 @@ def test_companion_restarts_stale_launcher_instead_of_waiting_forever() -> None:
     assert "$maximumStartupAgeSeconds" in source
     assert "Stop-Process -Id ([int]$existingLauncher.ProcessId)" in source
     assert "$existingLauncher = $null" in source
+    assert "$noWindowProcessScript = Join-Path $PSScriptRoot 'no-window-process.ps1'" in source
+    assert ". $noWindowProcessScript" in source
+    assert "Start-LocalTtsNoWindowProcess" in source
+    assert "Start-NoWindowDetached.ps1" not in source
     assert "[switch]$NoOpenBrowser" in detached
     assert "$arguments += '-NoOpenBrowser'" in detached
     assert "C:\\00_dev" not in source

@@ -12,15 +12,9 @@ $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $configPath = Join-Path $repoRoot 'config\config.local.json'
 $launchScript = Join-Path $PSScriptRoot 'launch-local-tts.ps1'
 $frontendScript = Join-Path $PSScriptRoot 'start-tts-frontend.ps1'
-$sharedRunnerRoot = if ($env:WINDOWS_GUI_CI_RUNNER_ROOT) {
-    [IO.Path]::GetFullPath($env:WINDOWS_GUI_CI_RUNNER_ROOT)
-} else {
-    [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $repoRoot) '74_windows-gui-ci-runner'))
-}
-$noWindowLauncher = Join-Path $sharedRunnerRoot 'scripts\host\Start-NoWindowDetached.ps1'
+$noWindowProcessScript = Join-Path $PSScriptRoot 'no-window-process.ps1'
 $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $logRoot = Join-Path $repoRoot 'runtime\logs'
-$statePath = Join-Path $logRoot 'companion-launch-state.json'
 $stdoutPath = Join-Path $logRoot 'companion-launch.stdout.log'
 $stderrPath = Join-Path $logRoot 'companion-launch.stderr.log'
 
@@ -47,17 +41,13 @@ function Test-HttpSuccess {
     }
 }
 
-function Quote-NativeArgument {
-    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Value)
-    if ($Value.Length -gt 0 -and $Value -notmatch '[\s"]') { return $Value }
-    return '"' + $Value.Replace('"', '\"') + '"'
-}
-
-foreach ($requiredPath in @($configPath, $launchScript, $frontendScript, $noWindowLauncher, $powershell)) {
+foreach ($requiredPath in @($configPath, $launchScript, $frontendScript, $noWindowProcessScript, $powershell)) {
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
         throw "Required launcher component was not found: $requiredPath"
     }
 }
+
+. $noWindowProcessScript
 
 $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $apiHost = [string](Get-JsonPropertyValue -Object $config -Name 'host' -Default '127.0.0.1')
@@ -118,7 +108,7 @@ if ($null -ne $existingLauncher) {
     }
 }
 
-$launchResult = $null
+$launchProcess = $null
 if ($null -eq $existingLauncher) {
     New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
     $arguments = @(
@@ -129,18 +119,13 @@ if ($null -eq $existingLauncher) {
         '-File', $launchScript,
         '-NoOpenBrowser'
     )
-    $argumentText = ($arguments | ForEach-Object { Quote-NativeArgument ([string]$_) }) -join ' '
-    $launchJson = & $noWindowLauncher `
+    $launchProcess = Start-LocalTtsNoWindowProcess `
         -FilePath $powershell `
-        -Arguments $argumentText `
+        -ArgumentList $arguments `
         -WorkingDirectory $repoRoot `
-        -StatePath $statePath `
-        -StdoutPath $stdoutPath `
-        -StderrPath $stderrPath
-    $launchResult = $launchJson | ConvertFrom-Json
-    if (-not $launchResult.started) {
-        throw "The no-window local TTS launcher failed. See $stderrPath"
-    }
+        -StandardOutputPath $stdoutPath `
+        -StandardErrorPath $stderrPath `
+        -RepoRoot $repoRoot
 }
 
 $deadline = [DateTime]::UtcNow.AddSeconds($StartupTimeoutSeconds)
@@ -148,27 +133,18 @@ do {
     if (Test-HttpSuccess -Url $frontHealthUrl) {
         if (-not $NoOpenBrowser) { Start-Process $frontUrl | Out-Null }
         [pscustomobject]@{
-            started = ($null -ne $launchResult)
+            started = ($null -ne $launchProcess)
             alreadyStarting = ($null -ne $existingLauncher)
             createNoWindow = $true
             url = $frontUrl
-            statePath = $statePath
             stdoutPath = $stdoutPath
             stderrPath = $stderrPath
         } | ConvertTo-Json -Compress
         exit 0
     }
 
-    if (Test-Path -LiteralPath $statePath -PathType Leaf) {
-        try {
-            $state = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ([string]$state.status -eq 'failed') {
-                throw "The detached local TTS process failed. See $stderrPath"
-            }
-        }
-        catch {
-            if ($_.Exception.Message -like 'The detached local TTS process failed*') { throw }
-        }
+    if ($null -ne $launchProcess -and $launchProcess.HasExited) {
+        throw "The detached local TTS process failed with exit code $($launchProcess.ExitCode). See $stderrPath"
     }
     Start-Sleep -Milliseconds 500
 } while ([DateTime]::UtcNow -lt $deadline)
