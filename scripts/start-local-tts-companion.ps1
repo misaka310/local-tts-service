@@ -2,7 +2,10 @@
 param(
     [ValidateRange(10, 900)]
     [int]$StartupTimeoutSeconds = 240,
-    [switch]$NoOpenBrowser
+    [switch]$NoOpenBrowser,
+    [string]$ReferenceVoicesDir = '',
+    [ValidateRange(-1, 86400)]
+    [int]$IrodoriIdleTimeoutSeconds = -1
 )
 
 Set-StrictMode -Version Latest
@@ -119,6 +122,12 @@ if ($null -eq $existingLauncher) {
         '-File', $launchScript,
         '-NoOpenBrowser'
     )
+    if (-not [string]::IsNullOrWhiteSpace($ReferenceVoicesDir)) {
+        $arguments += @('-ReferenceVoicesDir', [IO.Path]::GetFullPath($ReferenceVoicesDir))
+    }
+    if ($IrodoriIdleTimeoutSeconds -ge 0) {
+        $arguments += @('-IrodoriIdleTimeoutSeconds', [string]$IrodoriIdleTimeoutSeconds)
+    }
     $launchProcess = Start-LocalTtsNoWindowProcess `
         -FilePath $powershell `
         -ArgumentList $arguments `

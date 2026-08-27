@@ -1,6 +1,9 @@
 [CmdletBinding()]
 param(
-    [switch]$NoOpenBrowser
+    [switch]$NoOpenBrowser,
+    [string]$ReferenceVoicesDir = '',
+    [ValidateRange(-1, 86400)]
+    [int]$IrodoriIdleTimeoutSeconds = -1
 )
 
 Set-StrictMode -Version Latest
@@ -8,29 +11,19 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $workerScript = Join-Path $PSScriptRoot 'start-local-tts-companion.ps1'
-$sharedRunnerRoot = if ($env:WINDOWS_GUI_CI_RUNNER_ROOT) {
-    [IO.Path]::GetFullPath($env:WINDOWS_GUI_CI_RUNNER_ROOT)
-} else {
-    [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $repoRoot) '74_windows-gui-ci-runner'))
-}
-$noWindowLauncher = Join-Path $sharedRunnerRoot 'scripts\host\Start-NoWindowDetached.ps1'
+$noWindowProcessScript = Join-Path $PSScriptRoot 'no-window-process.ps1'
 $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $logRoot = Join-Path $repoRoot 'runtime\logs'
-$statePath = Join-Path $logRoot 'companion-button-launch-state.json'
 $stdoutPath = Join-Path $logRoot 'companion-button-launch.stdout.log'
 $stderrPath = Join-Path $logRoot 'companion-button-launch.stderr.log'
 
-function Quote-NativeArgument {
-    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Value)
-    if ($Value.Length -gt 0 -and $Value -notmatch '[\s"]') { return $Value }
-    return '"' + $Value.Replace('"', '\"') + '"'
-}
-
-foreach ($requiredPath in @($workerScript, $noWindowLauncher, $powershell)) {
+foreach ($requiredPath in @($workerScript, $noWindowProcessScript, $powershell)) {
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
         throw "Required launcher component was not found: $requiredPath"
     }
 }
+
+. $noWindowProcessScript
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
 
 $arguments = @(
@@ -43,12 +36,30 @@ $arguments = @(
 if ($NoOpenBrowser) {
     $arguments += '-NoOpenBrowser'
 }
-$argumentText = ($arguments | ForEach-Object { Quote-NativeArgument ([string]$_) }) -join ' '
+if (-not [string]::IsNullOrWhiteSpace($ReferenceVoicesDir)) {
+    $arguments += @('-ReferenceVoicesDir', [IO.Path]::GetFullPath($ReferenceVoicesDir))
+}
+if ($IrodoriIdleTimeoutSeconds -ge 0) {
+    $arguments += @('-IrodoriIdleTimeoutSeconds', [string]$IrodoriIdleTimeoutSeconds)
+}
 
-& $noWindowLauncher `
+$process = Start-LocalTtsNoWindowProcess `
     -FilePath $powershell `
-    -Arguments $argumentText `
+    -ArgumentList $arguments `
     -WorkingDirectory $repoRoot `
-    -StatePath $statePath `
-    -StdoutPath $stdoutPath `
-    -StderrPath $stderrPath
+    -StandardOutputPath $stdoutPath `
+    -StandardErrorPath $stderrPath `
+    -RepoRoot $repoRoot
+try {
+    [pscustomobject]@{
+        started = $true
+        launcherProcessId = [int]$process.Id
+        createNoWindow = $true
+        launcher = 'repository'
+        stdoutPath = $stdoutPath
+        stderrPath = $stderrPath
+    } | ConvertTo-Json -Compress
+}
+finally {
+    $process.Dispose()
+}
