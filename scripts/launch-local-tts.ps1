@@ -4,6 +4,9 @@ param(
   [switch]$Check,
   [switch]$PauseOnFailure,
   [switch]$NoOpenBrowser,
+  [string]$ReferenceVoicesDir = '',
+  [ValidateRange(-1, 86400)]
+  [int]$IrodoriIdleTimeoutSeconds = -1,
   [string]$WindowTitle = ''
 )
 
@@ -29,6 +32,17 @@ if (-not [string]::IsNullOrWhiteSpace($WindowTitle)) {
 }
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
+$resolvedReferenceVoicesDir = ''
+if (-not [string]::IsNullOrWhiteSpace($ReferenceVoicesDir)) {
+  $resolvedReferenceVoicesDir = [IO.Path]::GetFullPath($ReferenceVoicesDir)
+  if (-not [IO.Directory]::Exists($resolvedReferenceVoicesDir)) {
+    throw "Reference voices directory was not found: $resolvedReferenceVoicesDir"
+  }
+  $env:LOCAL_TTS_REFERENCE_VOICES_DIR = $resolvedReferenceVoicesDir
+}
+if ($IrodoriIdleTimeoutSeconds -ge 0) {
+  $env:LOCAL_TTS_IRODORI_IDLE_TIMEOUT_SEC = [string]$IrodoriIdleTimeoutSeconds
+}
 $configRelativePath = 'config/config.local.json'
 $configPath = Join-Path $repoRoot $configRelativePath
 $legacyConfigPath = Join-Path $repoRoot 'config.local.json'

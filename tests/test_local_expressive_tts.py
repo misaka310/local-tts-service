@@ -171,6 +171,7 @@ def test_standalone_style_strength_is_allowed_for_direct_exaggeration_models() -
 def test_companion_restarts_stale_launcher_instead_of_waiting_forever() -> None:
     source = (ROOT / "scripts" / "start-local-tts-companion.ps1").read_text(encoding="utf-8")
     detached = (ROOT / "scripts" / "start-local-tts-companion-detached.ps1").read_text(encoding="utf-8")
+    launch = (ROOT / "scripts" / "launch-local-tts.ps1").read_text(encoding="utf-8")
     launcher = (ROOT / "src" / "LocalTtsNoWindowLauncher.cs").read_text(encoding="utf-8")
 
     assert "$launcherAgeSeconds" in source
@@ -183,6 +184,22 @@ def test_companion_restarts_stale_launcher_instead_of_waiting_forever() -> None:
     assert "Start-NoWindowDetached.ps1" not in source
     assert "[switch]$NoOpenBrowser" in detached
     assert "$arguments += '-NoOpenBrowser'" in detached
+    assert "[string]$ReferenceVoicesDir = ''" in detached
+    assert "[int]$IrodoriIdleTimeoutSeconds = -1" in detached
+    assert "'-ReferenceVoicesDir'" in detached
+    assert "'-IrodoriIdleTimeoutSeconds'" in detached
+    assert "no-window-process.ps1" in detached
+    assert "Start-LocalTtsNoWindowProcess" in detached
+    assert "74_windows-gui-ci-runner" not in detached
+    assert "WINDOWS_GUI_CI_RUNNER_ROOT" not in detached
+    assert "[string]$ReferenceVoicesDir = ''" in source
+    assert "[int]$IrodoriIdleTimeoutSeconds = -1" in source
+    assert "'-ReferenceVoicesDir'" in source
+    assert "'-IrodoriIdleTimeoutSeconds'" in source
+    assert "[string]$ReferenceVoicesDir = ''" in launch
+    assert "[int]$IrodoriIdleTimeoutSeconds = -1" in launch
+    assert '$env:LOCAL_TTS_REFERENCE_VOICES_DIR = $resolvedReferenceVoicesDir' in launch
+    assert '$env:LOCAL_TTS_IRODORI_IDLE_TIMEOUT_SEC = [string]$IrodoriIdleTimeoutSeconds' in launch
     assert "C:\\00_dev" not in source
     assert "C:\\00_dev" not in detached
     assert "StandardOutputEncoding = new UTF8Encoding(false)" in launcher
