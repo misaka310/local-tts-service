@@ -31,12 +31,12 @@ if (-not (Test-Path -LiteralPath $RequestJson -PathType Leaf)) {
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $Req = Get-Content -LiteralPath $RequestJson -Raw -Encoding UTF8 | ConvertFrom-Json
 $Model = [string]$Req.model
-if ($Model -notin @('sarashina2_2_tts', 'fireredtts2', 't5gemma_tts_2b_2b', 'fish_s1_mini')) {
+if ($Model -notin @('sarashina2_2_tts', 'fireredtts2', 't5gemma_tts_2b_2b', 'fish_s1_mini', 'orpheus_3b_asmr', 'ming_omni_tts_0_5b')) {
   throw "unsupported WSL TTS model: $Model"
 }
 
-$ReferenceAudioWsl = Convert-ToWslPath ([string]$Req.referenceAudioPath)
-$ReferenceTextWsl = Convert-ToWslPath ([string]$Req.referenceTextPath)
+$ReferenceAudioWsl = if ([string]$Req.referenceAudioPath) { Convert-ToWslPath ([string]$Req.referenceAudioPath) } else { '' }
+$ReferenceTextWsl = if ([string]$Req.referenceTextPath) { Convert-ToWslPath ([string]$Req.referenceTextPath) } else { '' }
 $OutputFull = [System.IO.Path]::GetFullPath($OutputPath)
 $OutputParent = Split-Path -Parent $OutputFull
 if (-not (Test-Path -LiteralPath $OutputParent -PathType Container)) {
@@ -47,14 +47,15 @@ $CliWsl = Convert-ToWslPath (Join-Path $RepoRoot 'scripts/wsl_tts_cli.py')
 $ShellWsl = Convert-ToWslPath (Join-Path $RepoRoot 'scripts/run_wsl_tts.sh')
 $RepoWsl = Convert-ToWslPath ([string]$RepoRoot)
 
-$Req.referenceAudioPath = $ReferenceAudioWsl
-$Req.referenceTextPath = $ReferenceTextWsl
-$Req.outputPath = $OutputWsl
+$Req | Add-Member -NotePropertyName referenceAudioPath -NotePropertyValue $ReferenceAudioWsl -Force
+$Req | Add-Member -NotePropertyName referenceTextPath -NotePropertyValue $ReferenceTextWsl -Force
+$Req | Add-Member -NotePropertyName outputPath -NotePropertyValue $OutputWsl -Force
 $ConvertedJson = "$RequestJson.wsl.json"
 $StdoutLog = "$RequestJson.wsl.stdout.log"
 $StderrLog = "$RequestJson.wsl.stderr.log"
 [System.IO.File]::WriteAllText($ConvertedJson, ($Req | ConvertTo-Json -Depth 12), $Utf8NoBom)
 $ConvertedJsonWsl = Convert-ToWslPath $ConvertedJson
+$Succeeded = $false
 
 try {
   $RawArgs = @('--exec', 'bash', $ShellWsl, $Model, $RepoWsl, $CliWsl, $ConvertedJsonWsl, $OutputWsl)
@@ -66,12 +67,15 @@ try {
   if ($Stdout) { Write-Output $Stdout.TrimEnd() }
   if ($Process.ExitCode -ne 0) {
     $Details = if ($Stderr.Trim()) { $Stderr.Trim() } elseif ($Stdout.Trim()) { $Stdout.Trim() } else { "exit code $($Process.ExitCode)" }
-    throw "WSL TTS inference failed for $Model`: $Details"
+    throw "WSL TTS inference failed for $Model. Diagnostics retained: request=$ConvertedJson stdout=$StdoutLog stderr=$StderrLog`n$Details"
   }
+  $Succeeded = $true
 } finally {
-  Remove-Item -LiteralPath $ConvertedJson -Force -ErrorAction SilentlyContinue
-  Remove-Item -LiteralPath $StdoutLog -Force -ErrorAction SilentlyContinue
-  Remove-Item -LiteralPath $StderrLog -Force -ErrorAction SilentlyContinue
+  if ($Succeeded) {
+    Remove-Item -LiteralPath $ConvertedJson -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $StdoutLog -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $StderrLog -Force -ErrorAction SilentlyContinue
+  }
 }
 
 if (-not (Test-Path -LiteralPath $OutputFull -PathType Leaf) -or ((Get-Item -LiteralPath $OutputFull).Length -le 44)) {

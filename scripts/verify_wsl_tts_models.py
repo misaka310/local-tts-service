@@ -33,10 +33,24 @@ MODELS = [
     "fireredtts2",
     "t5gemma_tts_2b_2b",
     "fish_s1_mini",
+    "orpheus_3b_asmr",
+    "ming_omni_tts_0_5b",
     "qwen3_tts_clone_0_6b",
     "qwen3_tts_clone_1_7b",
 ]
 TARGET_TEXT = "こんにちは。音声生成の確認です。日本語を自然に読み上げられるか確認しています。"
+MODEL_TEXT = {
+    "orpheus_3b_asmr": "You can relax now while I speak softly beside you. Take a slow breath and rest for a moment.",
+    "ming_omni_tts_0_5b": "今晚可以安心休息。请慢慢呼吸，放松下来。",
+}
+MODEL_LANGUAGE = {
+    "orpheus_3b_asmr": "en",
+    "ming_omni_tts_0_5b": "zh",
+}
+MODEL_INSTRUCTION = {
+    "ming_omni_tts_0_5b": "ASMR whisper, very low volume, close microphone, slow and breathy, gentle and relaxed",
+}
+REFERENCE_MODELS = set(MODELS) - {"orpheus_3b_asmr", "ming_omni_tts_0_5b"}
 OUTPUT_DIR = ROOT / "runtime" / "audio" / "model-smoke"
 
 MODEL_SPECS: dict[str, dict[str, object]] = {
@@ -80,6 +94,26 @@ MODEL_SPECS: dict[str, dict[str, object]] = {
         "dtype": "official S1 CUDA implementation default (not overridden)",
         "quantization": "none",
     },
+    "orpheus_3b_asmr": {
+        "displayName": "Orpheus 3B ASMR",
+        "officialModelId": "HummingbirdCake/Orpheus-3B-ASMR-Q4_K_M-GGUF",
+        "officialCodeRepository": "https://github.com/freddyaboulton/orpheus-cpp.git",
+        "codeRevision": "ed126bea531ea9d53ef7564b00e8bc23f8f9aebe",
+        "modelRevision": "22892bc82fc22d5db827b005db658e778dcf7847",
+        "executionEnvironment": "WSL Ubuntu / dedicated Python venv / CPU llama.cpp",
+        "dtype": "Q4_K_M GGUF on CPU",
+        "quantization": "Q4_K_M",
+    },
+    "ming_omni_tts_0_5b": {
+        "displayName": "Ming Omni TTS 0.5B",
+        "officialModelId": "inclusionAI/Ming-omni-tts-0.5B",
+        "officialCodeRepository": "https://github.com/inclusionAI/Ming-omni-tts.git",
+        "codeRevision": "200a1562e33492e786c23174985bb14f8e012cc6",
+        "modelRevision": "9154772e7fbc585907b6237e3190790676f28975",
+        "executionEnvironment": "WSL Ubuntu / dedicated Python venv / PyTorch CUDA",
+        "dtype": "bfloat16 on CUDA",
+        "quantization": "none",
+    },
     "qwen3_tts_clone_0_6b": {
         "displayName": "Qwen3-TTS Voice Clone 0.6B",
         "officialModelId": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
@@ -103,6 +137,8 @@ WSL_ENV_KEYS = {
     "fireredtts2": "fireredtts2",
     "t5gemma_tts_2b_2b": "t5gemma",
     "fish_s1_mini": "fish_s1_mini",
+    "orpheus_3b_asmr": "orpheus_asmr",
+    "ming_omni_tts_0_5b": "ming_omni_tts",
 }
 
 
@@ -249,10 +285,11 @@ def main() -> int:
     selected_models = list(args.models)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    voice_id = args.voice_id.strip() or find_reference_voice()
-    voice_dir = ROOT / "reference" / "voices" / voice_id
-    reference_audio = voice_dir / "voice.wav"
-    reference_text = voice_dir / "voice.txt"
+    needs_reference = any(model in REFERENCE_MODELS for model in selected_models)
+    voice_id = (args.voice_id.strip() or find_reference_voice()) if needs_reference else ""
+    voice_dir = ROOT / "reference" / "voices" / voice_id if voice_id else None
+    reference_audio = voice_dir / "voice.wav" if voice_dir is not None else None
+    reference_text = voice_dir / "voice.txt" if voice_dir is not None else None
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
 
     config = load_config(ROOT)
@@ -282,30 +319,35 @@ def main() -> int:
             spec.update({key: value for key, value in qwen_metadata[model].items() if value is not None})
         env_key = WSL_ENV_KEYS.get(model)
         wsl_manifest = read_wsl_manifest(env_key) if env_key else None
+        uses_reference = model in REFERENCE_MODELS
         record: dict[str, object] = {
             "model": model,
             **spec,
-            "referenceVoiceId": voice_id,
-            "referenceAudioPath": str(reference_audio),
-            "referenceTextPath": str(reference_text),
+            "referenceVoiceId": voice_id if uses_reference else None,
+            "referenceAudioPath": str(reference_audio) if uses_reference and reference_audio is not None else None,
+            "referenceTextPath": str(reference_text) if uses_reference and reference_text is not None else None,
             "requestId": f"model-smoke-{run_id}-{model}",
             "status": "failed",
             "availableBeforeRun": bool(info.get("available", False)),
             "unavailableReasonBeforeRun": info.get("unavailableReason"),
             "wslManifest": wsl_manifest,
         }
+        request_payload: dict[str, object] = {
+            "text": MODEL_TEXT.get(model, TARGET_TEXT),
+            "model": model,
+            "language": MODEL_LANGUAGE.get(model, "Japanese" if model.startswith("qwen3_tts_") else "ja"),
+            "seed": 260700 + index,
+            "requestId": record["requestId"],
+            "format": "wav",
+        }
+        if uses_reference:
+            request_payload["voiceId"] = voice_id
+        if model in MODEL_INSTRUCTION:
+            request_payload["instruction"] = MODEL_INSTRUCTION[model]
         try:
             response = client.post(
                 "/v1/speak",
-                json={
-                    "text": TARGET_TEXT,
-                    "model": model,
-                    "voiceId": voice_id,
-                    "language": "Japanese" if model.startswith("qwen3_tts_") else "ja",
-                    "seed": 260700 + index,
-                    "requestId": record["requestId"],
-                    "format": "wav",
-                },
+                json=request_payload,
             )
             if response.status_code != 200:
                 raise RuntimeError(f"HTTP {response.status_code}: {failure_message(response.text)}")
@@ -350,9 +392,9 @@ def main() -> int:
         "createdAt": datetime.now(timezone.utc).isoformat(),
         "apiEndpoint": "/v1/speak",
         "text": TARGET_TEXT,
-        "referenceVoiceId": voice_id,
-        "referenceAudioSha256": sha256_file(reference_audio),
-        "referenceTextSha256": sha256_file(reference_text),
+        "referenceVoiceId": voice_id or None,
+        "referenceAudioSha256": sha256_file(reference_audio) if reference_audio is not None else None,
+        "referenceTextSha256": sha256_file(reference_text) if reference_text is not None else None,
         "environment": runtime_environment(),
         "requestedModels": selected_models,
         "passedCount": passed_count,

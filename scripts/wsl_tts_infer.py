@@ -17,7 +17,11 @@ SUPPORTED_MODELS = {
     "fireredtts2",
     "t5gemma_tts_2b_2b",
     "fish_s1_mini",
+    "orpheus_3b_asmr",
+    "ming_omni_tts_0_5b",
 }
+
+REFERENCE_REQUIRED_MODELS = SUPPORTED_MODELS - {"orpheus_3b_asmr", "ming_omni_tts_0_5b"}
 
 
 @dataclass(frozen=True)
@@ -25,13 +29,14 @@ class WslTtsRequest:
     model: str
     model_id: str
     text: str
-    reference_audio_path: Path
-    reference_text_path: Path
-    reference_text: str
+    reference_audio_path: Path | None
+    reference_text_path: Path | None
+    reference_text: str | None
     output_path: Path
     seed: int | None
     language: str
     speed_scale: float | None = None
+    instruction: str | None = None
 
 
 def _required_text(payload: dict[str, object], key: str) -> str:
@@ -50,16 +55,25 @@ def load_request(request_json: Path) -> WslTtsRequest:
     if model not in SUPPORTED_MODELS:
         raise ValueError(f"unsupported WSL TTS model: {model}")
 
-    reference_audio_path = Path(_required_text(payload, "referenceAudioPath")).expanduser()
-    if not reference_audio_path.is_file():
-        raise FileNotFoundError(f"reference audio not found: {reference_audio_path}")
-
-    reference_text_path = Path(_required_text(payload, "referenceTextPath")).expanduser()
-    if not reference_text_path.is_file():
-        raise FileNotFoundError(f"reference text not found: {reference_text_path}")
-    reference_text = reference_text_path.read_text(encoding="utf-8-sig").strip()
-    if not reference_text:
-        raise ValueError(f"reference text is empty: {reference_text_path}")
+    reference_audio_path: Path | None = None
+    reference_text_path: Path | None = None
+    reference_text: str | None = None
+    reference_audio_raw = str(payload.get("referenceAudioPath") or "").strip()
+    reference_text_raw = str(payload.get("referenceTextPath") or "").strip()
+    if model in REFERENCE_REQUIRED_MODELS and (not reference_audio_raw or not reference_text_raw):
+        raise ValueError(f"referenceAudioPath and referenceTextPath are required for model: {model}")
+    if reference_audio_raw or reference_text_raw:
+        if not reference_audio_raw or not reference_text_raw:
+            raise ValueError("referenceAudioPath and referenceTextPath must be supplied together")
+        reference_audio_path = Path(reference_audio_raw).expanduser()
+        if not reference_audio_path.is_file():
+            raise FileNotFoundError(f"reference audio not found: {reference_audio_path}")
+        reference_text_path = Path(reference_text_raw).expanduser()
+        if not reference_text_path.is_file():
+            raise FileNotFoundError(f"reference text not found: {reference_text_path}")
+        reference_text = reference_text_path.read_text(encoding="utf-8-sig").strip()
+        if not reference_text:
+            raise ValueError(f"reference text is empty: {reference_text_path}")
 
     output_path = Path(_required_text(payload, "outputPath")).expanduser()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -78,7 +92,11 @@ def load_request(request_json: Path) -> WslTtsRequest:
         output_path=output_path,
         seed=seed,
         speed_scale=speed_scale,
-        language=str(payload.get("language") or "ja").strip() or "ja",
+        language=str(
+            payload.get("language")
+            or ("en" if model == "orpheus_3b_asmr" else "zh" if model == "ming_omni_tts_0_5b" else "ja")
+        ).strip(),
+        instruction=str(payload.get("instruction") or "").strip() or None,
     )
 
 
@@ -104,6 +122,9 @@ def resolve_reference_prompt(request: WslTtsRequest) -> WslTtsRequest:
     engines expect a short prompt, so each long profile can provide voice_short.wav
     and voice_short.txt without changing the user-visible voice ID.
     """
+
+    if request.reference_audio_path is None or request.reference_text_path is None:
+        return request
 
     duration = _wav_duration_sec(request.reference_audio_path)
     if duration <= REFERENCE_PROMPT_MAX_DURATION_SEC:

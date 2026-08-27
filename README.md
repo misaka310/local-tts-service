@@ -24,7 +24,7 @@ https://github.com/user-attachments/assets/29ad093a-7950-4a17-ba09-8899dabb4828
 - TTS音声、音声ファイル、マイク録音をRVCで変換する
 - 生成履歴をブラウザ内に保存して再利用する
 
-対応モデルにはQwen3-TTS、Irodori、GPT-SoVITSなどがあります。モデルによって必要な設定や利用条件が異なります。
+対応モデルにはQwen3-TTS、Irodori、GPT-SoVITSなどがあります。追加モデルとして、ASMR向けOrpheus 3B（CPU版GGUF実行）とMing Omni TTSも個別導入できます。モデルによって必要な設定や利用条件が異なります。
 
 ## 必要環境
 

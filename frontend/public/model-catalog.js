@@ -14,6 +14,8 @@
     fireredtts2: "FireRedTTS-2",
     t5gemma_tts_2b_2b: "T5Gemma-TTS 2B-2B",
     fish_s1_mini: "FishAudio S1-mini",
+    orpheus_3b_asmr: "Orpheus 3B ASMR",
+    ming_omni_tts_0_5b: "Ming Omni TTS 0.5B",
     chatterbox_multilingual_v3: "Chatterbox Multilingual V3",
     fun_cosyvoice3_0_5b: "Fun-CosyVoice 3.0 0.5B",
     mock: "Mock WAV",
@@ -92,6 +94,24 @@
       rankReason: "表現力は優れるものの、長文での安定性に課題があります。",
       baseScore: 76,
     },
+    orpheus_3b_asmr: {
+      badges: ["ASMR追加学習", "英語", "商用利用可", "Apache-2.0"],
+      description: "ASMR音声で追加学習されたOrpheus 3B。小さく柔らかい話し方を狙う英語向けの実験モデルです。",
+      features: ["ASMRデータで追加学習", "soft-spoken / gentle speech向け", "本文中の<sigh>などの表現タグ", "WSLの専用環境でローカル生成"],
+      scores: { 自然さ: "中〜高", 感情表現: "高", 安定性: "実験" },
+      memo: "30では上流で安定している既存voiceを使います。モデル作者も真のwhisper再現は未達と明記しているため、完全な囁き専用モデルとしては扱いません。",
+      rankReason: "ASMRデータで追加学習されたモデルを直接比較したい場合の専用枠です。",
+      baseScore: 80,
+    },
+    ming_omni_tts_0_5b: {
+      badges: ["ASMR指示", "参照音声", "商用利用可", "Apache-2.0"],
+      description: "話し方メモだけでASMR声を設計でき、参照音声を選べばその声へ寄せながらstyle指示も同時に使えるMing Omni TTS 0.5Bです。",
+      features: ["参照音声なしのASMR voice design", "任意の参照音声によるzero-shot voice clone", "ASMR・音量・感情などのstyle指定", "WSLの専用環境でローカル生成"],
+      scores: { 自然さ: "高", 感情表現: "高", 安定性: "中" },
+      memo: "ASMR風では「非常に小さな声、近接マイク、ゆっくり、息を多め」などを話し方メモに入れます。声を寄せたいときだけ参照音声を選んでください。",
+      rankReason: "ASMR系の自然言語スタイル指示を単独でも声寄せと併用でも使えるのが強みです。",
+      baseScore: 92,
+    },
     chatterbox_multilingual_v3: {
       badges: ["Multilingual V3", "日本語", "MIT"],
       description: "参照音声の声質を使いながら、表現強度で感情の出方を調整できる多言語モデルです。",
@@ -114,6 +134,8 @@
 
   const DESIRED_MODELS = [
     "irodori_v4_small",
+    "ming_omni_tts_0_5b",
+    "orpheus_3b_asmr",
     "chatterbox_multilingual_v3",
     "fun_cosyvoice3_0_5b",
     "gpt_sovits_zero_shot",

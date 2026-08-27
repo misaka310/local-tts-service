@@ -17,6 +17,8 @@ case "$MODEL" in
   fireredtts2) ENV_KEY="fireredtts2" ;;
   t5gemma_tts_2b_2b) ENV_KEY="t5gemma" ;;
   fish_s1_mini) ENV_KEY="fish_s1_mini" ;;
+  orpheus_3b_asmr) ENV_KEY="orpheus_asmr" ;;
+  ming_omni_tts_0_5b) ENV_KEY="ming_omni_tts" ;;
   *) echo "unsupported WSL TTS model: $MODEL" >&2; exit 2 ;;
 esac
 
@@ -27,4 +29,11 @@ if [[ ! -x "$PYTHON" ]]; then
 fi
 
 export PYTHONPATH="$REPO_ROOT"
-exec "$PYTHON" "$CLI" --request-json "$REQUEST_JSON" --output-path "$OUTPUT_PATH"
+set +e
+"$PYTHON" "$CLI" --request-json "$REQUEST_JSON" --output-path "$OUTPUT_PATH"
+STATUS=$?
+set -e
+if [[ "$STATUS" -ne 0 ]]; then
+  echo "[ERROR] $MODEL python exited with status $STATUS" >&2
+fi
+exit "$STATUS"
