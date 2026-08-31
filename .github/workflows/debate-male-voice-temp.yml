@@ -30,6 +30,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $config = Get-Content -LiteralPath .\config\config.local.json -Raw -Encoding UTF8 | ConvertFrom-Json
           $frontBase = "http://$($config.frontend.host):$($config.frontend.port)"
+          $ttsBase = "http://$($config.host):$($config.port)"
           $outDir = Join-Path $PWD 'runtime/debate-listener-voice'
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
@@ -38,8 +39,8 @@ jobs:
             $bytes = [Text.Encoding]::UTF8.GetBytes($json)
             return Invoke-RestMethod -Method Post -Uri $Uri -Body $bytes -ContentType 'application/json; charset=utf-8' -TimeoutSec 7200
           }
-          function Download-Audio([string]$AudioUrl, [string]$Target) {
-            $uri = if ([Uri]::IsWellFormedUriString($AudioUrl, [UriKind]::Absolute)) { [Uri]$AudioUrl } else { [Uri]::new([Uri]("$frontBase/"), $AudioUrl.TrimStart('/')) }
+          function Download-BackendAudio([string]$AudioUrl, [string]$Target) {
+            $uri = if ([Uri]::IsWellFormedUriString($AudioUrl, [UriKind]::Absolute)) { [Uri]$AudioUrl } else { [Uri]::new([Uri]("$ttsBase/"), $AudioUrl.TrimStart('/')) }
             Invoke-WebRequest -Uri $uri.AbsoluteUri -OutFile $Target -TimeoutSec 7200 -UseBasicParsing | Out-Null
             $b = [IO.File]::ReadAllBytes($Target)
             if ($b.Length -le 44) { throw "generated WAV too small: $Target" }
@@ -48,13 +49,14 @@ jobs:
 
           $seedText = 'ちょっと待って。それはさすがに同じ話に聞こえるけど。'
           $description = '20代後半から30代前半くらいの日本人男性。声はやや低めの中低音で、落ち着いていて聞き取りやすい。テンションは高すぎず、少し呆れたようなツッコミ口調。早口すぎず、軽い皮肉と常識人っぽさがある。怒鳴らず、自然な会話の抑揚。バラエティ番組の一般男性コメンテーターのような雰囲気。'
-          $seedResponse = Invoke-JsonPost "$frontBase/api/speak" @{
+          $seedResponse = Invoke-JsonPost "$ttsBase/v1/speak" @{
             model='irodori_v3_voicedesign'; text=$seedText; instruction=$description; language='Japanese'; seed=31001; styleStrength=4.5; speedScale=1.0; format='wav'
           }
           if (-not $seedResponse.ok) { throw 'VoiceDesign seed generation returned ok=false' }
-          $seedResult = if ($null -ne $seedResponse.result) { $seedResponse.result } else { $seedResponse }
+          if ([string]$seedResponse.model -ne 'irodori_v3_voicedesign') { throw 'unexpected seed model' }
           $seedPath = Join-Path $outDir 'male_listener_seed.wav'
-          Download-Audio ([string]$seedResult.audioUrl) $seedPath
+          Download-BackendAudio ([string]$seedResponse.audioUrl) $seedPath
+          $seedSha = (Get-FileHash -LiteralPath $seedPath -Algorithm SHA256).Hash.ToLowerInvariant()
 
           $seedBytes = [IO.File]::ReadAllBytes($seedPath)
           $register = Invoke-JsonPost "$frontBase/api/reference-voices" @{
@@ -62,6 +64,10 @@ jobs:
           }
           if (-not $register.ok) { throw 'reference voice registration returned ok=false' }
           if ([string]$register.voice.voiceId -ne 'debate_male_listener_seed') { throw 'unexpected registered voiceId' }
+          $registeredPath = Join-Path $PWD 'reference/voices/debate_male_listener_seed/voice.wav'
+          if (-not (Test-Path -LiteralPath $registeredPath -PathType Leaf)) { throw 'registered reference WAV not found' }
+          $registeredSha = (Get-FileHash -LiteralPath $registeredPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($registeredSha -ne $seedSha) { throw "registered reference SHA mismatch: $registeredSha != $seedSha" }
 
           $lines = @(
             @{ id='listener_01'; text='いや、それ先週も聞いたって。' },
@@ -72,35 +78,52 @@ jobs:
           )
           $records = @()
           foreach ($line in $lines) {
-            $r = Invoke-JsonPost "$frontBase/api/speak" @{
+            $r = Invoke-JsonPost "$ttsBase/v1/speak" @{
               model='irodori_v3_voicedesign'; voiceId='debate_male_listener_seed'; text=$line.text; language='Japanese'; seed=31001; speedScale=1.0; format='wav'
             }
             if (-not $r.ok) { throw "listener generation failed: $($line.id)" }
-            $rr = if ($null -ne $r.result) { $r.result } else { $r }
+            if ([string]$r.voiceId -ne 'debate_male_listener_seed') { throw "wrong fixed voiceId for $($line.id): $($r.voiceId)" }
             $path = Join-Path $outDir ($line.id + '.wav')
-            Download-Audio ([string]$rr.audioUrl) $path
-            $records += [ordered]@{ id=$line.id; text=$line.text; model=[string]$rr.model; runtime=[string]$rr.runtime; voiceId=[string]$rr.voiceId; bytes=(Get-Item -LiteralPath $path).Length; sha256=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }
+            Download-BackendAudio ([string]$r.audioUrl) $path
+            $records += [ordered]@{
+              id=$line.id; text=$line.text; model=[string]$r.model; runtime=[string]$r.runtime; voiceId=[string]$r.voiceId;
+              referenceSha256=$registeredSha; bytes=(Get-Item -LiteralPath $path).Length;
+              sha256=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
           }
 
           $manifest = [ordered]@{
-            schemaVersion=1; generatedAtUtc=(Get-Date).ToUniversalTime().ToString('o');
-            seed=[ordered]@{ text=$seedText; description=$description; model=[string]$seedResult.model; runtime=[string]$seedResult.runtime; bytes=(Get-Item -LiteralPath $seedPath).Length; sha256=(Get-FileHash -LiteralPath $seedPath -Algorithm SHA256).Hash.ToLowerInvariant() };
-            referenceVoiceId='debate_male_listener_seed'; lines=$records
+            schemaVersion=2; generatedAtUtc=(Get-Date).ToUniversalTime().ToString('o');
+            seed=[ordered]@{
+              text=$seedText; description=$description; model=[string]$seedResponse.model; runtime=[string]$seedResponse.runtime;
+              voiceDescription=[string]$seedResponse.voiceDescription; instructionUsed=[string]$seedResponse.instructionUsed;
+              bytes=(Get-Item -LiteralPath $seedPath).Length; sha256=$seedSha
+            };
+            fixedReference=[ordered]@{ voiceId='debate_male_listener_seed'; sha256=$registeredSha; usageCount=$records.Count };
+            lines=$records
           }
           $manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $outDir 'manifest.json') -Encoding UTF8
 
           @'
-          import json, pathlib, wave
+          import json, pathlib, wave, math
+          import numpy as np
           root = pathlib.Path('runtime/debate-listener-voice')
           manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8-sig'))
           files = [root / 'male_listener_seed.wav'] + [root / f"{x['id']}.wav" for x in manifest['lines']]
           evidence=[]
           for p in files:
               with wave.open(str(p), 'rb') as w:
-                  frames=w.getnframes(); rate=w.getframerate(); channels=w.getnchannels(); width=w.getsampwidth(); duration=frames/rate if rate else 0
+                  frames=w.getnframes(); rate=w.getframerate(); channels=w.getnchannels(); width=w.getsampwidth(); data=w.readframes(frames); duration=frames/rate if rate else 0
               if duration <= 0.35 or duration >= 15: raise SystemExit(f'unexpected duration {duration:.3f}s: {p}')
-              if channels not in (1,2) or width not in (2,3,4): raise SystemExit(f'unexpected WAV format: {p}')
-              evidence.append({'file':p.name,'durationSec':round(duration,6),'sampleRate':rate,'channels':channels,'sampleWidth':width})
+              if channels not in (1,2) or width != 2: raise SystemExit(f'unexpected WAV format: {p}')
+              samples=np.frombuffer(data,dtype='<i2').astype(np.float64)
+              peak=float(np.max(np.abs(samples)))/32768.0 if samples.size else 0.0
+              rms=math.sqrt(float(np.mean(samples*samples)))/32768.0 if samples.size else 0.0
+              if peak < 0.005 or rms < 0.0005: raise SystemExit(f'audio appears silent: {p} peak={peak:.6f} rms={rms:.6f}')
+              evidence.append({'file':p.name,'durationSec':round(duration,6),'sampleRate':rate,'channels':channels,'sampleWidth':width,'peak':round(peak,6),'rms':round(rms,6)})
+          fixed = manifest['fixedReference']
+          if fixed['usageCount'] != 5: raise SystemExit('fixed reference was not used exactly five times')
+          if any(x['voiceId'] != fixed['voiceId'] or x['referenceSha256'] != fixed['sha256'] for x in manifest['lines']): raise SystemExit('fixed reference proof mismatch')
           (root/'wav-verification.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2),encoding='utf-8')
           print(json.dumps(evidence,ensure_ascii=False))
           '@ | .\.venv\Scripts\python.exe -
