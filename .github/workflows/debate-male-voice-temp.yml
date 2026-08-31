@@ -1,0 +1,124 @@
+name: Temporary debate listener voice generation
+
+on:
+  push:
+    paths:
+      - .github/workflows/debate-male-voice-temp.yml
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: windows-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Fresh install and baseline real generation
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File .\scripts\verify-clean-install.ps1
+          -TimeoutSec 7200
+
+      - name: Generate VoiceDesign seed and fixed-reference listener lines
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $config = Get-Content -LiteralPath .\config\config.local.json -Raw -Encoding UTF8 | ConvertFrom-Json
+          $frontBase = "http://$($config.frontend.host):$($config.frontend.port)"
+          $outDir = Join-Path $PWD 'runtime/debate-listener-voice'
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+          function Invoke-JsonPost([string]$Uri, [hashtable]$Body) {
+            $json = $Body | ConvertTo-Json -Depth 10
+            $bytes = [Text.Encoding]::UTF8.GetBytes($json)
+            return Invoke-RestMethod -Method Post -Uri $Uri -Body $bytes -ContentType 'application/json; charset=utf-8' -TimeoutSec 7200
+          }
+          function Download-Audio([string]$AudioUrl, [string]$Target) {
+            $uri = if ([Uri]::IsWellFormedUriString($AudioUrl, [UriKind]::Absolute)) { [Uri]$AudioUrl } else { [Uri]::new([Uri]("$frontBase/"), $AudioUrl.TrimStart('/')) }
+            Invoke-WebRequest -Uri $uri.AbsoluteUri -OutFile $Target -TimeoutSec 7200 -UseBasicParsing | Out-Null
+            $b = [IO.File]::ReadAllBytes($Target)
+            if ($b.Length -le 44) { throw "generated WAV too small: $Target" }
+            if ([Text.Encoding]::ASCII.GetString($b,0,4) -ne 'RIFF' -or [Text.Encoding]::ASCII.GetString($b,8,4) -ne 'WAVE') { throw "invalid WAV header: $Target" }
+          }
+
+          $seedText = 'ちょっと待って。それはさすがに同じ話に聞こえるけど。'
+          $description = '20代後半から30代前半くらいの日本人男性。声はやや低めの中低音で、落ち着いていて聞き取りやすい。テンションは高すぎず、少し呆れたようなツッコミ口調。早口すぎず、軽い皮肉と常識人っぽさがある。怒鳴らず、自然な会話の抑揚。バラエティ番組の一般男性コメンテーターのような雰囲気。'
+          $seedResponse = Invoke-JsonPost "$frontBase/api/speak" @{
+            model='irodori_v3_voicedesign'; text=$seedText; instruction=$description; language='Japanese'; seed=31001; styleStrength=4.5; speedScale=1.0; format='wav'
+          }
+          if (-not $seedResponse.ok) { throw 'VoiceDesign seed generation returned ok=false' }
+          $seedResult = if ($null -ne $seedResponse.result) { $seedResponse.result } else { $seedResponse }
+          $seedPath = Join-Path $outDir 'male_listener_seed.wav'
+          Download-Audio ([string]$seedResult.audioUrl) $seedPath
+
+          $seedBytes = [IO.File]::ReadAllBytes($seedPath)
+          $register = Invoke-JsonPost "$frontBase/api/reference-voices" @{
+            voiceId='debate_male_listener_seed'; referenceText=$seedText; mimeType='audio/wav'; dataUrl=('data:audio/wav;base64,' + [Convert]::ToBase64String($seedBytes))
+          }
+          if (-not $register.ok) { throw 'reference voice registration returned ok=false' }
+          if ([string]$register.voice.voiceId -ne 'debate_male_listener_seed') { throw 'unexpected registered voiceId' }
+
+          $lines = @(
+            @{ id='listener_01'; text='いや、それ先週も聞いたって。' },
+            @{ id='listener_02'; text='その話、何回目だよ。' },
+            @{ id='listener_03'; text='いや、同じに聞こえるけど。' },
+            @{ id='listener_04'; text='戻すな戻すな。' },
+            @{ id='listener_05'; text='結局またその話じゃん。' }
+          )
+          $records = @()
+          foreach ($line in $lines) {
+            $r = Invoke-JsonPost "$frontBase/api/speak" @{
+              model='irodori_v3_voicedesign'; voiceId='debate_male_listener_seed'; text=$line.text; language='Japanese'; seed=31001; speedScale=1.0; format='wav'
+            }
+            if (-not $r.ok) { throw "listener generation failed: $($line.id)" }
+            $rr = if ($null -ne $r.result) { $r.result } else { $r }
+            $path = Join-Path $outDir ($line.id + '.wav')
+            Download-Audio ([string]$rr.audioUrl) $path
+            $records += [ordered]@{ id=$line.id; text=$line.text; model=[string]$rr.model; runtime=[string]$rr.runtime; voiceId=[string]$rr.voiceId; bytes=(Get-Item -LiteralPath $path).Length; sha256=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }
+          }
+
+          $manifest = [ordered]@{
+            schemaVersion=1; generatedAtUtc=(Get-Date).ToUniversalTime().ToString('o');
+            seed=[ordered]@{ text=$seedText; description=$description; model=[string]$seedResult.model; runtime=[string]$seedResult.runtime; bytes=(Get-Item -LiteralPath $seedPath).Length; sha256=(Get-FileHash -LiteralPath $seedPath -Algorithm SHA256).Hash.ToLowerInvariant() };
+            referenceVoiceId='debate_male_listener_seed'; lines=$records
+          }
+          $manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $outDir 'manifest.json') -Encoding UTF8
+
+          @'
+          import json, pathlib, wave
+          root = pathlib.Path('runtime/debate-listener-voice')
+          manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8-sig'))
+          files = [root / 'male_listener_seed.wav'] + [root / f"{x['id']}.wav" for x in manifest['lines']]
+          evidence=[]
+          for p in files:
+              with wave.open(str(p), 'rb') as w:
+                  frames=w.getnframes(); rate=w.getframerate(); channels=w.getnchannels(); width=w.getsampwidth(); duration=frames/rate if rate else 0
+              if duration <= 0.35 or duration >= 15: raise SystemExit(f'unexpected duration {duration:.3f}s: {p}')
+              if channels not in (1,2) or width not in (2,3,4): raise SystemExit(f'unexpected WAV format: {p}')
+              evidence.append({'file':p.name,'durationSec':round(duration,6),'sampleRate':rate,'channels':channels,'sampleWidth':width})
+          (root/'wav-verification.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(evidence,ensure_ascii=False))
+          '@ | .\.venv\Scripts\python.exe -
+
+      - name: Upload listener voice evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: debate-listener-voice-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            runtime/debate-listener-voice/**
+            runtime/clean-install-verification/clean-install-report.json
+
+      - name: Stop services
+        if: always()
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop-managed-processes.ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\kill-tts-stack-ports.ps1 -ConfigPath config/config.local.json
