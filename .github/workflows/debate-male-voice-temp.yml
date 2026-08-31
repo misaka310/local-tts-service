@@ -25,7 +25,7 @@ jobs:
           -TimeoutSec 7200
 
       - name: Generate VoiceDesign seed and fixed-reference listener lines
-        shell: powershell
+        shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $config = Get-Content -LiteralPath .\config\config.local.json -Raw -Encoding UTF8 | ConvertFrom-Json
