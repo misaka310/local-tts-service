@@ -65,6 +65,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\audit-public-histo
 
 履歴書き換えは明示的な承認なしで実行しません。
 
+## 切り分け手順
+
+ブラウザの診断情報、次にNodeプロキシ、最後にPython APIの順で確認します。RVC設定の解決は`frontend/server/rvc/config.js`、境界エラーは`validation.js`、合成エラーは`src/local_tts_service/synthesis/`にあります。生成物を削除する前に、`-Apply`を付けずに`scripts/cleanup-runtime-artifacts.ps1`を実行し、候補が`runtime/`配下の古いファイルだけであることを確認してください。
+
 ## 関連資料
 
 - [API](./api.md)

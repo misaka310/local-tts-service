@@ -105,7 +105,3 @@ Windowsイベントログに`nvlddmkm`エラーが繰り返し記録され、`nv
 - `irodori_v3_voicedesign` 失敗時は helper の traceback までエラー本文に含めて返します。
 - 参照テキスト必須で `voice.txt` / `text.txt` が両方無い場合は `missing: voice.txt or text.txt` を返します。
 - caption が本文読み上げに混ざる `merged_input` は使わず、今回の成功モードは `separate_target` のみです。
-
-## Refactored diagnostics
-
-Inspect browser diagnostics, then the Node proxy, then the Python API. RVC configuration resolution is in `frontend/server/rvc/config.js`, boundary errors in `validation.js`, and synthesis errors in `src/local_tts_service/synthesis/`. Before cleaning artifacts, run `scripts/cleanup-runtime-artifacts.ps1` without `-Apply` and confirm every candidate is an old file below `runtime/`.

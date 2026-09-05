@@ -7,5 +7,4 @@ ruff>=0.9,<1
 yt-dlp==2026.7.4
 faster-whisper==1.2.1
 qwen-tts==0.1.1
-httpx2==2.5.0
 msvc-runtime==14.44.35112; sys_platform == "win32"
