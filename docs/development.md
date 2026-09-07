@@ -12,6 +12,10 @@
 - `config/config.irodori.example.json`
 - `config/config.qwen3.example.json`
 
+## Irodori upstream revision
+
+`scripts/setup-irodori.ps1` は、チェックポイントと推論コードの組み合わせを再現可能にするため Irodori-TTS upstream を完全なcommit SHAで固定します。Irodori v4.1 Smallを標準導入する現在の固定revisionは `8224dafb46d0aba89209a8f905f1cb7e3299d9c1` です。upstream側のrevisionを変更するときは、v2/v3互換性を維持したうえで、Windows clean-installの実生成smokeでv4.1 Small / Anime双方のWAV生成を確認してください。
+
 ## 主なテスト
 
 ```powershell
