@@ -22,11 +22,11 @@ Browser DOM
 
 上位層から下位層への依存だけを基本とし、サービス層からHTTPやDOMを参照しません。
 
-## Voice Buttonsとの責務境界
+## 利用側との責務境界
 
-Local TTS Serviceは、モデル、参照音声、推論runtime、汎用TTS API、no-window起動と停止など、再利用可能な音声生成基盤を所有します。Voice Buttons固有の40本の固定セリフ、会話5セット、カテゴリ、accepted SHA、Site向けrelease contract、SiteのWAV配置は所有しません。
+Local TTS Serviceは、モデル、参照音声、推論runtime、汎用TTS API、起動と停止など、再利用可能な音声生成基盤を所有します。利用側アプリ固有のセリフ、カテゴリ、表示資産、受入用ハッシュ、リリース契約、成果物配置や同期処理は所有しません。
 
-Voice Buttons Siteは保守時だけLocal TTS Serviceの公開APIと起動契約を利用し、生成結果の受入・SHA判定・Site資産への反映を所有します。Site実行時はLocal TTS Service、localhost、GPUから独立します。個別製品のセリフ一覧やSite同期用generatorをLocal TTS Serviceへ追加しないでください。
+外部アプリは公開APIと公開された起動契約だけを利用し、製品固有の受入・表示・配布を自身で所有します。特定の下流アプリを前提にした設定、generator、同期処理、テスト契約をこのリポジトリへ追加しないでください。
 
 ## フロントエンドサーバー
 
@@ -54,7 +54,7 @@ Voice Buttons Siteは保守時だけLocal TTS Serviceの公開APIと起動契約
 
 ## 永続RVCサービス
 
-`scripts/persistent_rvc_service.py` は、低遅延の連続利用向けにRVCモデル、HuBERT、RMVPEを1プロセスへ保持する汎用HTTPサービスです。設定はGit対象外の `config/rvc-persistent.local.json`、公開例は `config/rvc-persistent.example.json` に置きます。利用先固有のChatGPT、ブラウザ、再生デバイス、マイク制御は持ちません。詳細は `docs/persistent-rvc-service.md` を参照してください。
+`scripts/persistent_rvc_service.py` は、低遅延の連続利用向けにRVCモデル、HuBERT、RMVPEを1プロセスへ保持する汎用HTTPサービスです。設定はGit対象外の `config/rvc-persistent.local.json`、公開例は `config/rvc-persistent.example.json` に置きます。利用先固有のUI、ブラウザ、端末、再生制御、マイク制御は持ちません。詳細は `docs/persistent-rvc-service.md` を参照してください。
 
 ## ブラウザ画面
 
