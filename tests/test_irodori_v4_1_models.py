@@ -38,3 +38,11 @@ def test_irodori_setup_downloads_v4_1_base_and_anime_models() -> None:
 
     assert "Aratako/Irodori-TTS-v4.1-Small" in setup_script
     assert "phasefield-audio/Irodori-TTS-v4.1-Anime" in setup_script
+    assert "Irodori bundled Tokenizer files not found" in setup_script
+
+
+def test_launcher_repairs_existing_installs_missing_v4_1_models() -> None:
+    launcher = Path("scripts/launch-local-tts.ps1").read_text(encoding="utf-8-sig")
+
+    assert "runtime/models/irodori/Irodori-TTS-v4.1-Small/model.safetensors" in launcher
+    assert "runtime/models/irodori/Irodori-TTS-v4.1-Anime/model.safetensors" in launcher
