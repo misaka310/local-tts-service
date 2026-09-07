@@ -24,7 +24,7 @@ https://github.com/user-attachments/assets/29ad093a-7950-4a17-ba09-8899dabb4828
 - TTS音声、音声ファイル、マイク録音をRVCで変換する
 - 生成履歴をブラウザ内に保存して再利用する
 
-対応モデルにはQwen3-TTS、Irodori、GPT-SoVITSなどがあります。追加モデルとして、ASMR向けOrpheus 3B（CPU版GGUF実行）とMing Omni TTSも個別導入できます。モデルによって必要な設定や利用条件が異なります。
+対応モデルにはQwen3-TTS、Irodori v2 / v3 / v4 / v4.1（公式SmallとAnime fine-tune）、GPT-SoVITSなどがあります。追加モデルとして、ASMR向けOrpheus 3B（CPU版GGUF実行）とMing Omni TTSも個別導入できます。モデルによって必要な設定や利用条件が異なります。
 
 ## 必要環境
 
@@ -81,7 +81,7 @@ local-tts.bat -Check
 4. モデルに応じて話し方メモまたは参照音声を設定します。両方に対応するモデルは、どちらか一方が必要です。
 5. 「生成する」を押します。
 
-既定の `Irodori v3` は参照音声なしで試せます。`Qwen 1.7B`を選ぶ場合は、参照音声と一致する書き起こしが必要です。
+既定の `Irodori v3` は参照音声なしで試せます。`Irodori v4.1 Small` と `Irodori v4.1 Anime` は参照音声と話し方メモの両方に対応します。`Qwen 1.7B`を選ぶ場合は、参照音声と一致する書き起こしが必要です。
 
 画面ごとの操作方法は [利用ガイド](./docs/user-guide.md) を参照してください。
 
