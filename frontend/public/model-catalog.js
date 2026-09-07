@@ -1,5 +1,7 @@
 (() => {
   const MODEL_LABELS = {
+    irodori_v4_1_small: "Irodori v4.1 Small",
+    irodori_v4_1_anime: "Irodori v4.1 Anime",
     irodori_v4_small: "Irodori v4 Small",
     irodori_v3: "Irodori v3",
     irodori_v3_low_latency: "Irodori v3 低遅延 (8-step)",
@@ -22,14 +24,32 @@
   };
 
   const MODEL_PROFILE = {
+    irodori_v4_1_small: {
+      badges: ["v4.1", "公式", "約0.8B"],
+      description: "公式Irodori v4.1 Small。v4の統合型モデルを引き継ぎ、Duration Predictorが改善されています。",
+      features: ["参照音声による声寄せ", "話し方メモによるスタイル指定", "参照音声なしのVoiceDesign", "本文中の絵文字による表現調整", "最大120秒の参照音声に対応"],
+      scores: { 自然さ: "高", 感情表現: "高", 安定性: "高" },
+      memo: "公式v4.1の通常版です。声寄せと話し方指定を同じモデルで比較できます。",
+      rankReason: "現行Irodoriの標準モデルとして、自然さ・声寄せ・表現制御をまとめて確認できます。",
+      baseScore: 99,
+    },
+    irodori_v4_1_anime: {
+      badges: ["v4.1", "Anime FT", "日本語"],
+      description: "Irodori v4.1 Smallをアニメ調の日本語音声でfine-tuneした派生モデルです。",
+      features: ["アニメ調の日本語音声", "参照音声による声寄せ", "話し方メモによるスタイル指定", "参照音声なしのVoiceDesign", "絵文字による表現調整"],
+      scores: { 自然さ: "高", 感情表現: "高", 安定性: "中〜高" },
+      memo: "captionや絵文字の効き方は公式v4.1と異なる場合があります。同じ文章・参照音声で聞き比べてください。",
+      rankReason: "公式v4.1と同じ条件で、アニメ調fine-tuneによる声質・表現の差を比較できます。",
+      baseScore: 98,
+    },
     irodori_v4_small: {
-      badges: ["最新版", "公式v4", "約0.8B"],
-      description: "声寄せと話し方指定を1つに統合した公式Irodori v4。Smallは公式モデル名で、約7.66億パラメータの通常版です。",
+      badges: ["公式v4", "旧版", "約0.8B"],
+      description: "声寄せと話し方指定を1つに統合した公式Irodori v4。v4.1との比較用に残しています。",
       features: ["参照音声による声寄せ", "話し方メモによる感情・スタイル指定", "参照音声なしでは話し方メモから生成", "本文中の絵文字による表現調整", "最大120秒の参照音声に対応"],
       scores: { 自然さ: "高", 感情表現: "高", 安定性: "高" },
-      memo: "量子化版ではない公式チェックポイントです。短い参照1本でも使えますが、声寄せは30秒程度以上のきれいな参照音声で安定しやすくなります。",
-      rankReason: "声寄せと表現制御を1モデルで扱え、Irodori系の第一候補です。",
-      baseScore: 98,
+      memo: "旧v4チェックポイントです。通常利用はv4.1 Smallを優先してください。",
+      rankReason: "v4.1との比較や既存生成条件の再現に利用できます。",
+      baseScore: 96,
     },
     irodori_v3: {
       badges: ["感情表現強化", "自然さ向上", "長文向け"],
@@ -133,6 +153,8 @@
   };
 
   const DESIRED_MODELS = [
+    "irodori_v4_1_small",
+    "irodori_v4_1_anime",
     "irodori_v4_small",
     "ming_omni_tts_0_5b",
     "orpheus_3b_asmr",

@@ -155,6 +155,38 @@
       "supportsStyleStrength": true,
       "supportsVoiceDesign": true,
       "supportsReferenceVoice": true
+    },
+    "irodori_v4_1_small": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v4.1 Small",
+      "family": "irodori",
+      "modelId": "Aratako/Irodori-TTS-v4.1-Small",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-v4.1-Small/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsCaption": true,
+      "supportsInstruction": true,
+      "supportsSeed": true,
+      "supportsSpeedControl": true,
+      "supportsStyleStrength": true,
+      "supportsVoiceDesign": true,
+      "supportsReferenceVoice": true,
+      "notes": "公式Irodori v4.1 Small。v4のDuration Predictor改良版で、参照音声・話し方メモ・絵文字表現を利用できます。"
+    },
+    "irodori_v4_1_anime": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v4.1 Anime",
+      "family": "irodori",
+      "modelId": "phasefield-audio/Irodori-TTS-v4.1-Anime",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-v4.1-Anime/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsCaption": true,
+      "supportsInstruction": true,
+      "supportsSeed": true,
+      "supportsSpeedControl": true,
+      "supportsStyleStrength": true,
+      "supportsVoiceDesign": true,
+      "supportsReferenceVoice": true,
+      "notes": "Irodori v4.1 Smallをアニメ調日本語音声でfine-tuneしたモデル。captionと絵文字制御は公式v4.1と挙動が異なる場合があります。"
     }
   },
   "runtimes": {
