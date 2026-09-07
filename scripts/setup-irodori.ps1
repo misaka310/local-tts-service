@@ -15,7 +15,8 @@ $ModelRoot = Join-Path $RuntimeRoot 'models\irodori'
 $VenvRoot = Join-Path $RuntimeRoot 'venv-irodori'
 $VenvPython = Join-Path $VenvRoot 'Scripts\python.exe'
 $SourceRoot = Join-Path $VendorRoot 'Irodori-TTS-upstream'
-$PinnedRevision = '8ca3acb58ab4e19ad6d594aaed6bafe3e88f7f71'
+$PinnedRevision = '8224dafb46d0aba89209a8f905f1cb7e3299d9c1'
+$LegacyV4Revision = '8ca3acb58ab4e19ad6d594aaed6bafe3e88f7f71'
 $RepositoryUrl = 'https://github.com/Aratako/Irodori-TTS.git'
 $DownloadScript = Join-Path $PSScriptRoot 'download_hf_snapshot.py'
 $RepoPython = Join-Path $RepoRoot '.venv\Scripts\python.exe'
@@ -118,7 +119,11 @@ $currentRevision = if ($DryRun) { '' } else { Get-CheckoutRevision -RepositoryRo
 if ($currentRevision -eq $PinnedRevision) {
   Write-Step "reuse pinned Irodori source revision $PinnedRevision"
 } else {
-  Write-Step "checkout pinned Irodori source revision $PinnedRevision"
+  if ($currentRevision -eq $LegacyV4Revision) {
+    Write-Step "upgrade legacy Irodori v4 source revision to the v4.1-compatible revision $PinnedRevision"
+  } else {
+    Write-Step "checkout pinned Irodori source revision $PinnedRevision"
+  }
   Invoke-Native -FilePath $GitExecutable -Arguments @('-C', $SourceRoot, 'fetch', '--tags', '--force', 'origin') -Label 'git fetch Irodori-TTS'
   Invoke-Native -FilePath $GitExecutable -Arguments @('-C', $SourceRoot, 'checkout', '--force', $PinnedRevision) -Label 'git checkout Irodori-TTS revision'
 }
