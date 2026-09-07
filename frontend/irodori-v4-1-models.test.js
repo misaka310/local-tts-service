@@ -1,6 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 
 globalThis.window = globalThis;
 await import("./public/model-catalog.js");
@@ -16,7 +15,7 @@ test("Irodori v4.1 base and anime models are selectable comparison models", () =
   assert.ok(catalog.profileFor("irodori_v4_1_anime").badges.includes("Anime FT"));
 });
 
-test("normal model selector keeps a stable latest-to-oldest Irodori group", async () => {
+test("model selectors keep a stable latest-to-oldest Irodori group", () => {
   assert.deepEqual(catalog.DESIRED_MODELS.slice(0, 7), [
     "irodori_v4_1_small",
     "irodori_v4_1_anime",
@@ -27,7 +26,13 @@ test("normal model selector keeps a stable latest-to-oldest Irodori group", asyn
     "irodori_v2",
   ]);
 
-  const appSource = await readFile(new URL("./public/app.js", import.meta.url), "utf-8");
-  assert.match(appSource, /const order = DESIRED_MODELS;/);
-  assert.doesNotMatch(appSource, /sortModelsAvailableFirst\(prioritizedModels\)/);
+  const mixedAvailability = [
+    { id: "irodori_v2", available: true, enabled: true },
+    { id: "irodori_v4_1_small", available: false, enabled: false },
+    { id: "irodori_v3", available: true, enabled: true },
+  ];
+  assert.deepEqual(
+    catalog.sortModelsAvailableFirst(mixedAvailability).map((model) => model.id),
+    ["irodori_v4_1_small", "irodori_v3", "irodori_v2"],
+  );
 });
