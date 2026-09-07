@@ -29,7 +29,7 @@ local-tts.bat
 - 固定版MinGitを公式配布元から取得し、SHA-256検証後に保存
 - frontend依存を導入
 - Qwen3-TTS Voice Clone 1.7Bモデルを取得
-- Irodori v2 / v3 / v3 VoiceDesign、codec、Tokenizerをリポジトリ内へ導入
+- Irodori v2 / v3 / v3 VoiceDesign / v4 / v4.1 Small / v4.1 Anime、codec、Tokenizerをリポジトリ内へ導入
 - FFmpegを導入
 - yt-dlpとfaster-whisperを確認
 - BGM・伴奏除去用のDemucs環境を導入
@@ -52,6 +52,17 @@ runtime/models/irodori/tokenizers/llm-jp-3-150m/special_tokens_map.json
 ```
 
 起動時にcheckpoint、codec、Tokenizer、専用Python、Irodoriコードを検査し、既定のIrodori v3を事前ロードします。不足時は「○○がありません」と配置先を表示し、生成ボタンでは取得や初期化を行いません。通常起動と生成はHugging Faceのログイン状態や認証トークンに依存しません。
+
+### Irodori v4.1
+
+`Irodori v4.1 Small` と `Irodori v4.1 Anime` は既存のIrodori常駐runtimeで動作します。初回セットアップでは次の完全なモデルsnapshotを取得し、各モデルに同梱されたTokenizerもローカルから使用します。
+
+```text
+runtime/models/irodori/Irodori-TTS-v4.1-Small/
+runtime/models/irodori/Irodori-TTS-v4.1-Anime/
+```
+
+どちらも参照音声による声寄せ、話し方メモ、速度・表現強度、seedを利用できます。Animeはv4.1 Smallのfine-tuneで、captionや絵文字による表現制御は公式Smallと異なる出方になる場合があります。既存のIrodori v4 Smallとv2/v3は削除せず、そのまま選択できます。
 
 ## 2回目以降
 
@@ -88,7 +99,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-tts.ps
 | 機能・モデル | 初回セットアップ後 | 追加作業 |
 |---|---:|---|
 | Qwen3-TTS Voice Clone 1.7B | 使用可能 | 参照音声と一致する書き起こし |
-| Irodori v2 / v3 / v3 VoiceDesign | 使用可能 | なし |
+| Irodori v2 / v3 / v3 VoiceDesign / v4 / v4.1 Small / v4.1 Anime | 使用可能 | なし |
 | 動画URL候補抽出 | 使用可能 | 初回利用時に音声認識モデルを取得する場合あり |
 | BGM・伴奏除去 | 使用可能 | 初回利用時にDemucsモデルを取得する場合あり |
 | Qwen3-TTS Voice Clone 0.6B | 未導入 | 追加モデルと参照音声 |
