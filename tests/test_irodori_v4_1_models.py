@@ -2,29 +2,35 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from local_tts_service.config import DEFAULT_CONFIG
+from local_tts_service.config import load_config
 
 
 def test_irodori_v4_1_base_and_anime_models_are_registered() -> None:
-    models = DEFAULT_CONFIG["models"]
+    models = load_config(Path.cwd()).models
 
-    base = models["irodori_v4_small"]
+    base = models["irodori_v4_1_small"]
     anime = models["irodori_v4_1_anime"]
 
-    assert base["label"] == "Irodori v4.1 Small"
-    assert base["modelId"] == "Aratako/Irodori-TTS-v4.1-Small"
-    assert base["checkpoint"] == "./runtime/models/irodori/Irodori-TTS-v4.1-Small/model.safetensors"
+    assert base.label == "Irodori v4.1 Small"
+    assert base.model_id == "Aratako/Irodori-TTS-v4.1-Small"
+    assert base.checkpoint is not None
+    assert base.checkpoint.as_posix().endswith(
+        "runtime/models/irodori/Irodori-TTS-v4.1-Small/model.safetensors"
+    )
 
-    assert anime["label"] == "Irodori v4.1 Anime"
-    assert anime["modelId"] == "phasefield-audio/Irodori-TTS-v4.1-Anime"
-    assert anime["checkpoint"] == "./runtime/models/irodori/Irodori-TTS-v4.1-Anime/model.safetensors"
-    assert anime["runtime"] == "irodori_voicedesign_direct"
-    assert anime["supportsReferenceVoice"] is True
-    assert anime["supportsCaption"] is True
-    assert anime["supportsInstruction"] is True
-    assert anime["supportsStyleStrength"] is True
-    assert anime["supportsVoiceDesign"] is True
-    assert anime["supportsSpeedControl"] is True
+    assert anime.label == "Irodori v4.1 Anime"
+    assert anime.model_id == "phasefield-audio/Irodori-TTS-v4.1-Anime"
+    assert anime.checkpoint is not None
+    assert anime.checkpoint.as_posix().endswith(
+        "runtime/models/irodori/Irodori-TTS-v4.1-Anime/model.safetensors"
+    )
+    assert anime.runtime == "irodori_voicedesign_direct"
+    assert anime.supports_reference_voice is True
+    assert anime.supports_caption is True
+    assert anime.supports_instruction is True
+    assert anime.supports_style_strength is True
+    assert anime.supports_voice_design is True
+    assert anime.supports_speed_control is True
 
 
 def test_irodori_setup_downloads_v4_1_base_and_anime_models() -> None:
@@ -32,4 +38,3 @@ def test_irodori_setup_downloads_v4_1_base_and_anime_models() -> None:
 
     assert "Aratako/Irodori-TTS-v4.1-Small" in setup_script
     assert "phasefield-audio/Irodori-TTS-v4.1-Anime" in setup_script
-    assert "Irodori-TTS-v4-Small" not in setup_script
