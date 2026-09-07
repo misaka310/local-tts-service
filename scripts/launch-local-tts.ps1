@@ -66,7 +66,9 @@ function Get-MissingStandardComponents {
     @{ Path = '.venv/Scripts/python.exe'; Label = 'Python environment' },
     @{ Path = 'runtime/tools/node/node.exe'; Label = 'Node.js runtime' },
     @{ Path = 'runtime/venv-demucs/Scripts/python.exe'; Label = 'background-removal environment' },
-    @{ Path = 'runtime/venv-irodori/Scripts/python.exe'; Label = 'Irodori runtime' }
+    @{ Path = 'runtime/venv-irodori/Scripts/python.exe'; Label = 'Irodori runtime' },
+    @{ Path = 'runtime/models/irodori/Irodori-TTS-v4.1-Small/model.safetensors'; Label = 'Irodori v4.1 Small model' },
+    @{ Path = 'runtime/models/irodori/Irodori-TTS-v4.1-Anime/model.safetensors'; Label = 'Irodori v4.1 Anime model' }
   )
   foreach ($item in $requiredFiles) {
     if (-not (Test-Path -LiteralPath (Join-Path $repoRoot $item.Path) -PathType Leaf)) { $missing.Add($item.Label) }
