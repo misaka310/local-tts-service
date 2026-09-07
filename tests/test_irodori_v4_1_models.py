@@ -6,6 +6,7 @@ from local_tts_service.config import load_config
 
 
 V4_1_UPSTREAM_REVISION = "8224dafb46d0aba89209a8f905f1cb7e3299d9c1"
+LEGACY_V4_UPSTREAM_REVISION = "8ca3acb58ab4e19ad6d594aaed6bafe3e88f7f71"
 
 
 def test_irodori_v4_1_base_and_anime_models_are_registered() -> None:
@@ -48,7 +49,7 @@ def test_irodori_setup_pins_v4_1_compatible_upstream_revision() -> None:
     setup_script = Path("scripts/setup-irodori.ps1").read_text(encoding="utf-8-sig")
 
     assert f"$PinnedRevision = '{V4_1_UPSTREAM_REVISION}'" in setup_script
-    assert "8ca3acb58ab4e19ad6d594aaed6bafe3e88f7f71" not in setup_script
+    assert f"$LegacyV4Revision = '{LEGACY_V4_UPSTREAM_REVISION}'" in setup_script
 
 
 def test_launcher_repairs_existing_installs_missing_v4_1_models() -> None:
