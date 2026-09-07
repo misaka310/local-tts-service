@@ -33,6 +33,8 @@ $Models = @(
   @{ RepoId = 'Aratako/Irodori-TTS-500M-v3'; Directory = 'Irodori-TTS-500M-v3'; AllowPatterns = @() },
   @{ RepoId = 'Aratako/Irodori-TTS-600M-v3-VoiceDesign'; Directory = 'Irodori-TTS-600M-v3-VoiceDesign'; AllowPatterns = @() },
   @{ RepoId = 'Aratako/Irodori-TTS-v4-Small'; Directory = 'Irodori-TTS-v4-Small'; AllowPatterns = @() },
+  @{ RepoId = 'Aratako/Irodori-TTS-v4.1-Small'; Directory = 'Irodori-TTS-v4.1-Small'; AllowPatterns = @() },
+  @{ RepoId = 'phasefield-audio/Irodori-TTS-v4.1-Anime'; Directory = 'Irodori-TTS-v4.1-Anime'; AllowPatterns = @() },
   @{ RepoId = 'Aratako/Semantic-DACVAE-Japanese-32dim'; Directory = 'Semantic-DACVAE-Japanese-32dim'; AllowPatterns = @() },
   @{
     RepoId = 'llm-jp/llm-jp-3-150m'
@@ -222,9 +224,18 @@ Invoke-Native -FilePath $VenvPython -Arguments @((Join-Path $PSScriptRoot 'check
 
 if (-not $DryRun) {
   foreach ($model in $Models | Where-Object { $_.Directory -like 'Irodori-TTS-*' }) {
-    $modelFile = Join-Path (Join-Path $ModelRoot $model.Directory) 'model.safetensors'
+    $modelDir = Join-Path $ModelRoot $model.Directory
+    $modelFile = Join-Path $modelDir 'model.safetensors'
     if (-not (Test-Path -LiteralPath $modelFile -PathType Leaf)) {
       throw "Irodori model file not found: $modelFile"
+    }
+    if ($model.Directory -like 'Irodori-TTS-v4.1-*') {
+      $bundledTokenizer = Join-Path $modelDir 'tokenizer'
+      $bundledTokenizerConfig = Join-Path $bundledTokenizer 'tokenizer_config.json'
+      $bundledTokenizerData = Join-Path $bundledTokenizer 'tokenizer.json'
+      if (-not (Test-Path -LiteralPath $bundledTokenizerConfig -PathType Leaf) -or -not (Test-Path -LiteralPath $bundledTokenizerData -PathType Leaf)) {
+        throw "Irodori bundled Tokenizer files not found: $bundledTokenizer"
+      }
     }
   }
   $codecWeights = Join-Path (Join-Path $ModelRoot 'Semantic-DACVAE-Japanese-32dim') 'weights.pth'
@@ -244,5 +255,5 @@ if ($DryRun) {
   Write-Output '[DRY-RUN] Irodori setup plan completed without changing files.'
 } else {
   Write-Output '[OK] Irodori is installed inside this repository under runtime/.'
-  Write-Output 'Restart local-tts.bat, then select Irodori v4 Small, Irodori v3, Irodori v3 VoiceDesign, or Irodori v2.'
+  Write-Output 'Restart local-tts.bat, then select Irodori v4.1 Small, Irodori v4.1 Anime, Irodori v4 Small, Irodori v3, Irodori v3 VoiceDesign, or Irodori v2.'
 }
