@@ -31,6 +31,7 @@ on:
       - scripts/run-local-tts-stack.ps1
       - scripts/setup-irodori.ps1
       - scripts/setup-local-tts.ps1
+      - scripts/smoke-irodori-v4-1.ps1
       - scripts/start-local-tts-console.ps1
       - scripts/start-local-tts-stack.ps1
       - scripts/start-local-tts.ps1
@@ -70,6 +71,19 @@ jobs:
           -File .\scripts\verify-clean-install.ps1
           -TimeoutSec 7200
 
+      - name: Run Irodori v4.1 real-generation smoke
+        id: irodori_v4_1_smoke
+        if: steps.clean-install.outcome == 'success'
+        shell: powershell
+        run: |
+          $config = Get-Content -LiteralPath .\config\config.local.json -Raw -Encoding UTF8 | ConvertFrom-Json
+          $backendHost = if ([string]::IsNullOrWhiteSpace([string]$config.host)) { '127.0.0.1' } else { [string]$config.host }
+          $backendPort = [int]$config.port
+          if ($backendPort -le 0) { throw 'Backend port is missing from config/config.local.json' }
+          $baseUrl = "http://$backendHost`:$backendPort"
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-irodori-v4-1.ps1 -BaseUrl $baseUrl -OutputDirectory runtime/clean-install-verification/irodori-v4-1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Stop clean-install services
         id: stop-clean-install
         if: always()
@@ -81,7 +95,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Run root BAT startup and shutdown lifecycle
-        if: steps.clean-install.outcome == 'success' && steps.stop-clean-install.outcome == 'success'
+        if: steps.clean-install.outcome == 'success' && steps.irodori_v4_1_smoke.outcome == 'success' && steps.stop-clean-install.outcome == 'success'
         shell: powershell
         run: >-
           powershell -NoProfile -ExecutionPolicy Bypass
