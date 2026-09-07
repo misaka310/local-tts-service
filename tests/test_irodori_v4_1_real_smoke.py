@@ -17,8 +17,11 @@ def test_real_smoke_covers_both_irodori_v4_1_models_and_audio_quality() -> None:
     assert "WAVE" in smoke
 
 
-def test_clean_install_runs_irodori_v4_1_real_smoke() -> None:
-    verification = Path("scripts/verify-clean-install.ps1").read_text(encoding="utf-8-sig")
+def test_clean_install_runs_irodori_v4_1_real_smoke_before_shutdown() -> None:
+    workflow = Path(".github/workflows/windows-clean-install.yml").read_text(encoding="utf-8-sig")
 
-    assert "smoke-irodori-v4-1.ps1" in verification
-    assert "irodori-v4-1" in verification
+    smoke_step = "Run Irodori v4.1 real-generation smoke"
+    stop_step = "Stop clean-install services"
+    assert smoke_step in workflow
+    assert "smoke-irodori-v4-1.ps1" in workflow
+    assert workflow.index(smoke_step) < workflow.index(stop_step)
