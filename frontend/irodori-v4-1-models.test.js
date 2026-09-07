@@ -14,3 +14,25 @@ test("Irodori v4.1 base and anime models are selectable comparison models", () =
   assert.ok(catalog.profileFor("irodori_v4_1_small").badges.includes("v4.1"));
   assert.ok(catalog.profileFor("irodori_v4_1_anime").badges.includes("Anime FT"));
 });
+
+test("model selectors keep a stable latest-to-oldest Irodori group", () => {
+  assert.deepEqual(catalog.DESIRED_MODELS.slice(0, 7), [
+    "irodori_v4_1_small",
+    "irodori_v4_1_anime",
+    "irodori_v4_small",
+    "irodori_v3",
+    "irodori_v3_low_latency",
+    "irodori_v3_voicedesign",
+    "irodori_v2",
+  ]);
+
+  const mixedAvailability = [
+    { id: "irodori_v2", available: true, enabled: true },
+    { id: "irodori_v4_1_small", available: false, enabled: false },
+    { id: "irodori_v3", available: true, enabled: true },
+  ];
+  assert.deepEqual(
+    catalog.sortModelsAvailableFirst(mixedAvailability).map((model) => model.id),
+    ["irodori_v4_1_small", "irodori_v3", "irodori_v2"],
+  );
+});
