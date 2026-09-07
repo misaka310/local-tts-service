@@ -152,33 +152,76 @@
     },
   };
 
+  const MODEL_ORDER = [
+    "irodori_v4_1_small",
+    "irodori_v4_1_anime",
+    "irodori_v4_small",
+    "irodori_v3",
+    "irodori_v3_low_latency",
+    "irodori_v3_voicedesign",
+    "irodori_v2",
+    "qwen3_tts_clone_1_7b",
+    "qwen3_tts_clone_0_6b",
+    "chatterbox_multilingual_v3",
+    "fun_cosyvoice3_0_5b",
+    "fireredtts2",
+    "fish_s1_mini",
+    "ming_omni_tts_0_5b",
+    "orpheus_3b_asmr",
+    "sarashina2_2_tts",
+    "t5gemma_tts_2b_2b",
+    "gpt_sovits_zero_shot",
+    "gpt_sovits_finetuned",
+    "f5_tts_zero_shot",
+    "mock",
+  ];
+
   const DESIRED_MODELS = [
     "irodori_v4_1_small",
     "irodori_v4_1_anime",
     "irodori_v4_small",
+    "irodori_v3",
+    "irodori_v3_low_latency",
+    "irodori_v3_voicedesign",
+    "irodori_v2",
     "ming_omni_tts_0_5b",
     "orpheus_3b_asmr",
     "chatterbox_multilingual_v3",
     "fun_cosyvoice3_0_5b",
     "gpt_sovits_zero_shot",
     "qwen3_tts_clone_1_7b",
-    "irodori_v3_voicedesign",
-    "irodori_v3_low_latency",
-    "irodori_v3",
     "sarashina2_2_tts",
     "fireredtts2",
     "t5gemma_tts_2b_2b",
     "fish_s1_mini",
   ];
 
+  const MODEL_ORDER_INDEX = new Map(MODEL_ORDER.map((id, index) => [id, index]));
+
   function modelIsAvailable(model) {
     return Boolean(model && model.available && model.enabled);
   }
 
+  function modelId(model) {
+    return String((model && (model.id || model.model)) || "");
+  }
+
   function sortModelsAvailableFirst(models, availability = modelIsAvailable) {
     return Array.from(models || [])
-      .map((model, index) => ({ model, index, available: Boolean(availability(model)) }))
-      .sort((a, b) => Number(b.available) - Number(a.available) || a.index - b.index)
+      .map((model, index) => ({
+        model,
+        index,
+        id: modelId(model),
+        rank: MODEL_ORDER_INDEX.get(modelId(model)),
+        available: Boolean(availability(model)),
+      }))
+      .sort((a, b) => {
+        const aKnown = Number.isInteger(a.rank);
+        const bKnown = Number.isInteger(b.rank);
+        if (aKnown && bKnown) return a.rank - b.rank;
+        if (aKnown !== bKnown) return aKnown ? -1 : 1;
+        return Number(b.available) - Number(a.available) || a.index - b.index;
+      })
       .map((entry) => entry.model);
   }
 
@@ -201,6 +244,7 @@
   window.LocalTtsModelCatalog = Object.freeze({
     MODEL_LABELS,
     MODEL_PROFILE,
+    MODEL_ORDER,
     DESIRED_MODELS,
     modelIsAvailable,
     sortModelsAvailableFirst,
