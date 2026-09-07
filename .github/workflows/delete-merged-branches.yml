@@ -1,0 +1,47 @@
+name: Delete merged branches
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: write
+
+jobs:
+  delete-bootstrap-branches:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete branch-hygiene bootstrap branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          branches=(
+            "feat/irodori-v4-1-models"
+            "maintenance/enable-branch-hygiene"
+          )
+          for branch in "${branches[@]}"; do
+            status="$(curl --silent --show-error --location --output /tmp/response --write-out '%{http_code}' --request DELETE --header "Authorization: Bearer ${GH_TOKEN}" --header 'Accept: application/vnd.github+json' --header 'X-GitHub-Api-Version: 2022-11-28' "https://api.github.com/repos/${GH_REPO}/git/refs/heads/${branch}" || true)"
+            test "${status}" = '204' || test "${status}" = '404' || test "${status}" = '422'
+          done
+
+  delete-merged-pr-branch:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete merged PR head branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ "${HEAD_BRANCH}" = "${DEFAULT_BRANCH}" ]; then exit 0; fi
+          status="$(curl --silent --show-error --location --output /tmp/response --write-out '%{http_code}' --request DELETE --header "Authorization: Bearer ${GH_TOKEN}" --header 'Accept: application/vnd.github+json' --header 'X-GitHub-Api-Version: 2022-11-28' "https://api.github.com/repos/${GH_REPO}/git/refs/heads/${HEAD_BRANCH}" || true)"
+          test "${status}" = '204' || test "${status}" = '404' || test "${status}" = '422'
