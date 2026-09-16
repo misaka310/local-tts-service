@@ -181,16 +181,27 @@ def _install_ming_attention_fallback() -> None:
                 torch.ones((query_length, key_length), dtype=torch.bool, device=q_heads.device),
                 diagonal=key_length - query_length,
             )
-        output = torch.nn.functional.scaled_dot_product_attention(
-            q_heads,
-            k_heads,
-            v_heads,
-            attn_mask=attention_mask,
-            dropout_p=dropout_p,
-            is_causal=False,
-            scale=softmax_scale,
-            enable_gqa=q_heads.size(1) != k_heads.size(1),
-        )
+        sdpa_kwargs = {
+            "attn_mask": attention_mask,
+            "dropout_p": dropout_p,
+            "is_causal": False,
+        }
+        if softmax_scale is not None:
+            sdpa_kwargs["scale"] = softmax_scale
+        if q_heads.size(1) != k_heads.size(1):
+            sdpa_kwargs["enable_gqa"] = True
+        try:
+            output = torch.nn.functional.scaled_dot_product_attention(q_heads, k_heads, v_heads, **sdpa_kwargs)
+        except TypeError as exc:
+            if "enable_gqa" not in str(exc):
+                raise
+            if q_heads.size(1) % k_heads.size(1) != 0:
+                raise
+            repeat_factor = q_heads.size(1) // k_heads.size(1)
+            k_heads = k_heads.repeat_interleave(repeat_factor, dim=1)
+            v_heads = v_heads.repeat_interleave(repeat_factor, dim=1)
+            sdpa_kwargs.pop("enable_gqa", None)
+            output = torch.nn.functional.scaled_dot_product_attention(q_heads, k_heads, v_heads, **sdpa_kwargs)
         return output.transpose(1, 2)
 
     def _unsupported_flash_helper(*_args, **_kwargs):

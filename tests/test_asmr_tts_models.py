@@ -258,13 +258,21 @@ def test_ming_attention_fallback_matches_flash_attention_lower_right_causal_mask
         q_heads = q.transpose(1, 2)
         k_heads = k.transpose(1, 2)
         v_heads = v.transpose(1, 2)
-        from torch.nn.attention.bias import causal_lower_right
+        try:
+            from torch.nn.attention.bias import causal_lower_right
+        except ModuleNotFoundError:
+            causal_mask = torch.tril(
+                torch.ones((q_heads.size(-2), k_heads.size(-2)), dtype=torch.bool),
+                diagonal=k_heads.size(-2) - q_heads.size(-2),
+            )
+        else:
+            causal_mask = causal_lower_right(q.shape[1], k.shape[1])
 
         expected = torch.nn.functional.scaled_dot_product_attention(
             q_heads,
             k_heads,
             v_heads,
-            attn_mask=causal_lower_right(q.shape[1], k.shape[1]),
+            attn_mask=causal_mask,
         ).transpose(1, 2)
 
         assert torch.allclose(actual, expected)
