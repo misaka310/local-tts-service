@@ -11,8 +11,13 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: branch-cleanup-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   delete-bootstrap-branches:
+    timeout-minutes: 5
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
@@ -34,6 +39,7 @@ jobs:
   delete-merged-pr-branch:
     if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Delete merged PR head branch
         env:
