@@ -50,4 +50,4 @@ def test_repository_root_has_only_public_entry_files() -> None:
     visible_files = sorted(
         path.name for path in REPO_ROOT.iterdir() if path.is_file() and not path.name.startswith(".")
     )
-    assert visible_files == ["AGENTS.md", "CHANGELOG.md", "LICENSE", "README.md", "local-tts.bat"]
+    assert visible_files == ["AGENTS.md", "LICENSE", "README.md", "local-tts.bat"]
