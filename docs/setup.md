@@ -195,6 +195,14 @@ VoxCPM2互換は標準設定に含まれません。ComfyUIの配置先と起動
 
 同じポートを無関係なアプリが使用している場合、そのプロセスは終了せず、起動を中断して使用中のURLを表示します。別アプリを終了するかポート設定を変更してください。
 
+常駐運用では、次のスクリプトでWindows Scheduled Taskを登録できます。タスクはログオン時に起動し、既定では5分ごとに`/health`を確認します。サービスが正常なら即終了し、停止している場合だけ非表示ウィンドウで`start-local-tts.ps1`を再実行します。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-local-tts-startup-task.ps1
+```
+
+監視間隔は`-IntervalMinutes`で変更できます。タスク名は既定で`LocalTTS Managed Stack`です。
+
 ## ローカルデータ
 
 次のデータはGit管理対象外です。
