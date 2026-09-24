@@ -141,8 +141,21 @@ function Test-ManagedProcessRecord {
     }
 
     $storedStart = [DateTime]::MinValue
-    if (-not [DateTime]::TryParse([string]$Record.processStartTimeUtc, [ref]$storedStart)) {
-        return [PSCustomObject]@{ valid = $false; reason = 'invalid stored start time'; identity = $identity }
+    $storedValue = $Record.processStartTimeUtc
+    if ($storedValue -is [DateTime]) {
+        $storedStart = [DateTime]$storedValue
+    }
+    else {
+        try {
+            $storedStart = [DateTime]::Parse(
+                [string]$storedValue,
+                [Globalization.CultureInfo]::InvariantCulture,
+                [Globalization.DateTimeStyles]::RoundtripKind
+            )
+        }
+        catch {
+            return [PSCustomObject]@{ valid = $false; reason = 'invalid stored start time'; identity = $identity }
+        }
     }
     $startDelta = [Math]::Abs(($identity.processStartTimeUtc - $storedStart.ToUniversalTime()).TotalSeconds)
     if ($startDelta -gt 1.0) {

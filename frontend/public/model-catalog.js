@@ -11,11 +11,13 @@
     gpt_sovits_zero_shot: "GPT-SoVITS Zero-shot",
     gpt_sovits_finetuned: "GPT-SoVITS Fine-tuned",
     qwen3_tts_clone_0_6b: "Qwen3-TTS Clone 0.6B",
-    qwen3_tts_clone_1_7b: "Qwen 1.7B",
+    qwen3_tts_clone_1_7b: "Qwen3-TTS Clone 1.7B",
     sarashina2_2_tts: "Sarashina2.2-TTS",
     fireredtts2: "FireRedTTS-2",
     t5gemma_tts_2b_2b: "T5Gemma-TTS 2B-2B",
     fish_s1_mini: "FishAudio S1-mini",
+    fish_s2_pro: "Fish Audio S2 Pro",
+    indextts_2_5: "IndexTTS 2.5",
     orpheus_3b_asmr: "Orpheus 3B ASMR",
     ming_omni_tts_0_5b: "Ming Omni TTS 0.5B",
     chatterbox_multilingual_v3: "Chatterbox Multilingual V3",
@@ -83,7 +85,7 @@
       description: "参照音声を使って声質を近づける1.7Bモデル。ほかのモデルと再現性や自然さを聞き比べられます。",
       features: ["参照音声を使った音声クローンに対応", "Qwen系モデルの声質を比較できる", "同一条件で他モデルと聞き比べやすい", "F5-TTSの代替比較枠"],
       scores: { 自然さ: "中", 感情表現: "中", 安定性: "中" },
-      memo: "Qwen 1.7B の出力確認用です。参照音声との近さとノイズ感を他モデルと比較してください。",
+      memo: "Qwen3-TTS Clone 1.7B の出力確認用です。参照音声との近さとノイズ感を他モデルと比較してください。",
       rankReason: "Qwen系の声質確認枠として、他モデルとの差を見やすいです。",
       baseScore: 82,
     },
@@ -114,8 +116,26 @@
       rankReason: "表現力は優れるものの、長文での安定性に課題があります。",
       baseScore: 76,
     },
+    fish_s2_pro: {
+      badges: ["S2 Pro", "参照音声", "商用は別契約", "Fish Audio Research License"],
+      description: "Fish Audioの高品質S2 Pro。専用環境で参照WAVと書き起こしを使います。",
+      features: ["日本語の声寄せ", "参照音声と文字起こし", "S1-miniと分離した導入"],
+      scores: { 自然さ: "高", 感情表現: "高", 安定性: "実験" },
+      memo: "公式推奨VRAMは24GB以上。足りない場合は選択できない状態で理由を表示します。",
+      rankReason: "既存モデルとの実音声比較用です。",
+      baseScore: 90,
+    },
+    indextts_2_5: {
+      badges: ["日本語", "参照音声", "条件付き商用", "bilibili Model License"],
+      description: "参照WAVのみで日本語の声寄せができるIndexTTS 2.5。",
+      features: ["日本語・英語など5言語", "文字起こし不要", "エンジン標準の話速調整"],
+      scores: { 自然さ: "高", 感情表現: "高", 安定性: "実験" },
+      memo: "参照音声を登録すれば、文字起こしなしで生成できます。",
+      rankReason: "同じ参照WAVでの声寄せ比較用です。",
+      baseScore: 89,
+    },
     orpheus_3b_asmr: {
-      badges: ["ASMR追加学習", "英語", "商用利用可", "Apache-2.0"],
+      badges: ["ASMR追加学習", "英語", "要確認", "派生元条件あり"],
       description: "ASMR音声で追加学習されたOrpheus 3B。小さく柔らかい話し方を狙う英語向けの実験モデルです。",
       features: ["ASMRデータで追加学習", "soft-spoken / gentle speech向け", "本文中の<sigh>などの表現タグ", "WSLの専用環境でローカル生成"],
       scores: { 自然さ: "中〜高", 感情表現: "高", 安定性: "実験" },
@@ -152,6 +172,31 @@
     },
   };
 
+  const MODEL_METADATA = {
+    irodori_v4_1_small: { licenseGroup: "irodori_v4_1_small", commercialStatus: "商用可", license: "MIT + 公式Ethical Restrictions", commercial: "MIT上は商用利用可。声の無断模倣・なりすまし・誤情報用途は禁止", termsUrl: "https://huggingface.co/Aratako/Irodori-TTS-v4.1-Small/blob/main/README.md", modelUrl: "https://huggingface.co/Aratako/Irodori-TTS-v4.1-Small", codeUrl: "https://github.com/Aratako/Irodori-TTS", languages: "日本語", reference: "参照音声は任意。Voice Designにも対応" },
+    irodori_v4_1_anime: { licenseGroup: "irodori_v4_1_anime", commercialStatus: "商用可", license: "MIT + Irodori Ethical Restrictions", commercial: "MIT上は商用利用可。ベースモデルと同じ倫理制限を遵守", termsUrl: "https://huggingface.co/phasefield-audio/Irodori-TTS-v4.1-Anime/blob/main/README.md", modelUrl: "https://huggingface.co/phasefield-audio/Irodori-TTS-v4.1-Anime", codeUrl: "https://github.com/Aratako/Irodori-TTS", languages: "日本語", reference: "参照音声は任意。Anime fine-tune" },
+    irodori_v4_small: { licenseGroup: "irodori_v4_small", commercialStatus: "商用可", license: "MIT + 公式Ethical Restrictions", commercial: "MIT上は商用利用可。声の無断模倣・なりすまし・誤情報用途は禁止", termsUrl: "https://huggingface.co/Aratako/Irodori-TTS-v4-Small", modelUrl: "https://huggingface.co/Aratako/Irodori-TTS-v4-Small", codeUrl: "https://github.com/Aratako/Irodori-TTS", languages: "日本語", reference: "参照音声は任意。Voice Designにも対応" },
+    irodori_v3: { licenseGroup: "irodori_v3", commercialStatus: "商用可", license: "MIT + 公式Ethical Restrictions", commercial: "MIT上は商用利用可。声の無断模倣・なりすまし・誤情報用途は禁止", termsUrl: "https://huggingface.co/Aratako/Irodori-TTS-500M-v3", modelUrl: "https://huggingface.co/Aratako/Irodori-TTS-500M-v3", codeUrl: "https://github.com/Aratako/Irodori-TTS", languages: "日本語", reference: "参照音声は任意" },
+    irodori_v3_low_latency: { licenseGroup: "irodori_v3", commercialStatus: "商用可", license: "MIT + 公式Ethical Restrictions", commercial: "MIT上は商用利用可。声の無断模倣・なりすまし・誤情報用途は禁止", termsUrl: "https://huggingface.co/Aratako/Irodori-TTS-500M-v3", modelUrl: "https://huggingface.co/Aratako/Irodori-TTS-500M-v3", codeUrl: "https://github.com/Aratako/Irodori-TTS", languages: "日本語", reference: "参照音声は任意。30独自の8-step低遅延実行プロファイル" },
+    irodori_v3_voicedesign: { licenseGroup: "irodori_v3_voicedesign", commercialStatus: "商用可", license: "MIT + 公式Ethical Restrictions", commercial: "MIT上は商用利用可。声の無断模倣・なりすまし・誤情報用途は禁止", termsUrl: "https://huggingface.co/Aratako/Irodori-TTS-600M-v3-VoiceDesign/blob/main/README.md", modelUrl: "https://huggingface.co/Aratako/Irodori-TTS-600M-v3-VoiceDesign", codeUrl: "https://github.com/Aratako/Irodori-TTS", languages: "日本語", reference: "参照音声は任意。Caption/Voice Design対応" },
+    irodori_v2: { licenseGroup: "irodori_v2", commercialStatus: "商用可", license: "MIT", commercial: "MIT上は商用利用可。参照音声・生成物の第三者権利は別途確認", termsUrl: "https://huggingface.co/Aratako/Irodori-TTS-500M-v2", modelUrl: "https://huggingface.co/Aratako/Irodori-TTS-500M-v2", codeUrl: "https://github.com/Aratako/Irodori-TTS", languages: "日本語", reference: "参照音声は任意" },
+    qwen3_tts_clone_0_6b: { licenseGroup: "qwen3_tts_clone_0_6b", commercialStatus: "商用可", license: "Apache-2.0", commercial: "Apache-2.0の条件で商用利用可。参照音声の権利は別途必要", termsUrl: "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base", modelUrl: "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base", codeUrl: "https://github.com/QwenLM/Qwen3-TTS", languages: "日本語を含む多言語", reference: "voice.wav + voice.txtが必須" },
+    qwen3_tts_clone_1_7b: { licenseGroup: "qwen3_tts_clone_1_7b", commercialStatus: "商用可", license: "Apache-2.0", commercial: "Apache-2.0の条件で商用利用可。参照音声の権利は別途必要", termsUrl: "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base", modelUrl: "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base", codeUrl: "https://github.com/QwenLM/Qwen3-TTS", languages: "日本語を含む多言語", reference: "voice.wav + voice.txtが必須" },
+    sarashina2_2_tts: { licenseGroup: "sarashina2_2_tts", commercialStatus: "非商用", license: "Sarashina Model NonCommercial License Agreement v2.0", commercial: "標準ライセンスでは商用利用不可", termsUrl: "https://huggingface.co/sbintuitions/sarashina2.2-tts/blob/main/LICENSE", modelUrl: "https://huggingface.co/sbintuitions/sarashina2.2-tts", codeUrl: "https://github.com/sbintuitions/sarashina2.2-tts", languages: "日本語・英語", reference: "voice.wav + voice.txtが必須" },
+    fireredtts2: { licenseGroup: "fireredtts2", commercialStatus: "商用可", license: "Apache-2.0", commercial: "Apache-2.0の条件で商用利用可。声・入力素材の権利は別途確認", termsUrl: "https://github.com/FireRedTeam/FireRedTTS2/blob/main/LICENSE", modelUrl: "https://huggingface.co/FireRedTeam/FireRedTTS2", codeUrl: "https://github.com/FireRedTeam/FireRedTTS2", languages: "日本語・英語・中国語・韓国語・フランス語・ドイツ語・ロシア語等", reference: "voice.wav + voice.txtが必須" },
+    t5gemma_tts_2b_2b: { licenseGroup: "t5gemma_tts_2b_2b", commercialStatus: "非商用", license: "Gemma Terms of Use + CC BY-NC 4.0", commercial: "非商用のみ。XCodec2もCC BY-NC条件", termsUrl: "https://huggingface.co/Aratako/T5Gemma-TTS-2b-2b/blob/main/README.md", modelUrl: "https://huggingface.co/Aratako/T5Gemma-TTS-2b-2b", codeUrl: "https://github.com/Aratako/T5Gemma-TTS", languages: "日本語", reference: "voice.wav + voice.txtが必須" },
+    fish_s1_mini: { licenseGroup: "fish_s1_mini", commercialStatus: "非商用", license: "CC BY-NC-SA 4.0 + Hugging Faceゲート条件", commercial: "非商用。モデルページの追加条件・法令順守も必要", termsUrl: "https://huggingface.co/fishaudio/s1-mini", modelUrl: "https://huggingface.co/fishaudio/s1-mini", codeUrl: "https://github.com/fishaudio/fish-speech", languages: "日本語を含む13言語", reference: "voice.wav + voice.txtが必須" },
+    fish_s2_pro: { licenseGroup: "fish_s2_pro", commercialStatus: "要別契約", license: "Fish Audio Research License", commercial: "商用利用はFish Audioとの別途書面ライセンスが必要", termsUrl: "https://huggingface.co/fishaudio/s2-pro/blob/main/LICENSE.md", modelUrl: "https://huggingface.co/fishaudio/s2-pro", codeUrl: "https://github.com/fishaudio/fish-speech", languages: "日本語を含む多言語", reference: "voice.wav + 内容一致のvoice.txtが必須", compute: "公式推論ガイドは24GB以上のVRAMを推奨。30ではRTX 5060 Ti 16GBで実生成確認済み", verification: "2026-09-24 参照音声付き実生成成功" },
+    indextts_2_5: { licenseGroup: "indextts_2_5", commercialStatus: "条件付き", license: "bilibili Model Use License Agreement", commercial: "条件付き。1億MAU超または前年売上10億元超は別途ライセンスが必要", termsUrl: "https://github.com/index-tts/index-tts/blob/main/LICENSE", modelUrl: "https://huggingface.co/IndexTeam/IndexTTS-2.5", codeUrl: "https://github.com/index-tts/index-tts", languages: "日本語・英語・中国語・スペイン語・アラビア語", reference: "voice.wavが必須。voice.txtは不要", compute: "WSL CUDA + BF16。30ではRTX 5060 Ti 16GBで実生成確認済み", verification: "2026-09-24 参照音声付き実生成成功" },
+    orpheus_3b_asmr: { licenseGroup: "orpheus_3b_asmr", commercialStatus: "要確認", license: "配布ページはApache-2.0表記 + 上流Llama 3.2系条件", commercial: "配布ページはApache-2.0表記。派生元のLlama 3.2系条件も確認が必要", termsUrl: "https://huggingface.co/nyuuzyou/Orpheus-3B-ASMR", modelUrl: "https://huggingface.co/nyuuzyou/Orpheus-3B-ASMR", codeUrl: "https://github.com/freddyaboulton/orpheus-cpp", languages: "英語", reference: "30ではpreset voiceを使用" },
+    ming_omni_tts_0_5b: { licenseGroup: "ming_omni_tts_0_5b", commercialStatus: "商用可", license: "モデル Apache-2.0 / 公式コード MIT", commercial: "各ライセンス条件で商用利用可。入力音声・生成物の第三者権利は別途確認", termsUrl: "https://huggingface.co/inclusionAI/Ming-omni-tts-0.5B", modelUrl: "https://huggingface.co/inclusionAI/Ming-omni-tts-0.5B", codeUrl: "https://github.com/inclusionAI/Ming-omni-tts", languages: "中国語・英語中心", reference: "参照音声は任意。Voice Design/Clone対応" },
+    chatterbox_multilingual_v3: { licenseGroup: "chatterbox_multilingual_v3", commercialStatus: "商用可", license: "MIT", commercial: "MITの条件で商用利用可。参照音声の権利は別途必要", termsUrl: "https://huggingface.co/ResembleAI/chatterbox", modelUrl: "https://huggingface.co/ResembleAI/chatterbox", codeUrl: "https://github.com/resemble-ai/chatterbox", languages: "日本語を含む23言語", reference: "voice.wavが必須" },
+    fun_cosyvoice3_0_5b: { licenseGroup: "fun_cosyvoice3_0_5b", commercialStatus: "商用可", license: "Apache-2.0", commercial: "Apache-2.0の条件で商用利用可。モデルカード内のデモ素材等は別途権利確認", termsUrl: "https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512", modelUrl: "https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512", codeUrl: "https://github.com/FunAudioLLM/CosyVoice", languages: "日本語を含む9言語", reference: "voice.wavが必須。instruction対応" },
+    f5_tts_zero_shot: { licenseGroup: "f5_tts_zero_shot", commercialStatus: "非商用", license: "モデル CC BY-NC 4.0 / コード MIT", commercial: "公式F5-TTS重みは非商用", termsUrl: "https://huggingface.co/SWivid/F5-TTS", modelUrl: "https://huggingface.co/SWivid/F5-TTS", codeUrl: "https://github.com/SWivid/F5-TTS", languages: "使用する重みに依存", reference: "voice.wav + voice.txtが必須" },
+    gpt_sovits_zero_shot: { licenseGroup: "gpt_sovits", licenseLabel: "GPT-SoVITS", commercialStatus: "要確認", license: "コード MIT / 使用する重み・音声は個別条件", commercial: "コードはMIT。pretrained/追加重み・学習済み重み・参照音声の条件は個別確認", termsUrl: "https://github.com/RVC-Boss/GPT-SoVITS/blob/main/LICENSE", modelUrl: "https://github.com/RVC-Boss/GPT-SoVITS", codeUrl: "https://github.com/RVC-Boss/GPT-SoVITS", languages: "日本語を含む多言語", reference: "Zero-shot / Fine-tunedで参照条件が異なる" },
+    gpt_sovits_finetuned: { licenseGroup: "gpt_sovits", licenseLabel: "GPT-SoVITS", commercialStatus: "要確認", license: "コード MIT / 使用する重み・音声は個別条件", commercial: "コードはMIT。pretrained/追加重み・学習済み重み・参照音声の条件は個別確認", termsUrl: "https://github.com/RVC-Boss/GPT-SoVITS/blob/main/LICENSE", modelUrl: "https://github.com/RVC-Boss/GPT-SoVITS", codeUrl: "https://github.com/RVC-Boss/GPT-SoVITS", languages: "日本語を含む多言語", reference: "Zero-shot / Fine-tunedで参照条件が異なる" },
+  };
+
   const MODEL_ORDER = [
     "irodori_v4_1_small",
     "irodori_v4_1_anime",
@@ -166,6 +211,8 @@
     "fun_cosyvoice3_0_5b",
     "fireredtts2",
     "fish_s1_mini",
+    "fish_s2_pro",
+    "indextts_2_5",
     "ming_omni_tts_0_5b",
     "orpheus_3b_asmr",
     "sarashina2_2_tts",
@@ -194,6 +241,8 @@
     "fireredtts2",
     "t5gemma_tts_2b_2b",
     "fish_s1_mini",
+    "fish_s2_pro",
+    "indextts_2_5",
   ];
 
   const MODEL_ORDER_INDEX = new Map(MODEL_ORDER.map((id, index) => [id, index]));
@@ -229,26 +278,35 @@
     return MODEL_LABELS[id] || fallback || id || "Unknown";
   }
 
+  function metadataFor(id) {
+    return MODEL_METADATA[id] || null;
+  }
+
   function profileFor(id) {
-    return MODEL_PROFILE[id] || {
-      badges: ["TTS", "生成"],
-      description: "登録済みのTTSモデルです。",
-      features: ["利用可能なモデル", "用途に応じて比較可能", "ローカル生成に対応"],
+    const metadata = metadataFor(id);
+    const profile = MODEL_PROFILE[id] || {
+      badges: metadata ? [metadata.license] : ["TTS", "生成"],
+      description: metadata ? `${metadata.languages}。 ${metadata.reference}` : "登録済みのTTSモデルです。",
+      features: metadata ? [metadata.languages, metadata.reference, metadata.commercial] : ["利用可能なモデル", "用途に応じて比較可能", "ローカル生成に対応"],
       scores: { 自然さ: "中", 感情表現: "中", 安定性: "中" },
       memo: "生成結果を再生して確認してください。",
       rankReason: "生成結果を聞いて判断してください。",
       baseScore: 60,
     };
+    if (!metadata) return profile;
+    return { ...profile, metadata };
   }
 
   window.LocalTtsModelCatalog = Object.freeze({
     MODEL_LABELS,
     MODEL_PROFILE,
+    MODEL_METADATA,
     MODEL_ORDER,
     DESIRED_MODELS,
     modelIsAvailable,
     sortModelsAvailableFirst,
     modelLabel,
+    metadataFor,
     profileFor,
   });
 })();

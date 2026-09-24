@@ -4,13 +4,13 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
-import signal
 import subprocess
 from typing import Any
 
 from ..errors import ProviderError
 from ..models import ModelConfig
 from .base import BaseRuntime, SynthesizeRequest, SynthesizeResult
+from .process_utils import terminate_process_tree
 
 
 @dataclass(frozen=True)
@@ -20,30 +20,9 @@ class ExternalCliAvailability:
 
 
 def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
-    """Terminate the command and its descendants after a timeout."""
+    """Compatibility wrapper around the shared process lifecycle helper."""
 
-    if process.poll() is not None:
-        return
-    if os.name == "nt":
-        completed = subprocess.run(
-            ["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-            creationflags=int(getattr(subprocess, "CREATE_NO_WINDOW", 0)),
-        )
-        if completed.returncode == 0:
-            return
-    else:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-            return
-        except (OSError, ProcessLookupError):
-            pass
-    if process.poll() is None:
-        process.kill()
+    terminate_process_tree(process)
 
 
 def _run_external_command(

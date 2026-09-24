@@ -26,13 +26,17 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from local_tts_service.config import load_config
-from local_tts_service.server import _build_runtime_registry, create_app
+from local_tts_service.runtime_registry import build_runtime_registry as _build_runtime_registry
+from local_tts_service.api.app import create_app
+from unittest.mock import patch
 
 MODELS = [
     "sarashina2_2_tts",
     "fireredtts2",
     "t5gemma_tts_2b_2b",
     "fish_s1_mini",
+    "fish_s2_pro",
+    "indextts_2_5",
     "orpheus_3b_asmr",
     "ming_omni_tts_0_5b",
     "qwen3_tts_clone_0_6b",
@@ -94,6 +98,26 @@ MODEL_SPECS: dict[str, dict[str, object]] = {
         "dtype": "official S1 CUDA implementation default (not overridden)",
         "quantization": "none",
     },
+    "fish_s2_pro": {
+        "displayName": "Fish Audio S2 Pro",
+        "officialModelId": "fishaudio/s2-pro",
+        "officialCodeRepository": "https://github.com/fishaudio/fish-speech.git",
+        "codeRevision": "214da3cd841bda85da2496b96cd3c4d7edb1337e",
+        "modelRevision": "1de9996b6be38b745688de084d87a5633f714e4e",
+        "executionEnvironment": "WSL Ubuntu / isolated Python 3.12 / CUDA 12.8",
+        "dtype": "official S2 CUDA default",
+        "quantization": "none",
+    },
+    "indextts_2_5": {
+        "displayName": "IndexTTS 2.5",
+        "officialModelId": "IndexTeam/IndexTTS-2.5",
+        "officialCodeRepository": "https://github.com/index-tts/index-tts.git",
+        "codeRevision": "ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c",
+        "modelRevision": "c39ce5ba981572cb187443877ff559dfb246ce63",
+        "executionEnvironment": "WSL Ubuntu / isolated Python 3.11 / CUDA",
+        "dtype": "bf16",
+        "quantization": "none",
+    },
     "orpheus_3b_asmr": {
         "displayName": "Orpheus 3B ASMR",
         "officialModelId": "HummingbirdCake/Orpheus-3B-ASMR-Q4_K_M-GGUF",
@@ -137,6 +161,8 @@ WSL_ENV_KEYS = {
     "fireredtts2": "fireredtts2",
     "t5gemma_tts_2b_2b": "t5gemma",
     "fish_s1_mini": "fish_s1_mini",
+    "fish_s2_pro": "fish_s2_pro",
+    "indextts_2_5": "indextts_2_5",
     "orpheus_3b_asmr": "orpheus_asmr",
     "ming_omni_tts_0_5b": "ming_omni_tts",
 }
@@ -218,6 +244,7 @@ def read_wsl_manifest(env_key: str) -> dict[str, object] | None:
         errors="replace",
         timeout=30,
         check=False,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     if completed.returncode != 0 or not completed.stdout.strip():
         return None
@@ -281,7 +308,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Verify real TTS generation through the 30 service /v1/speak API.")
     parser.add_argument("--models", nargs="+", choices=MODELS, default=MODELS)
     parser.add_argument("--voice-id", default="")
+    parser.add_argument("--text", default="", help="Override standard Japanese validation sentence")
     args = parser.parse_args()
+    target_text = args.text.strip() or TARGET_TEXT
     selected_models = list(args.models)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -297,7 +326,10 @@ def main() -> int:
         config,
         [item for item in selected_models if item.startswith("qwen3_tts_")],
     )
-    client = TestClient(create_app(ROOT))
+    # Verifying an optional model must not preload the unrelated default Irodori
+    # worker (or create a second hidden GPU worker via server.py's global app).
+    with patch('local_tts_service.api.app._prepare_default_model'):
+        client = TestClient(create_app(ROOT))
     model_response = client.get("/v1/models")
     model_response.raise_for_status()
     model_payload = model_response.json()
@@ -333,7 +365,7 @@ def main() -> int:
             "wslManifest": wsl_manifest,
         }
         request_payload: dict[str, object] = {
-            "text": MODEL_TEXT.get(model, TARGET_TEXT),
+            "text": MODEL_TEXT.get(model, target_text),
             "model": model,
             "language": MODEL_LANGUAGE.get(model, "Japanese" if model.startswith("qwen3_tts_") else "ja"),
             "seed": 260700 + index,
@@ -391,7 +423,7 @@ def main() -> int:
         "runId": run_id,
         "createdAt": datetime.now(timezone.utc).isoformat(),
         "apiEndpoint": "/v1/speak",
-        "text": TARGET_TEXT,
+        "text": target_text,
         "referenceVoiceId": voice_id or None,
         "referenceAudioSha256": sha256_file(reference_audio) if reference_audio is not None else None,
         "referenceTextSha256": sha256_file(reference_text) if reference_text is not None else None,

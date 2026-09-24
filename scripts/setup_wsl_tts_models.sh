@@ -282,6 +282,13 @@ if want sarashina; then setup_sarashina; fi
 if want fireredtts2; then setup_firered; fi
 if want t5gemma; then setup_t5gemma; fi
 if want fish_s1_mini; then setup_fish; fi
+for optional in fish_s2_pro indextts_2_5; do
+  for target in "${TARGETS[@]}"; do
+    if [[ "$target" == "$optional" ]]; then
+      bash "$(dirname "$0")/setup_wsl_tts_advanced.sh" "$optional"
+    fi
+  done
+done
 if want_asmr orpheus_asmr; then setup_orpheus_asmr; fi
 if want_asmr ming_omni_tts; then setup_ming_omni_tts; fi
 

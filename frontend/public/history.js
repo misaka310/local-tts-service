@@ -12,7 +12,7 @@
     gpt_sovits_zero_shot: "GPT-SoVITS Zero-shot",
     gpt_sovits_finetuned: "GPT-SoVITS Fine-tuned",
     qwen3_tts_clone_0_6b: "Qwen3-TTS Clone 0.6B",
-    qwen3_tts_clone_1_7b: "Qwen 1.7B",
+    qwen3_tts_clone_1_7b: "Qwen3-TTS Clone 1.7B",
     qwen3_tts_design_1_7b: "Qwen3-TTS Design 1.7B",
     mock: "Mock WAV"
   };

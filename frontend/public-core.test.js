@@ -44,10 +44,79 @@ function fakeElement() {
   };
 }
 
-test("low latency Irodori v3 is a named selectable catalog model", () => {
+test("low latency Irodori v3 stays a runtime profile, not a separate license entry", () => {
   assert.equal(modelCatalog.modelLabel("irodori_v3_low_latency"), "Irodori v3 低遅延 (8-step)");
   assert.ok(modelCatalog.DESIRED_MODELS.includes("irodori_v3_low_latency"));
   assert.deepEqual(modelCatalog.profileFor("irodori_v3_low_latency").badges, ["低遅延", "8-step", "実験"]);
+  const normal = modelCatalog.metadataFor("irodori_v3");
+  const lowLatency = modelCatalog.metadataFor("irodori_v3_low_latency");
+  assert.equal(lowLatency.modelUrl, normal.modelUrl);
+  assert.equal(lowLatency.licenseGroup, normal.licenseGroup);
+  assert.equal(lowLatency.commercialStatus, normal.commercialStatus);
+});
+
+test("every real selectable model must declare normalized license metadata and license UI stays in the guide", async () => {
+  const allowedCommercialStatuses = new Set(["商用可", "非商用", "条件付き", "要別契約", "要確認"]);
+  const modelUrlGroups = new Map();
+
+  for (const id of modelCatalog.MODEL_ORDER.filter((id) => id !== "mock")) {
+    const metadata = modelCatalog.metadataFor(id);
+    assert.ok(metadata, `${id} must declare MODEL_METADATA`);
+    for (const field of ["licenseGroup", "commercialStatus", "license", "commercial", "termsUrl", "modelUrl", "codeUrl", "languages", "reference"]) {
+      assert.ok(String(metadata[field] || "").trim(), `${id} must declare ${field}`);
+    }
+    assert.ok(allowedCommercialStatuses.has(metadata.commercialStatus), `${id} has invalid commercialStatus`);
+    for (const field of ["termsUrl", "modelUrl", "codeUrl"]) {
+      assert.match(metadata[field], /^https:\/\//, `${id} ${field} must be an official https URL`);
+    }
+    const groups = modelUrlGroups.get(metadata.modelUrl) || new Set();
+    groups.add(metadata.licenseGroup);
+    modelUrlGroups.set(metadata.modelUrl, groups);
+  }
+
+  for (const [modelUrl, groups] of modelUrlGroups) {
+    assert.equal(groups.size, 1, `same distributed model must not create duplicate license groups: ${modelUrl}`);
+  }
+
+  assert.equal(modelCatalog.metadataFor("irodori_v2").commercialStatus, "商用可");
+  assert.equal(modelCatalog.metadataFor("fireredtts2").commercialStatus, "商用可");
+  assert.equal(modelCatalog.metadataFor("ming_omni_tts_0_5b").commercialStatus, "商用可");
+  assert.equal(modelCatalog.metadataFor("fun_cosyvoice3_0_5b").commercialStatus, "商用可");
+  assert.equal(modelCatalog.metadataFor("f5_tts_zero_shot").commercialStatus, "非商用");
+  assert.equal(modelCatalog.metadataFor("sarashina2_2_tts").commercialStatus, "非商用");
+  assert.equal(modelCatalog.metadataFor("orpheus_3b_asmr").commercialStatus, "要確認");
+  assert.equal(modelCatalog.metadataFor("gpt_sovits_zero_shot").licenseGroup, modelCatalog.metadataFor("gpt_sovits_finetuned").licenseGroup);
+
+  const fish = modelCatalog.metadataFor("fish_s2_pro");
+  assert.equal(fish.license, "Fish Audio Research License");
+  assert.equal(fish.commercialStatus, "要別契約");
+  assert.match(fish.commercial, /別途書面ライセンス/);
+  assert.match(fish.compute, /RTX 5060 Ti 16GB/);
+  assert.match(fish.verification, /参照音声付き実生成成功/);
+
+  const index = modelCatalog.metadataFor("indextts_2_5");
+  assert.equal(index.license, "bilibili Model Use License Agreement");
+  assert.equal(index.commercialStatus, "条件付き");
+  assert.match(index.commercial, /1億MAU/);
+  assert.match(index.compute, /RTX 5060 Ti 16GB/);
+  assert.match(index.verification, /参照音声付き実生成成功/);
+
+  const compareSource = await readFile(new URL("./public/compare-page.js", import.meta.url), "utf-8");
+  const normalSource = await readFile(new URL("./public/normal-page.js", import.meta.url), "utf-8");
+  const indexSource = await readFile(new URL("./public/index.html", import.meta.url), "utf-8");
+  const guideLicenseSource = await readFile(new URL("./public/guide-license-list.js", import.meta.url), "utf-8");
+  assert.doesNotMatch(compareSource, /usageTermsHtml/);
+  assert.doesNotMatch(normalSource, /renderNormalModelMetadata|normalModelInfo/);
+  assert.doesNotMatch(indexSource, /id="normalModelInfo"/);
+  assert.match(indexSource, /id="guideModelLicenseTitle"/);
+  assert.match(indexSource, /id="guideModelLicenseList"/);
+  assert.doesNotMatch(indexSource, /Fish Audio Research License|bilibili Model Use License Agreement/);
+  assert.match(indexSource, /guide-license-list\.js/);
+  assert.match(guideLicenseSource, /licenseGroup/);
+  assert.match(guideLicenseSource, /commercialStatus/);
+  assert.match(guideLicenseSource, /seen\.has/);
+  assert.match(guideLicenseSource, /guide-license-row/);
+  assert.match(guideLicenseSource, /詳細 ↗/);
 });
 
 test("model lists keep available models first without scrambling their configured order", async () => {

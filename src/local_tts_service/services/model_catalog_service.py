@@ -26,6 +26,22 @@ class ModelCatalogService:
             status = inspector(name, cfg); return bool(getattr(status, "available", False)), getattr(status, "reason", None)
         return True, None
 
+    def synthesis_availability(self, name: str, cfg: Any) -> tuple[bool, str | None]:
+        """Check only static prerequisites before runtimes get a chance to self-recover.
+
+        Runtimes with a prepare hook own worker startup and retry after an exited
+        worker. Their live probe may retain a transient failure from the previous
+        request, so treating that probe as a hard API gate would prevent recovery.
+        """
+        runtime = self.runtimes.get(cfg.runtime)
+        can_prepare = callable(getattr(runtime, "prepare_model", None))
+        has_static_check = callable(getattr(runtime, "get_static_model_availability", None))
+        return self.availability(
+            name,
+            cfg,
+            run_external_probe=not (can_prepare and has_static_check),
+        )
+
     def serialize(self, name: str, cfg: Any, *, run_external_probe: bool = True) -> ModelInfo:
         available, reason = self.availability(name, cfg, run_external_probe=run_external_probe)
         runtime = self.runtimes.get(cfg.runtime)

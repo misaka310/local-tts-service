@@ -47,6 +47,22 @@ case "$MODEL" in
     REQUIRED_MODEL="model.pth"
     IMPORT_MODULE="fish_speech"
     ;;
+  fish_s2_pro)
+    ENV_KEY="fish_s2_pro"
+    CODE_REV="214da3cd841bda85da2496b96cd3c4d7edb1337e"
+    MODEL_REV="1de9996b6be38b745688de084d87a5633f714e4e"
+    REQUIRED_VENDOR="fish_speech/models/text2semantic/inference.py"
+    REQUIRED_MODEL="model.safetensors.index.json"
+    IMPORT_MODULE="fish_speech"
+    ;;
+  indextts_2_5)
+    ENV_KEY="indextts_2_5"
+    CODE_REV="ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c"
+    MODEL_REV="c39ce5ba981572cb187443877ff559dfb246ce63"
+    REQUIRED_VENDOR="indextts/infer_v2_5.py"
+    REQUIRED_MODEL="config.yaml"
+    IMPORT_MODULE="indextts"
+    ;;
   orpheus_3b_asmr)
     ENV_KEY="orpheus_asmr"
     CODE_REV="ed126bea531ea9d53ef7564b00e8bc23f8f9aebe"
@@ -119,6 +135,22 @@ PY
 
 if [[ "$MODEL" == "t5gemma_tts_2b_2b" ]]; then
   "$PYTHON" "$SCRIPT_DIR/t5gemma_offline_infer.py" --check-cache --model-dir "$MODEL_DIR"
+fi
+
+if [[ "$MODEL" == "fish_s2_pro" ]]; then
+  for item in codec.pth config.json model.safetensors.index.json; do
+    [[ -s "$MODEL_DIR/$item" ]] || { echo "Fish S2 Pro checkpoint missing: $MODEL_DIR/$item" >&2; exit 5; }
+  done
+fi
+if [[ "$MODEL" == "indextts_2_5" ]]; then
+  for item in gpt.pth s2mel.pth codec.pth wav2vec2bert_stats.pt \
+      hf_cache/w2v-bert-2.0/config.json \
+      hf_cache/semantic_codec_model.safetensors \
+      hf_cache/campplus_cn_common.bin \
+      hf_cache/bigvgan/config.json \
+      hf_cache/bigvgan/bigvgan_generator.pt; do
+    [[ -s "$MODEL_DIR/$item" ]] || { echo "IndexTTS 2.5 checkpoint missing: $MODEL_DIR/$item" >&2; exit 5; }
+  done
 fi
 
 printf '利用可能: %s (%s)\n' "$MODEL" "$ENV_KEY"

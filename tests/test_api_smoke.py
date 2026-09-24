@@ -569,6 +569,55 @@ def test_speak_chunks_long_text_and_merges_wav(tmp_path) -> None:
         assert fp.getnframes() > 0
 
 
+def test_speak_retries_a_runtime_after_a_transient_probe_failure(tmp_path) -> None:
+    _write_config(tmp_path)
+    app = create_app(tmp_path)
+    client = TestClient(app)
+    calls: list[str] = []
+
+    class _RecoveringRuntime:
+        name = "irodori_voicedesign_direct"
+
+        def get_static_model_availability(self, model_name, _model_cfg):  # noqa: ANN001
+            calls.append(f"static:{model_name}")
+            return type("Availability", (), {"available": True, "reason": None})()
+
+        def get_model_availability(self, model_name, _model_cfg):  # noqa: ANN001
+            calls.append(f"probe:{model_name}")
+            return type("Availability", (), {"available": False, "reason": "stale worker"})()
+
+        def prepare_model(self, model_name):  # noqa: ANN001
+            calls.append(f"prepare:{model_name}")
+            return type("Availability", (), {"available": True, "reason": None})()
+
+        def synthesize(self, request):  # noqa: ANN001
+            calls.append(f"synthesize:{request.model_name}")
+            out = tmp_path / "runtime" / "audio" / f"{request.output_basename}.wav"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            write_silence_wav(out, duration_sec=0.05, sample_rate=16000)
+            return SynthesizeResult(runtime=self.name, model=request.model_name, audio_path=out)
+
+    recovering = _RecoveringRuntime()
+    app.state.service.runtimes["irodori_voicedesign_direct"] = recovering
+
+    speak = client.post(
+        "/v1/speak",
+        json={
+            "text": "transient recovery",
+            "model": "irodori_v3_voicedesign",
+            "instruction": "落ち着いた自然な声",
+            "requestId": "transient-recovery",
+            "format": "wav",
+        },
+    )
+
+    assert speak.status_code == 200
+    assert speak.json()["ok"] is True
+    assert "static:irodori_v3_voicedesign" in calls
+    assert "probe:irodori_v3_voicedesign" not in calls
+    assert "synthesize:irodori_v3_voicedesign" in calls
+
+
 def test_speak_passes_selected_reference_voice_to_runtime(tmp_path) -> None:
     _write_config(tmp_path)
     app = create_app(tmp_path)

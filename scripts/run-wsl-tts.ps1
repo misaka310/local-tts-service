@@ -31,7 +31,7 @@ if (-not (Test-Path -LiteralPath $RequestJson -PathType Leaf)) {
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $Req = Get-Content -LiteralPath $RequestJson -Raw -Encoding UTF8 | ConvertFrom-Json
 $Model = [string]$Req.model
-if ($Model -notin @('sarashina2_2_tts', 'fireredtts2', 't5gemma_tts_2b_2b', 'fish_s1_mini', 'orpheus_3b_asmr', 'ming_omni_tts_0_5b')) {
+if ($Model -notin @('sarashina2_2_tts', 'fireredtts2', 't5gemma_tts_2b_2b', 'fish_s1_mini', 'fish_s2_pro', 'indextts_2_5', 'orpheus_3b_asmr', 'ming_omni_tts_0_5b')) {
   throw "unsupported WSL TTS model: $Model"
 }
 
@@ -58,7 +58,23 @@ $ConvertedJsonWsl = Convert-ToWslPath $ConvertedJson
 $Succeeded = $false
 
 try {
-  $RawArgs = @('--exec', 'bash', $ShellWsl, $Model, $RepoWsl, $CliWsl, $ConvertedJsonWsl, $OutputWsl)
+  $RawArgs = @('--exec')
+  $CudaSelection = [string]$env:LOCAL_TTS_WSL_CUDA_VISIBLE_DEVICES
+  if ($Model -in @('fish_s2_pro', 'indextts_2_5') -and $CudaSelection.Trim()) {
+    if ($CudaSelection -match '[^0-9,]' -or $CudaSelection.StartsWith(',') -or $CudaSelection.EndsWith(',') -or $CudaSelection.Contains(',,')) {
+      throw "invalid LOCAL_TTS_WSL_CUDA_VISIBLE_DEVICES: expected comma-separated GPU indexes"
+    }
+    $RawArgs += @('env', "CUDA_VISIBLE_DEVICES=$CudaSelection")
+  }
+  if ($Model -eq 'fish_s2_pro' -and $env:LOCAL_TTS_FISH_S2_SEMANTIC_DEVICE) {
+    $FishDevice = [string]$env:LOCAL_TTS_FISH_S2_SEMANTIC_DEVICE
+    if ($FishDevice -notin @('cpu', 'cuda')) {
+      throw "invalid LOCAL_TTS_FISH_S2_SEMANTIC_DEVICE: choose cpu or cuda"
+    }
+    if ($RawArgs -notcontains 'env') { $RawArgs += 'env' }
+    $RawArgs += "LOCAL_TTS_FISH_S2_SEMANTIC_DEVICE=$FishDevice"
+  }
+  $RawArgs += @('bash', $ShellWsl, $Model, $RepoWsl, $CliWsl, $ConvertedJsonWsl, $OutputWsl)
   $WslExe = (Get-Command wsl.exe -ErrorAction Stop).Source
   $Process = Start-LocalTtsNoWindowProcess -FilePath $WslExe -ArgumentList $RawArgs -WorkingDirectory $RepoRoot -StandardOutputPath $StdoutLog -StandardErrorPath $StderrLog -RepoRoot $RepoRoot
   $Process.WaitForExit()
