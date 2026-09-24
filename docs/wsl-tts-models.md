@@ -12,7 +12,7 @@ Fish S2 ProとIndexTTS 2.5は通常の4モデルと分けて任意導入する�
 | `fish_s1_mini` | FishAudio S1-mini | `fishaudio/s1-mini` | `voice.wav` + `voice.txt` | 日本語ほか | CC BY-NC-SA 4.0 |
 | `fish_s2_pro` | Fish Audio S2 Pro | `fishaudio/s2-pro` | `voice.wav` + `voice.txt` | 日本語ほか | **Fish Audio Research License**。研究・非商用は条件付き、**商用は別途書面ライセンス必須**。[公式利用条件](https://huggingface.co/fishaudio/s2-pro/blob/main/LICENSE.md) |
 | `indextts_2_5` | IndexTTS 2.5 | `IndexTeam/IndexTTS-2.5` | `voice.wav` | 日本語・英語・中国語・スペイン語・アラビア語 | **bilibili Model Use License Agreement**。条件付き利用、1億MAU超または前年売上10億元超は別途ライセンス。[公式利用条件](https://github.com/index-tts/index-tts/blob/main/LICENSE) |
-| `orpheus_3b_asmr` | Orpheus 3B ASMR | `nyuuzyou/Orpheus-3B-ASMR` | なし（30ではpreset voiceを使用） | 英語 | **商用利用: 可**（Apache-2.0の条件に従う）。モデル: [Apache-2.0表示](https://huggingface.co/nyuuzyou/Orpheus-3B-ASMR) / 上流コード: [Apache-2.0 LICENSE](https://github.com/canopyai/Orpheus-TTS/blob/main/LICENSE) |
+| `orpheus_3b_asmr` | Orpheus 3B ASMR | `nyuuzyou/Orpheus-3B-ASMR` | なし（30ではpreset voiceを使用） | 英語 | **要確認**。配布ページはApache-2.0表記だが、派生元Llama 3.2系の適用条件も確認する |
 | `ming_omni_tts_0_5b` | Ming Omni TTS 0.5B | `inclusionAI/Ming-omni-tts-0.5B` | 任意。声寄せ時のみ `voice.wav` + `voice.txt` | 中国語・英語中心 | **商用利用: 可**（モデルはApache-2.0、コードはMITの条件に従う）。モデル: [Apache-2.0表示](https://huggingface.co/inclusionAI/Ming-omni-tts-0.5B) / 公式コード: [MIT LICENSE](https://github.com/inclusionAI/Ming-omni-tts/blob/main/LICENSE) |
 
 第三者の声を本人の同意なく複製・なりすまし用途へ使用しないでください。
@@ -29,7 +29,7 @@ Fish S2 ProとIndexTTS 2.5は通常の4モデルと分けて任意導入する�
 | FishAudio S1-mini | `https://github.com/fishaudio/fish-speech.git` | `23a4beb06952a6cc29813851309184ec1c498cac` | `f4b445029346701e082b60bb63fcc2d1bb17a0e2` |
 | Fish Audio S2 Pro | `https://github.com/fishaudio/fish-speech.git` | `214da3cd841bda85da2496b96cd3c4d7edb1337e` | `1de9996b6be38b745688de084d87a5633f714e4e` |
 | IndexTTS 2.5 | `https://github.com/index-tts/index-tts.git` | `ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c` | `c39ce5ba981572cb187443877ff559dfb246ce63` |
-| Orpheus 3B ASMR | `https://github.com/canopyai/Orpheus-TTS.git` | `e64661fe6d02c414fc77c53578c9d64082614861` | `b6c3f2a25273a33a7e866ad04865fc6ceb5b127e` |
+| Orpheus 3B ASMR | `https://github.com/freddyaboulton/orpheus-cpp.git` | `ed126bea531ea9d53ef7564b00e8bc23f8f9aebe` | `22892bc82fc22d5db827b005db658e778dcf7847` |
 | Ming Omni TTS 0.5B | `https://github.com/inclusionAI/Ming-omni-tts.git` | `200a1562e33492e786c23174985bb14f8e012cc6` | `9154772e7fbc585907b6237e3190790676f28975` |
 
 FishAudioはS1-miniに対応する上記revisionを使用します。現行S2向けコードへ置き換えないでください。

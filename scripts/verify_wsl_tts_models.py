@@ -54,7 +54,7 @@ MODEL_LANGUAGE = {
 MODEL_INSTRUCTION = {
     "ming_omni_tts_0_5b": "ASMR whisper, very low volume, close microphone, slow and breathy, gentle and relaxed",
 }
-REFERENCE_MODELS = set(MODELS) - {"orpheus_3b_asmr"}
+REFERENCE_MODELS = set(MODELS) - {"orpheus_3b_asmr", "ming_omni_tts_0_5b"}
 OUTPUT_DIR = ROOT / "runtime" / "audio" / "model-smoke"
 
 MODEL_SPECS: dict[str, dict[str, object]] = {
@@ -120,13 +120,13 @@ MODEL_SPECS: dict[str, dict[str, object]] = {
     },
     "orpheus_3b_asmr": {
         "displayName": "Orpheus 3B ASMR",
-        "officialModelId": "nyuuzyou/Orpheus-3B-ASMR",
-        "officialCodeRepository": "https://github.com/canopyai/Orpheus-TTS.git",
-        "codeRevision": "e64661fe6d02c414fc77c53578c9d64082614861",
-        "modelRevision": "b6c3f2a25273a33a7e866ad04865fc6ceb5b127e",
-        "executionEnvironment": "WSL Ubuntu / dedicated Python 3.11 venv",
-        "dtype": "vLLM CUDA runtime default with eager execution",
-        "quantization": "none",
+        "officialModelId": "HummingbirdCake/Orpheus-3B-ASMR-Q4_K_M-GGUF",
+        "officialCodeRepository": "https://github.com/freddyaboulton/orpheus-cpp.git",
+        "codeRevision": "ed126bea531ea9d53ef7564b00e8bc23f8f9aebe",
+        "modelRevision": "22892bc82fc22d5db827b005db658e778dcf7847",
+        "executionEnvironment": "WSL Ubuntu / dedicated Python venv / CPU llama.cpp",
+        "dtype": "Q4_K_M GGUF on CPU",
+        "quantization": "Q4_K_M",
     },
     "ming_omni_tts_0_5b": {
         "displayName": "Ming Omni TTS 0.5B",
@@ -134,7 +134,7 @@ MODEL_SPECS: dict[str, dict[str, object]] = {
         "officialCodeRepository": "https://github.com/inclusionAI/Ming-omni-tts.git",
         "codeRevision": "200a1562e33492e786c23174985bb14f8e012cc6",
         "modelRevision": "9154772e7fbc585907b6237e3190790676f28975",
-        "executionEnvironment": "WSL Ubuntu / dedicated Python 3.11 venv / PyTorch CUDA 12.8",
+        "executionEnvironment": "WSL Ubuntu / dedicated Python venv / PyTorch CUDA",
         "dtype": "bfloat16 on CUDA",
         "quantization": "none",
     },
