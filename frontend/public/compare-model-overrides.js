@@ -4,7 +4,7 @@
   const MODEL_OVERRIDES = {
     f5_tts_zero_shot: {
       id: "qwen3_tts_clone_1_7b",
-      label: "Qwen 1.7B",
+      label: "Qwen3-TTS Clone 1.7B",
       badges: ["高品質", "参照音声", "1.7B"],
       description: "参照音声と voice.txt を使う Qwen3-TTS 1.7B。F5-TTS の代わりに比較します。"
     },
@@ -46,7 +46,7 @@
   function rewriteStaticHints() {
     document.querySelectorAll(".hint-panel li").forEach((item) => {
       item.innerHTML = item.innerHTML
-        .replace("<strong>F5-TTS</strong>：高速で安定した読み上げを大量に作る時。", "<strong>Qwen 1.7B</strong>：参照音声寄せの高品質比較をしたい時。")
+        .replace("<strong>F5-TTS</strong>：高速で安定した読み上げを大量に作る時。", "<strong>Qwen3-TTS Clone 1.7B</strong>：参照音声寄せの高品質比較をしたい時。")
         .replace("<strong>Irodori</strong>：感情表現や自然な抑揚を見たい時。", "<strong>Irodori</strong>：v3通常版とVoiceDesign版の自然さ・話し方指定を見たい時。");
     });
   }
@@ -84,7 +84,7 @@
   function rewriteLabelsInText(root = document) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const replacements = [
-      ["F5-TTS Zero-shot", "Qwen 1.7B"],
+      ["F5-TTS Zero-shot", "Qwen3-TTS Clone 1.7B"],
       ["f5_tts_zero_shot", "qwen3_tts_clone_1_7b"],
       ["Irodori v2", "Irodori v3 VoiceDesign"],
       ["irodori v2", "Irodori v3 VoiceDesign"],

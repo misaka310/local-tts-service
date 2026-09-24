@@ -1,10 +1,11 @@
 param(
-  [ValidateSet('all', 'asmr', 'sarashina', 'fireredtts2', 't5gemma', 'fish_s1_mini', 'orpheus_asmr', 'ming_omni_tts')]
+  [ValidateSet('all', 'asmr', 'sarashina', 'fireredtts2', 't5gemma', 'fish_s1_mini', 'fish_s2_pro', 'indextts_2_5', 'orpheus_asmr', 'ming_omni_tts')]
   [string[]]$Model = @('all'),
   [switch]$Background
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'no-window-process.ps1')
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $ScriptPath = Join-Path $PSScriptRoot 'setup_wsl_tts_models.sh'
 if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) { throw 'WSL is not installed.' }
@@ -27,15 +28,17 @@ $LogPath = Join-Path $LogDir 'setup-wsl-tts-models.log'
 $ErrorLogPath = Join-Path $LogDir 'setup-wsl-tts-models.err.log'
 $Arguments = @('--exec', 'bash', $ScriptWsl) + @($Model)
 
+$WslExe = (Get-Command wsl.exe -ErrorAction Stop).Source
 if ($Background) {
-  $Process = Start-Process -FilePath 'wsl.exe' -ArgumentList $Arguments -RedirectStandardOutput $LogPath -RedirectStandardError $ErrorLogPath -WindowStyle Hidden -PassThru
+  $Process = Start-LocalTtsNoWindowProcess -FilePath $WslExe -ArgumentList $Arguments -WorkingDirectory $RepoRoot -StandardOutputPath $LogPath -StandardErrorPath $ErrorLogPath -RepoRoot $RepoRoot
   Write-Host "[INFO] WSL setup started in background. pid=$($Process.Id)"
   Write-Host "[INFO] log=$LogPath"
   Write-Host "[INFO] errorLog=$ErrorLogPath"
   exit 0
 }
 
-$Process = Start-Process -FilePath 'wsl.exe' -ArgumentList $Arguments -RedirectStandardOutput $LogPath -RedirectStandardError $ErrorLogPath -WindowStyle Hidden -PassThru -Wait
+$Process = Start-LocalTtsNoWindowProcess -FilePath $WslExe -ArgumentList $Arguments -WorkingDirectory $RepoRoot -StandardOutputPath $LogPath -StandardErrorPath $ErrorLogPath -RepoRoot $RepoRoot
+$Process.WaitForExit()
 $Stdout = if (Test-Path -LiteralPath $LogPath) { Get-Content -LiteralPath $LogPath -Raw -Encoding UTF8 } else { '' }
 $Stderr = if (Test-Path -LiteralPath $ErrorLogPath) { Get-Content -LiteralPath $ErrorLogPath -Raw -Encoding UTF8 } else { '' }
 if ($Stdout) { Write-Output $Stdout.TrimEnd() }

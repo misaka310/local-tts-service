@@ -10,9 +10,6 @@ fi
 
 MODEL="$1"
 BASE="${LOCAL_TTS_WSL_HOME:-$HOME/.local/share/local-tts-service}"
-REQUIRE_TORCH="1"
-REQUIRED_MODEL_EXTRA=""
-IMPORT_MODULE_EXTRA=""
 
 case "$MODEL" in
   sarashina2_2_tts)
@@ -47,16 +44,29 @@ case "$MODEL" in
     REQUIRED_MODEL="model.pth"
     IMPORT_MODULE="fish_speech"
     ;;
+  fish_s2_pro)
+    ENV_KEY="fish_s2_pro"
+    CODE_REV="214da3cd841bda85da2496b96cd3c4d7edb1337e"
+    MODEL_REV="1de9996b6be38b745688de084d87a5633f714e4e"
+    REQUIRED_VENDOR="fish_speech/models/text2semantic/inference.py"
+    REQUIRED_MODEL="model.safetensors.index.json"
+    IMPORT_MODULE="fish_speech"
+    ;;
+  indextts_2_5)
+    ENV_KEY="indextts_2_5"
+    CODE_REV="ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c"
+    MODEL_REV="c39ce5ba981572cb187443877ff559dfb246ce63"
+    REQUIRED_VENDOR="indextts/infer_v2_5.py"
+    REQUIRED_MODEL="config.yaml"
+    IMPORT_MODULE="indextts"
+    ;;
   orpheus_3b_asmr)
     ENV_KEY="orpheus_asmr"
-    CODE_REV="ed126bea531ea9d53ef7564b00e8bc23f8f9aebe"
-    MODEL_REV="22892bc82fc22d5db827b005db658e778dcf7847"
-    REQUIRED_VENDOR="src/orpheus_cpp/model.py"
-    REQUIRED_MODEL="orpheus-3b-asmr-q4_k_m.gguf"
-    REQUIRED_MODEL_EXTRA="snac-decoder_model.onnx"
-    IMPORT_MODULE="orpheus_cpp"
-    IMPORT_MODULE_EXTRA="llama_cpp onnxruntime"
-    REQUIRE_TORCH="0"
+    CODE_REV="e64661fe6d02c414fc77c53578c9d64082614861"
+    MODEL_REV="b6c3f2a25273a33a7e866ad04865fc6ceb5b127e"
+    REQUIRED_VENDOR="orpheus_tts_pypi/orpheus_tts/engine_class.py"
+    REQUIRED_MODEL="config.json"
+    IMPORT_MODULE="orpheus_tts"
     ;;
   ming_omni_tts_0_5b)
     ENV_KEY="ming_omni_tts"
@@ -65,7 +75,6 @@ case "$MODEL" in
     REQUIRED_VENDOR="cookbooks/test.py"
     REQUIRED_MODEL="model.safetensors"
     IMPORT_MODULE="transformers"
-    IMPORT_MODULE_EXTRA="torchaudio yaml numpy loguru huggingface_hub onnxruntime"
     ;;
   *)
     echo "未対応のWSL TTSモデルです: $MODEL" >&2
@@ -81,10 +90,6 @@ MANIFEST="$BASE/manifests/$ENV_KEY.json"
 [[ -x "$PYTHON" ]] || { echo "WSLの専用Python環境が未導入です: $PYTHON" >&2; exit 3; }
 [[ -f "$VENDOR/$REQUIRED_VENDOR" ]] || { echo "公式コードの実行入口がありません: $VENDOR/$REQUIRED_VENDOR" >&2; exit 4; }
 [[ -f "$MODEL_DIR/$REQUIRED_MODEL" ]] || { echo "モデル重みがありません: $MODEL_DIR/$REQUIRED_MODEL" >&2; exit 5; }
-if [[ -n "$REQUIRED_MODEL_EXTRA" && ! -f "$MODEL_DIR/$REQUIRED_MODEL_EXTRA" ]]; then
-  echo "モデル依存ファイルがありません: $MODEL_DIR/$REQUIRED_MODEL_EXTRA" >&2
-  exit 5
-fi
 [[ -f "$MANIFEST" ]] || { echo "固定revisionの導入記録がありません: $MANIFEST" >&2; exit 6; }
 
 ACTUAL_CODE_REV="$(git -C "$VENDOR" rev-parse HEAD 2>/dev/null || true)"
@@ -93,7 +98,7 @@ ACTUAL_CODE_REV="$(git -C "$VENDOR" rev-parse HEAD 2>/dev/null || true)"
   exit 7
 }
 
-"$PYTHON" - "$MANIFEST" "$MODEL_REV" "$IMPORT_MODULE" "$REQUIRE_TORCH" "$IMPORT_MODULE_EXTRA" <<'PY'
+"$PYTHON" - "$MANIFEST" "$MODEL_REV" "$IMPORT_MODULE" <<'PY'
 import importlib.util
 import json
 from pathlib import Path
@@ -102,23 +107,38 @@ import sys
 manifest_path = Path(sys.argv[1])
 expected_model_revision = sys.argv[2]
 module_name = sys.argv[3]
-require_torch = sys.argv[4] == "1"
-extra_module_names = sys.argv[5].split()
 payload = json.loads(manifest_path.read_text(encoding="utf-8"))
 actual_model_revision = str(payload.get("modelRevision") or "")
 if actual_model_revision != expected_model_revision:
     raise SystemExit(
         f"モデルrevisionが不一致です: expected={expected_model_revision} actual={actual_model_revision or '未記録'}"
     )
-if require_torch and importlib.util.find_spec("torch") is None:
+if importlib.util.find_spec("torch") is None:
     raise SystemExit("専用Python環境にtorchがありません")
-for required_module in [module_name, *extra_module_names]:
-    if importlib.util.find_spec(required_module) is None:
-        raise SystemExit(f"専用Python環境に必要なモジュールがありません: {required_module}")
+if importlib.util.find_spec(module_name) is None:
+    raise SystemExit(f"専用Python環境に必要なモジュールがありません: {module_name}")
 PY
 
 if [[ "$MODEL" == "t5gemma_tts_2b_2b" ]]; then
   "$PYTHON" "$SCRIPT_DIR/t5gemma_offline_infer.py" --check-cache --model-dir "$MODEL_DIR"
+fi
+if [[ "$MODEL" == "fish_s2_pro" ]]; then
+  for item in codec.pth config.json model.safetensors.index.json; do
+    [[ -s "$MODEL_DIR/$item" ]] || { echo "Fish S2 Pro checkpoint missing: $MODEL_DIR/$item" >&2; exit 5; }
+  done
+fi
+if [[ "$MODEL" == "indextts_2_5" ]]; then
+  for item in gpt.pth s2mel.pth codec.pth wav2vec2bert_stats.pt \
+      hf_cache/w2v-bert-2.0/config.json \
+      hf_cache/semantic_codec_model.safetensors \
+      hf_cache/campplus_cn_common.bin \
+      hf_cache/bigvgan/config.json \
+      hf_cache/bigvgan/bigvgan_generator.pt; do
+    [[ -s "$MODEL_DIR/$item" ]] || {
+      echo "IndexTTS 2.5 checkpoint missing: $MODEL_DIR/$item" >&2
+      exit 5
+    }
+  done
 fi
 
 printf '利用可能: %s (%s)\n' "$MODEL" "$ENV_KEY"

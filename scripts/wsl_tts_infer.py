@@ -17,11 +17,13 @@ SUPPORTED_MODELS = {
     "fireredtts2",
     "t5gemma_tts_2b_2b",
     "fish_s1_mini",
+    "fish_s2_pro",
+    "indextts_2_5",
     "orpheus_3b_asmr",
     "ming_omni_tts_0_5b",
 }
 
-REFERENCE_REQUIRED_MODELS = SUPPORTED_MODELS - {"orpheus_3b_asmr", "ming_omni_tts_0_5b"}
+REFERENCE_REQUIRED_MODELS = SUPPORTED_MODELS - {"orpheus_3b_asmr", "ming_omni_tts_0_5b", "indextts_2_5"}
 
 
 @dataclass(frozen=True)
@@ -62,18 +64,21 @@ def load_request(request_json: Path) -> WslTtsRequest:
     reference_text_raw = str(payload.get("referenceTextPath") or "").strip()
     if model in REFERENCE_REQUIRED_MODELS and (not reference_audio_raw or not reference_text_raw):
         raise ValueError(f"referenceAudioPath and referenceTextPath are required for model: {model}")
+    if model == "indextts_2_5" and not reference_audio_raw:
+        raise ValueError("referenceAudioPath is required for model: indextts_2_5")
     if reference_audio_raw or reference_text_raw:
-        if not reference_audio_raw or not reference_text_raw:
+        if not reference_audio_raw or (not reference_text_raw and model != "indextts_2_5"):
             raise ValueError("referenceAudioPath and referenceTextPath must be supplied together")
         reference_audio_path = Path(reference_audio_raw).expanduser()
         if not reference_audio_path.is_file():
             raise FileNotFoundError(f"reference audio not found: {reference_audio_path}")
-        reference_text_path = Path(reference_text_raw).expanduser()
-        if not reference_text_path.is_file():
-            raise FileNotFoundError(f"reference text not found: {reference_text_path}")
-        reference_text = reference_text_path.read_text(encoding="utf-8-sig").strip()
-        if not reference_text:
-            raise ValueError(f"reference text is empty: {reference_text_path}")
+        if reference_text_raw:
+            reference_text_path = Path(reference_text_raw).expanduser()
+            if not reference_text_path.is_file():
+                raise FileNotFoundError(f"reference text not found: {reference_text_path}")
+            reference_text = reference_text_path.read_text(encoding="utf-8-sig").strip()
+            if not reference_text:
+                raise ValueError(f"reference text is empty: {reference_text_path}")
 
     output_path = Path(_required_text(payload, "outputPath")).expanduser()
     output_path.parent.mkdir(parents=True, exist_ok=True)

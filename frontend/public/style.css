@@ -1170,6 +1170,13 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--blue); }
 .guide-task-card p { margin: 0; }
 .guide-task-card small { color: var(--muted); line-height: 1.55; }
 .guide-task-card button { width: 100%; margin-top: auto; }
+.guide-license-list { display: grid; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; }
+.guide-license-row { display: grid; grid-template-columns: minmax(180px, 1.1fr) 86px minmax(220px, 1.4fr) 58px; gap: 10px; align-items: center; min-height: 38px; padding: 7px 11px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.guide-license-row:last-child { border-bottom: 0; }
+.guide-license-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guide-license-commercial { justify-self: start; padding: 2px 7px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel-soft); color: #354862; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.guide-license-nameplate { min-width: 0; overflow: hidden; color: #52647c; text-overflow: ellipsis; white-space: nowrap; }
+.guide-license-row a { justify-self: end; white-space: nowrap; font-weight: 800; }
 .guide-reference-layout { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; }
 .guide-reference-layout p { margin-top: 0; }
 .guide-reference-layout > button { min-width: 230px; }
@@ -1230,6 +1237,10 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--blue); }
   .guide-actions-panel,
   .guide-mode-card { padding: 16px; }
   .guide-external-link { min-width: 0; width: 100%; white-space: normal; }
+  .guide-license-row { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; }
+  .guide-license-commercial { grid-column: 1; grid-row: 2; }
+  .guide-license-nameplate { grid-column: 1; grid-row: 3; }
+  .guide-license-row a { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
   .guide-combined-flow { justify-content: flex-start; }
   .guide-quick-grid,
   .voice-method-picker,

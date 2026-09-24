@@ -1,13 +1,19 @@
 # WSL Zero-shot TTSモデル
 
-`local-tts-service`は、Windows側の既存`.venv`へ依存関係を混ぜず、次の4モデルをWSL内の専用環境から`external_cli`経由で実行します。通常生成・モデル比較とも既存UIを使用します。
+Fish S2 ProとIndexTTS 2.5は通常の4モデルと分けて任意導入する。詳細は[専用導入・実生成検証ガイド](fish-s2-pro-indextts-2-5.md)を参照。
 
-| モデルID | 表示名 | 公式モデルID | 参照入力 | 日本語 | ライセンス上の注意 |
+`local-tts-service`は、Windows側の既存`.venv`へ依存関係を混ぜず、WSL内の専用環境から`external_cli`経由で各モデルを実行します。標準の`all`対象は従来4モデルのまま、ASMR向け2モデルは明示的に追加します。通常生成・モデル比較とも既存UIを使用します。
+
+| モデルID | 表示名 | 公式モデルID | 参照入力 | 主な言語 | ライセンス上の注意 |
 |---|---|---|---|---|---|
-| `sarashina2_2_tts` | Sarashina2.2-TTS | `sbintuitions/sarashina2.2-tts` | `voice.wav` + `voice.txt` | 対応 | モデルは非商用。商用利用は提供元へ確認 |
-| `fireredtts2` | FireRedTTS-2 | `FireRedTeam/FireRedTTS2` | `voice.wav` + `voice.txt` | 対応 | Apache-2.0 |
-| `t5gemma_tts_2b_2b` | T5Gemma-TTS 2B-2B | `Aratako/T5Gemma-TTS-2b-2b` | `voice.wav` + `voice.txt` | 対応 | モデルはGemma利用条件とCC BY-NC 4.0系の制約を確認。コードはMIT |
-| `fish_s1_mini` | FishAudio S1-mini | `fishaudio/s1-mini` | `voice.wav` + `voice.txt` | 対応 | CC BY-NC-SA 4.0 |
+| `sarashina2_2_tts` | Sarashina2.2-TTS | `sbintuitions/sarashina2.2-tts` | `voice.wav` + `voice.txt` | 日本語 | モデルは非商用。商用利用は提供元へ確認 |
+| `fireredtts2` | FireRedTTS-2 | `FireRedTeam/FireRedTTS2` | `voice.wav` + `voice.txt` | 日本語ほか | Apache-2.0 |
+| `t5gemma_tts_2b_2b` | T5Gemma-TTS 2B-2B | `Aratako/T5Gemma-TTS-2b-2b` | `voice.wav` + `voice.txt` | 日本語 | モデルはGemma利用条件とCC BY-NC 4.0系の制約を確認。コードはMIT |
+| `fish_s1_mini` | FishAudio S1-mini | `fishaudio/s1-mini` | `voice.wav` + `voice.txt` | 日本語ほか | CC BY-NC-SA 4.0 |
+| `fish_s2_pro` | Fish Audio S2 Pro | `fishaudio/s2-pro` | `voice.wav` + `voice.txt` | 日本語ほか | **Fish Audio Research License**。研究・非商用は条件付き、**商用は別途書面ライセンス必須**。[公式利用条件](https://huggingface.co/fishaudio/s2-pro/blob/main/LICENSE.md) |
+| `indextts_2_5` | IndexTTS 2.5 | `IndexTeam/IndexTTS-2.5` | `voice.wav` | 日本語・英語・中国語・スペイン語・アラビア語 | **bilibili Model Use License Agreement**。条件付き利用、1億MAU超または前年売上10億元超は別途ライセンス。[公式利用条件](https://github.com/index-tts/index-tts/blob/main/LICENSE) |
+| `orpheus_3b_asmr` | Orpheus 3B ASMR | `nyuuzyou/Orpheus-3B-ASMR` | なし（30ではpreset voiceを使用） | 英語 | **商用利用: 可**（Apache-2.0の条件に従う）。モデル: [Apache-2.0表示](https://huggingface.co/nyuuzyou/Orpheus-3B-ASMR) / 上流コード: [Apache-2.0 LICENSE](https://github.com/canopyai/Orpheus-TTS/blob/main/LICENSE) |
+| `ming_omni_tts_0_5b` | Ming Omni TTS 0.5B | `inclusionAI/Ming-omni-tts-0.5B` | 任意。声寄せ時のみ `voice.wav` + `voice.txt` | 中国語・英語中心 | **商用利用: 可**（モデルはApache-2.0、コードはMITの条件に従う）。モデル: [Apache-2.0表示](https://huggingface.co/inclusionAI/Ming-omni-tts-0.5B) / 公式コード: [MIT LICENSE](https://github.com/inclusionAI/Ming-omni-tts/blob/main/LICENSE) |
 
 第三者の声を本人の同意なく複製・なりすまし用途へ使用しないでください。
 
@@ -21,6 +27,10 @@
 | FireRedTTS-2 | `https://github.com/FireRedTeam/FireRedTTS2.git` | `404f3f61d25bb4804859b588a6a734bf8468090c` | `4af3f5cc4963373b86b52d750220d4de85261f05` |
 | T5Gemma-TTS | `https://github.com/Aratako/T5Gemma-TTS.git` | `c8722b37e1aca0e21f85185188755e164c316828` | `e548f8358891975e61d2107e3d7ccc47b1b7294e` |
 | FishAudio S1-mini | `https://github.com/fishaudio/fish-speech.git` | `23a4beb06952a6cc29813851309184ec1c498cac` | `f4b445029346701e082b60bb63fcc2d1bb17a0e2` |
+| Fish Audio S2 Pro | `https://github.com/fishaudio/fish-speech.git` | `214da3cd841bda85da2496b96cd3c4d7edb1337e` | `1de9996b6be38b745688de084d87a5633f714e4e` |
+| IndexTTS 2.5 | `https://github.com/index-tts/index-tts.git` | `ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c` | `c39ce5ba981572cb187443877ff559dfb246ce63` |
+| Orpheus 3B ASMR | `https://github.com/canopyai/Orpheus-TTS.git` | `e64661fe6d02c414fc77c53578c9d64082614861` | `b6c3f2a25273a33a7e866ad04865fc6ceb5b127e` |
+| Ming Omni TTS 0.5B | `https://github.com/inclusionAI/Ming-omni-tts.git` | `200a1562e33492e786c23174985bb14f8e012cc6` | `9154772e7fbc585907b6237e3190790676f28975` |
 
 FishAudioはS1-miniに対応する上記revisionを使用します。現行S2向けコードへ置き換えないでください。
 
@@ -51,6 +61,8 @@ FishAudioはS1-miniに対応する上記revisionを使用します。現行S2向
 - FireRedTTS-2: `transformers==4.57.3`、`huggingface_hub<1.0`。WSLのメモリ急増を避けるためCPU checkpointをmemory-mapし、`torch.compile`をeager実行へ固定する。参照条件によって空生成になった場合は、同じ参照音声の先頭3秒と最初の1文で1回だけ再試行する
 - T5Gemma-TTS: 固定revisionの公式CLIには`--low_vram`引数がないため、公式実装のBF16・Accelerate device mappingを使用し、量子化はしない。セットアップ時に本文モデルに加えてTokenizerと音声Codecの依存snapshotもキャッシュし、推論とavailability判定では`local_files_only`で検査・読込する。`torch.compile`はeager実行へ固定する
 - FishAudio S1-mini: S1互換依存を専用venvへ固定
+- Orpheus 3B ASMR: 上流Orpheusのローカルpackageを使い、30ではpreset voice `tara`を固定して英語ASMR比較用にする。モデル作者は「true whisperは未達」と明記しているため、完全な囁き再現は保証しない
+- Ming Omni TTS 0.5B: RTX 50系向けにPyTorch/Torchaudio/TorchvisionはCUDA 12.8版2.8.0を使う。0.5B denseモデルでは不要な`grouped_gemm`を外し、公式audio encoderが要求するFlashAttentionが無い環境ではPyTorch SDPA互換経路を使う。参照音声は任意で、選択時はvoice clone、未選択時はvoice designとして話し方メモをstyle指示へ渡す
 
 ## 事前条件
 
@@ -65,10 +77,16 @@ hf auth whoami
 
 ## セットアップ
 
-全モデル:
+標準4モデル（ASMR追加2モデルは含みません）:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model all
+```
+
+ASMR追加2モデル:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model asmr
 ```
 
 個別:
@@ -78,6 +96,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-mode
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model fireredtts2
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model t5gemma
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model fish_s1_mini
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model orpheus_asmr
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model ming_omni_tts
 ```
 
 バックグラウンド実行:
@@ -113,13 +133,15 @@ powershell -NoProfile -File .\scripts\check-wsl-tts.ps1 -Model sarashina2_2_tts
 powershell -NoProfile -File .\scripts\check-wsl-tts.ps1 -Model fireredtts2
 powershell -NoProfile -File .\scripts\check-wsl-tts.ps1 -Model t5gemma_tts_2b_2b
 powershell -NoProfile -File .\scripts\check-wsl-tts.ps1 -Model fish_s1_mini
+powershell -NoProfile -File .\scripts\check-wsl-tts.ps1 -Model orpheus_3b_asmr
+powershell -NoProfile -File .\scripts\check-wsl-tts.ps1 -Model ming_omni_tts_0_5b
 ```
 
 不足があるモデルはUIで選択不可になり、`unavailableReason`を通常生成とモデル比較に表示します。
 
 ## 参照音声
 
-使用する参照音声フォルダには両方が必要です。
+Sarashina / FireRed / T5Gemma / Fish S1-miniでは、使用する参照音声フォルダに両方が必要です。Ming Omni TTSは参照音声を使う場合だけ両方を要求し、参照なしでもvoice designできます。Orpheus 3B ASMRは30ではpreset voiceを使うため参照音声を要求しません。
 
 ```text
 reference/voices/<voiceId>/voice.wav
@@ -127,6 +149,11 @@ reference/voices/<voiceId>/voice.txt
 ```
 
 `voice.txt`は`voice.wav`で実際に話している内容と一致させてください。
+
+### ASMR向けの使い分け
+
+- **Ming Omni TTS 0.5B**: 話し方メモに「very low volume, close microphone, slow, breathy, gentle ASMR style」のような指示を入れます。参照音声なしならvoice design、参照音声を選べばその声へ寄せたzero-shot voice cloneとして同じstyle指示を併用します。
+- **Orpheus 3B ASMR**: 英語本文を入力します。`<sigh>`、`<yawn>`、`<gasp>`など上流Orpheusの表現タグを本文中に入れられます。短すぎる本文は上流のstreaming buffer制約で無音になる可能性があるため、1文以上の入力を推奨します。
 
 ## 実生成検証
 
