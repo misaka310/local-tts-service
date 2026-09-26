@@ -39,6 +39,10 @@
     if (!model) return messages.modelRequired || "model is required";
     if (model.available === false || model.enabled === false) return model.unavailableReason || messages.modelUnavailable || "model is unavailable";
     if (!String(text || "").trim()) return messages.textRequired || "text is required";
+    if (typeof validators.validateText === "function") {
+      const textError = String(validators.validateText(model, text) || "").trim();
+      if (textError) return textError;
+    }
     if (capabilities.requiresReference(model) && !voice) return messages.referenceRequired || "reference voice is required";
     if (voice && capabilities.requiresReference(model) && model.requiresReferenceText && !voice.hasReferenceText) {
       return messages.referenceTextRequired || "reference text is required";
