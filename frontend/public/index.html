@@ -76,7 +76,7 @@
                     <span class="info-dot" tabindex="0" aria-label="seed自動更新の説明" data-tip="生成成功後、次回のseedを1増やします。今の生成には入力中のseedを使います。">i</span>
                   </label>
                 </div>
-                <input hidden id="normalLanguageInput" type="text" value="Japanese" placeholder="Japanese">
+                <input hidden id="normalLanguageInput" type="text" value="">
               </div>
 
               <div class="textarea-grid single-textarea-grid">
@@ -250,7 +250,7 @@
                   </div>
                   <div class="chunk-preview" data-chunk-preview hidden></div>
 
-                  <input hidden id="compareLanguageInput" type="text" value="Japanese">
+                  <input hidden id="compareLanguageInput" type="text" value="">
                   <div class="generation-options-row compare-generation-options">
                     <label><input id="compareAutoPlayInput" type="checkbox"> 生成後に音声を自動再生 <span class="info-dot" tabindex="0" aria-label="比較結果の自動再生設定の説明" data-tip="一括生成後はおすすめ結果、単独再生成後はそのモデルを再生します。">i</span></label>
                   </div>
@@ -388,7 +388,7 @@
                     <button class="small-square" type="button" id="rvcReferencePreviewButton" title="参照音声を確認">▶</button>
                   </div>
                 </label>
-                <input hidden id="rvcLanguageInput" type="text" value="Japanese">
+                <input hidden id="rvcLanguageInput" type="text" value="">
                 <div class="field seed-field">
                   <span>seed <em>初期値のままでOK</em> <span class="info-dot" tabindex="0" aria-label="RVC seedの説明" data-tip="seedはTTSで作る入力音声のランダムな揺らぎを決める数値です。同じ条件を再現・比較しやすくします。ファイル・マイク入力では使いません。">i</span></span>
                   <input id="rvcSeedInput" type="number" inputmode="numeric" value="1" min="0" step="1">

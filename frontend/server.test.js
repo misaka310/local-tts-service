@@ -872,6 +872,9 @@ test("all generation tabs expose persistent seed and autoplay controls", () => {
     assert.match(indexSource, new RegExp(`id="${scope}AutoPlayInput"`));
   }
   assert.equal((indexSource.match(/生成後に音声を自動再生/g) || []).length, 3);
+  for (const scope of ["normal", "compare", "rvc"]) {
+    assert.match(indexSource, new RegExp(`id="${scope}LanguageInput"[^>]*value=""`));
+  }
   assert.doesNotMatch(indexSource, /id="normalRetryButton"/);
   assert.match(indexSource, /同じ設定・seedで再生成/);
   assert.match(indexSource, /長文は発音や抑揚が不安定/);
