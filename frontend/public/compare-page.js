@@ -28,6 +28,7 @@ const compareEls = {
 
 let compareDiagnosticEntries = [];
 let activeCompareModelIds = new Set();
+const COMPARE_STATUS_REFRESH_INTERVAL_MS = 15000;
 
 function setCompareGenerationActive(active) {
   compareGenerationActive = Boolean(active);
@@ -52,6 +53,8 @@ function appendCompareDiagnostic(model, error, request = null) {
 
 function saveCompareFormSettings() {
   saveObject(COMPARE_FORM_SETTINGS_KEY, {
+    text: els.compareText?.value || "",
+    instruction: els.compareInstruction?.value || "",
     voice: els.compareVoice?.value || "",
     seed: normalizedStoredSeed(els.compareSeed),
     autoIncrement: Boolean(els.compareSeedAutoIncrement?.checked),
@@ -62,6 +65,8 @@ function saveCompareFormSettings() {
 
 function applySavedCompareFormSettings() {
   const saved = loadObject(COMPARE_FORM_SETTINGS_KEY, {});
+  if (els.compareText && typeof saved.text === "string") els.compareText.value = saved.text;
+  if (els.compareInstruction && typeof saved.instruction === "string") els.compareInstruction.value = saved.instruction;
   if (els.compareSeed) els.compareSeed.value = String(Number.isInteger(saved.seed) && saved.seed >= 0 ? saved.seed : 1);
   if (els.compareSeedAutoIncrement && typeof saved.autoIncrement === "boolean") els.compareSeedAutoIncrement.checked = saved.autoIncrement;
   if (els.compareAutoPlay && typeof saved.autoPlay === "boolean") els.compareAutoPlay.checked = saved.autoPlay;
@@ -70,7 +75,34 @@ function applySavedCompareFormSettings() {
     const selected = new Set(saved.selectedModels);
     all('[data-model-card] input:not(:disabled)').forEach((input) => { input.checked = selected.has(input.value); });
   }
+  refreshTextCountsAndChunkPreview();
   updateCompareButtonState();
+}
+
+function formatCompareElapsed(startedAt) {
+  const totalSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return hours
+    ? `${hours}時間${minutes}分${seconds}秒`
+    : `${minutes}分${seconds}秒`;
+}
+
+function updateCompareElapsedStatus(index, total, id, startedAt, batchStartedAt = null) {
+  const batchElapsed = batchStartedAt == null ? "" : `／一括全体 ${formatCompareElapsed(batchStartedAt)}`;
+  setStatus(
+    els.compareStatus,
+    `${index}/${total} ${modelLabel(id, id)} を生成中です（このモデル ${formatCompareElapsed(startedAt)}${batchElapsed}）。完了済みの音声は再生できます。`
+  );
+}
+
+function startCompareElapsedTimer(index, total, id, startedAt, batchStartedAt = null) {
+  updateCompareElapsedStatus(index, total, id, startedAt, batchStartedAt);
+  return window.setInterval(
+    () => updateCompareElapsedStatus(index, total, id, startedAt, batchStartedAt),
+    COMPARE_STATUS_REFRESH_INTERVAL_MS
+  );
 }
 
 function renderCompareModelCards() {
@@ -161,6 +193,13 @@ async function generateCompare() {
   saveCompareFormSettings();
   const seedRaw = els.compareSeed.value.trim();
   if (seedRaw && !Number.isInteger(Number(seedRaw))) { setStatus(els.compareStatus, "seed は整数で入力してください。", true); return; }
+  const bodyBase = {
+    text: els.compareText.value,
+    instruction: els.compareInstruction.value,
+    language: els.compareLanguage.value,
+    seed: seedRaw || undefined,
+    chunking: chunkSettingsFromForm("compare").chunking
+  };
   activeCompareModelIds = new Set(ids);
   compareResults = compareResults.map((item) => ({
     ...item,
@@ -177,32 +216,49 @@ async function generateCompare() {
   for (const item of compareResults) updateCompareResultProgress(item.model, item.state, item.message);
   els.compareResultCount.textContent = `（${compareResults.length}件）`;
   setCompareGenerationActive(true);
-  updateCompareButtonState();
-  setStatus(els.compareStatus, `${ids.length}モデルを順番に生成します。完了した音声から再生できます。`);
-  const bodyBase = {
-    text: els.compareText.value,
-    instruction: els.compareInstruction.value,
-    language: els.compareLanguage.value,
-    seed: seedRaw || undefined,
-    chunking: chunkSettingsFromForm("compare").chunking
-  };
-  for (const [index, id] of ids.entries()) {
-    const hadPreviousAudio = Boolean(compareResults.find((item) => item.model === id)?.result?.audioUrl);
-    const pendingMessage = hadPreviousAudio ? "新しい音声を生成中です。前回の音声はそのまま再生できます。" : "生成中です。";
-    compareResults = compareResults.map((item) => item.model === id ? { ...item, state: "pending", message: pendingMessage } : item);
-    updateCompareResultProgress(id, "pending", pendingMessage);
-    setStatus(els.compareStatus, `${index + 1}/${ids.length} ${modelLabel(id, id)} を生成中です。完了済みの音声は再生できます。`);
-    await generateCompareModel(id, bodyBase);
-    if (index + 1 < ids.length) {
-      const successCount = compareResults.filter((item) => item.state === "success").length;
-      setStatus(els.compareStatus, `${index + 1}/${ids.length} 完了（成功 ${successCount}件）。完了済みの音声は再生できます。`);
+  let interruptionMessage = "";
+  const batchStartedAt = Date.now();
+  try {
+    updateCompareButtonState();
+    setStatus(els.compareStatus, `${ids.length}モデルを順番に生成します。完了したモデルから再生できます。`);
+    for (const [index, id] of ids.entries()) {
+      const hadPreviousAudio = Boolean(compareResults.find((item) => item.model === id)?.result?.audioUrl);
+      const pendingMessage = hadPreviousAudio ? "新しい音声を生成中です。前回の音声はそのまま再生できます。" : "生成中です。";
+      compareResults = compareResults.map((item) => item.model === id ? { ...item, state: "pending", message: pendingMessage } : item);
+      updateCompareResultProgress(id, "pending", pendingMessage);
+      const startedAt = Date.now();
+      const elapsedTimer = startCompareElapsedTimer(index + 1, ids.length, id, startedAt, batchStartedAt);
+      try {
+        await generateCompareModel(id, bodyBase);
+      } finally {
+        window.clearInterval(elapsedTimer);
+      }
+      if (index + 1 < ids.length) {
+        const successCount = compareResults.filter((item) => item.state === "success").length;
+        setStatus(els.compareStatus, `${index + 1}/${ids.length} 完了（成功 ${successCount}件）。完了済みの音声は再生できます。`);
+      }
     }
+    if (compareResults.some((item) => item.state === "success")) incrementSeedInputIfNeeded(els.compareSeed, els.compareSeedAutoIncrement);
+  } catch (error) {
+    interruptionMessage = `比較生成を中断しました: ${humanizeError(error)}`;
+    compareResults = compareResults.map((item) => {
+      if (!activeCompareModelIds.has(item.model) || !["pending", "queued"].includes(item.state)) return item;
+      const hasPreviousAudio = Boolean(item.result?.audioUrl);
+      return {
+        ...item,
+        state: hasPreviousAudio ? "stale" : "failed",
+        message: `${interruptionMessage} このモデルは再生成できます。`,
+        score: 0,
+        recommended: false,
+      };
+    });
+    renderCompareResults();
+  } finally {
+    setCompareGenerationActive(false);
+    saveCompareFormSettings();
+    updateCompareButtonState();
   }
-  if (compareResults.some((item) => item.state === "success")) incrementSeedInputIfNeeded(els.compareSeed, els.compareSeedAutoIncrement);
-  saveCompareFormSettings();
-  setCompareGenerationActive(false);
-  updateCompareButtonState();
-  setStatus(els.compareStatus, "比較生成が完了しました。");
+  setStatus(els.compareStatus, interruptionMessage || "比較生成が完了しました。", Boolean(interruptionMessage));
   await playCompareResultIfEnabled();
   const selectedResults = compareResults.filter((item) => activeCompareModelIds.has(item.model));
   const successful = selectedResults.filter((item) => item.state === "success");
@@ -210,8 +266,8 @@ async function generateCompare() {
   addCompareHistory({
     createdAt: new Date().toISOString(),
     count: ids.length,
-    text: els.compareText.value,
-    instruction: els.compareInstruction.value,
+    text: bodyBase.text,
+    instruction: bodyBase.instruction,
     seed: seedRaw,
     referenceVoice: selectedVoice(els.compareVoice)?.voiceId || "",
     models: ids,
@@ -226,8 +282,8 @@ async function generateCompare() {
       type: "compare",
       status: successful.length ? "success" : "failed",
       createdAt: new Date().toISOString(),
-      text: els.compareText.value,
-      instruction: els.compareInstruction.value,
+      text: bodyBase.text,
+      instruction: bodyBase.instruction,
       models: ids,
       referenceVoice: selectedVoice(els.compareVoice)?.voiceId || "",
       seed: seedRaw || "",
@@ -259,23 +315,43 @@ async function regenerateCompareModel(id) {
     setStatus(els.compareStatus, "seed は整数で入力してください。", true);
     return;
   }
+  const bodyBase = compareBodyBaseFromForm();
   resetCompareDiagnostics();
-  setCompareGenerationActive(true);
-  activeCompareModelIds = new Set([id]);
   const pendingMessage = compareResults.find((item) => item.model === id)?.result?.audioUrl
     ? "再生成中です。前回の音声はそのまま再生できます。"
     : "再生成中です。";
-  compareResults = compareResults.map((item) => item.model === id ? { ...item, state: "pending", message: pendingMessage, score: 0, recommended: false } : item);
-  updateCompareResultProgress(id, "pending", pendingMessage);
-  updateCompareButtonState();
-  setStatus(els.compareStatus, `${modelLabel(id, id)} を再生成しています...`);
-  await generateCompareModel(id, compareBodyBaseFromForm());
-  if (compareResults.some((item) => item.model === id && item.state === "success")) incrementSeedInputIfNeeded(els.compareSeed, els.compareSeedAutoIncrement);
-  saveCompareFormSettings();
-  setCompareGenerationActive(false);
-  updateCompareButtonState();
-  setStatus(els.compareStatus, `${modelLabel(id, id)} の再生成が完了しました。`);
-  await playCompareResultIfEnabled(id);
+  const startedAt = Date.now();
+  let interruptionMessage = "";
+  let elapsedTimer = null;
+  try {
+    setCompareGenerationActive(true);
+    activeCompareModelIds = new Set([id]);
+    compareResults = compareResults.map((item) => item.model === id ? { ...item, state: "pending", message: pendingMessage, score: 0, recommended: false } : item);
+    updateCompareResultProgress(id, "pending", pendingMessage);
+    updateCompareButtonState();
+    elapsedTimer = startCompareElapsedTimer(1, 1, id, startedAt);
+    await generateCompareModel(id, bodyBase);
+    if (compareResults.some((item) => item.model === id && item.state === "success")) incrementSeedInputIfNeeded(els.compareSeed, els.compareSeedAutoIncrement);
+  } catch (error) {
+    interruptionMessage = `再生成を中断しました: ${humanizeError(error)}`;
+    compareResults = compareResults.map((item) => {
+      if (item.model !== id || item.state !== "pending") return item;
+      const hasPreviousAudio = Boolean(item.result?.audioUrl);
+      return { ...item, state: hasPreviousAudio ? "stale" : "failed", message: interruptionMessage, score: 0 };
+    });
+    renderCompareResultModel(id);
+  } finally {
+    if (elapsedTimer !== null) window.clearInterval(elapsedTimer);
+    setCompareGenerationActive(false);
+    saveCompareFormSettings();
+    updateCompareButtonState();
+  }
+  const result = compareResults.find((item) => item.model === id);
+  let statusMessage = `${modelLabel(id, id)} の再生成に失敗しました。結果欄に詳細を表示しています。`;
+  if (interruptionMessage) statusMessage = interruptionMessage;
+  else if (result?.state === "success") statusMessage = `${modelLabel(id, id)} の再生成が完了しました。`;
+  setStatus(els.compareStatus, statusMessage, Boolean(interruptionMessage || result?.state !== "success"));
+  if (result?.state === "success") await playCompareResultIfEnabled(id);
 }
 
 function adoptCompareModel(id) {
