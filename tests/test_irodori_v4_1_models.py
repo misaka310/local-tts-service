@@ -19,14 +19,14 @@ def test_irodori_v4_1_base_and_anime_models_are_registered() -> None:
     assert base.model_id == "Aratako/Irodori-TTS-v4.1-Small"
     assert base.checkpoint is not None
     assert base.checkpoint.as_posix().endswith(
-        "runtime/models/irodori/Irodori-TTS-v4.1-Small/model.safetensors"
+        "models/irodori/Irodori-TTS-v4.1-Small/model.safetensors"
     )
 
     assert anime.label == "Irodori v4.1 Anime"
     assert anime.model_id == "phasefield-audio/Irodori-TTS-v4.1-Anime"
     assert anime.checkpoint is not None
     assert anime.checkpoint.as_posix().endswith(
-        "runtime/models/irodori/Irodori-TTS-v4.1-Anime/model.safetensors"
+        "models/irodori/Irodori-TTS-v4.1-Anime/model.safetensors"
     )
     assert anime.runtime == "irodori_voicedesign_direct"
     assert anime.supports_reference_voice is True
