@@ -46,6 +46,12 @@ class ModelCatalogService:
         available, reason = self.availability(name, cfg, run_external_probe=run_external_probe)
         runtime = self.runtimes.get(cfg.runtime)
         runtime_metadata: dict[str, Any] = {}
+        generation_timeout_sec = getattr(runtime, "timeout_sec", None)
+        if not isinstance(generation_timeout_sec, (int, float)) or generation_timeout_sec <= 0:
+            generation_timeout_sec = 1800
+        startup_timeout_sec = getattr(runtime, "startup_timeout_sec", 0)
+        if isinstance(startup_timeout_sec, (int, float)) and startup_timeout_sec > 0:
+            generation_timeout_sec += startup_timeout_sec
         metadata_provider = getattr(runtime, "get_runtime_metadata", None)
         if available and callable(metadata_provider):
             runtime_metadata = dict(metadata_provider() or {})
@@ -78,6 +84,7 @@ class ModelCatalogService:
             defaultCaption=cfg.default_caption,
             chunking=getattr(cfg, "chunking", None) or self.config.chunking,
             textSplitMethod=getattr(cfg, "text_split_method", None),
+            generationTimeoutSec=int(generation_timeout_sec),
         )
 
     def list(self, *, run_external_probe: bool) -> list[ModelInfo]:

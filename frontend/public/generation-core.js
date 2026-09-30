@@ -93,6 +93,32 @@
     return compactMessage(firstLine || message);
   }
 
+  function generationRequestTimeoutMs(model) {
+    const configuredSeconds = Number(model?.generationTimeoutSec);
+    const timeoutSeconds = Number.isFinite(configuredSeconds) && configuredSeconds > 0
+      ? Math.ceil(configuredSeconds)
+      : 1800;
+    return timeoutSeconds * 1000 + 15000;
+  }
+
+  function isGenerationTimeout(error) {
+    if (error?.name === "TimeoutError") return true;
+    const message = String(error?.payload?.errorMessage || error?.payload?.error || error?.message || "");
+    return /timeout|time(?:d)?\s*out|時間切れ|制限時間/i.test(message);
+  }
+
+  function failQueuedCompareResults(results, activeModelIds, message) {
+    const active = new Set(activeModelIds || []);
+    return (results || []).map((item) => {
+      if (!active.has(item.model) || item.state !== "queued") return item;
+      return {
+        ...item,
+        state: item.result?.audioUrl ? "stale" : "failed",
+        message,
+      };
+    });
+  }
+
   function transitionCompareResult(previous, event) {
     const state = { ...(previous || {}) };
     if (event.type === "start") return { status: "loading" };
@@ -111,6 +137,9 @@
     buildRequestBody,
     attachChunking,
     humanizeError,
+    generationRequestTimeoutMs,
+    isGenerationTimeout,
+    failQueuedCompareResults,
     transitionCompareResult,
   });
 })(globalThis);

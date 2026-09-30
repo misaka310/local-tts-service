@@ -184,6 +184,42 @@ test("normalizes seed and auto increment deterministically", () => {
   assert.deepEqual(core.incrementSeed("12", true), { value: 13, changed: true });
 });
 
+test("bounds compare requests by the model timeout and a response grace period", () => {
+  assert.equal(core.generationRequestTimeoutMs({ generationTimeoutSec: 300 }), 315000);
+  assert.equal(core.generationRequestTimeoutMs({ generationTimeoutSec: 0 }), 1815000);
+  assert.equal(core.generationRequestTimeoutMs({}), 1815000);
+});
+
+test("recognizes browser and runtime generation timeouts", () => {
+  assert.equal(core.isGenerationTimeout({ name: "TimeoutError" }), true);
+  assert.equal(core.isGenerationTimeout({ message: "external command timed out after 1800s" }), true);
+  assert.equal(core.isGenerationTimeout({ message: "Failed to fetch" }), false);
+});
+
+test("stops queued compare models without discarding their previous audio", () => {
+  const activeModelIds = new Set(["timed-out", "queued-with-audio", "queued-without-audio"]);
+  const results = [
+    { model: "timed-out", state: "failed", result: {} },
+    { model: "queued-with-audio", state: "queued", result: { audioUrl: "/audio/old.wav" } },
+    { model: "queued-without-audio", state: "queued", result: {} },
+    { model: "unselected", state: "queued", result: {} },
+  ];
+
+  assert.deepEqual(core.failQueuedCompareResults(results, activeModelIds, "一括生成を停止しました。"), [
+    { model: "timed-out", state: "failed", result: {} },
+    { model: "queued-with-audio", state: "stale", result: { audioUrl: "/audio/old.wav" }, message: "一括生成を停止しました。" },
+    { model: "queued-without-audio", state: "failed", result: {}, message: "一括生成を停止しました。" },
+    { model: "unselected", state: "queued", result: {} },
+  ]);
+});
+
+test("compare generation applies the runtime deadline and stops the remaining queue on timeout", async () => {
+  const compareSource = await readFile(new URL("./public/compare-page.js", import.meta.url), "utf-8");
+  assert.match(compareSource, /signal:\s*AbortSignal\.timeout\(generationCore\.generationRequestTimeoutMs\(model\)\)/);
+  assert.match(compareSource, /if \(outcome\?\.timedOut\)/);
+  assert.match(compareSource, /failQueuedCompareResults\(/);
+});
+
 test("normalizes long-text chunk settings", () => {
   assert.deepEqual(core.normalizeChunkSettings({ targetChars: 200, hardMaxChars: 400 }), {
     targetChars: 200,

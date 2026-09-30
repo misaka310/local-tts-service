@@ -165,6 +165,7 @@ class ModelInfo(BaseModel):
     requiresTrainedCheckpoint: bool = False
     chunking: dict[str, Any] | None = None
     textSplitMethod: str | None = None
+    generationTimeoutSec: int = 1800
 
 
 class ModelsResponse(BaseModel):
