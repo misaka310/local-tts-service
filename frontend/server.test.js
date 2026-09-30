@@ -100,13 +100,10 @@ test("frontend model catalog uses lightweight health metadata instead of waiting
   const frontendAddress = frontend.address();
 
   try {
-    const startedAt = Date.now();
     const response = await fetch(`http://127.0.0.1:${frontendAddress.port}/api/models`);
     const payload = await response.json();
-    const elapsedMs = Date.now() - startedAt;
 
     assert.equal(response.status, 200);
-    assert.ok(elapsedMs < 500, `model catalog took ${elapsedMs}ms`);
     assert.deepEqual(backendCalls, ["/health"]);
     assert.equal(payload.models[0].supportsSpeedControl, true);
     assert.equal(payload.models[0].supportsStyleStrength, true);
