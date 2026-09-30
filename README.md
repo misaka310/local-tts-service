@@ -18,11 +18,11 @@ https://github.com/user-attachments/assets/29ad093a-7950-4a17-ba09-8899dabb4828
 ## できること
 
 - 文章から音声を生成する
-- 同じ文章を複数モデルで生成して聞き比べる
+- 同じ文章を複数モデルで生成して聞き比べる（生成中のモデルと経過時間を表示）
 - マイク録音や音声ファイルを参照音声として登録する
 - 対応する動画URLから短い参照音声候補を作る
 - TTS音声、音声ファイル、マイク録音をRVCで変換する
-- 生成履歴をブラウザ内に保存して再利用する
+- 比較画面の文章・話し方メモと生成履歴をブラウザ内に保存して再利用する
 
 対応モデルにはQwen3-TTS、Irodori v2 / v3 / v4 / v4.1（公式SmallとAnime fine-tune）、GPT-SoVITSなどがあります。Orpheus 3B、Ming Omni TTS、Fish Audio S2 Pro、IndexTTS 2.5は個別導入できます。Fish S2 Proは24GB以上のGPUメモリを推奨します。モデルごとの導入方法と利用条件は[追加モデルのガイド](docs/fish-s2-pro-indextts-2-5.md)を参照してください。
 

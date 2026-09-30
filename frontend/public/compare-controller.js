@@ -35,6 +35,7 @@
       [elements.text, elements.instruction].filter(Boolean).forEach((element) => {
         listen(element, "input", () => {
           actions.refreshText();
+          actions.saveSettings();
           actions.updateSelection();
         });
       });
