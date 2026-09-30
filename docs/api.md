@@ -44,6 +44,7 @@ Important fields:
 - `supportsSpeedControl`: accepts the independent `speedScale` synthesis parameter
 - `supportsStyleStrength`: accepts the independent `styleStrength` synthesis parameter
 - `chunking`: default chunk limits for long text
+- `generationTimeoutSec`: model generation and startup limit in seconds. The comparison UI adds a 15-second response grace; runtimes without their own limit use a 30-minute browser safety deadline. A browser timeout ends waiting and leaves process termination to the runtime.
 
 ### `GET /v1/models`
 

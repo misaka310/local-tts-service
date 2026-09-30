@@ -160,19 +160,23 @@ async function generateCompareModel(id, bodyBase) {
     appendCompareDiagnostic(id, new Error(validation), { ...bodyBase, model: id });
     if (previousAudioUrl) updateCompareResultProgress(id, "stale", message);
     else renderCompareResultModel(id);
-    return;
+    return { timedOut: false };
   }
   const body = attachChunking(
     buildRequestBody(model, voice, bodyBase.text, bodyBase.instruction, bodyBase.language, bodyBase.seed),
     bodyBase.chunking
   );
+  let timedOut = false;
   try {
-    const payload = await ttsApi.speak(body);
+    const payload = await ttsApi.speak(body, {
+      signal: AbortSignal.timeout(generationCore.generationRequestTimeoutMs(model)),
+    });
     const result = payload.result || {};
     const score = profileFor(id).baseScore + (result.audioUrl ? 2 : 0);
     const duration = formatDuration(Number(result.timings?.durationSec ?? result.durationSec));
     compareResults = compareResults.map((item) => item.model === id ? { ...item, state: "success", result: { ...result, duration }, message: profileFor(id).memo, score } : item);
   } catch (error) {
+    timedOut = generationCore.isGenerationTimeout(error);
     const errorMessage = humanizeError(error);
     const message = previousAudioUrl ? `新しい生成に失敗しました。前回の音声を残しています。${errorMessage}` : errorMessage;
     compareResults = compareResults.map((item) => item.model === id ? { ...item, state: previousAudioUrl ? "stale" : "failed", message, score: 0 } : item);
@@ -183,6 +187,7 @@ async function generateCompareModel(id, bodyBase) {
   const updated = compareResults.find((item) => item.model === id);
   if (updated?.state === "stale") updateCompareResultProgress(id, "stale", updated.message);
   else renderCompareResultModel(id);
+  return { timedOut };
 }
 
 async function generateCompare() {
@@ -229,7 +234,18 @@ async function generateCompare() {
       const startedAt = Date.now();
       const elapsedTimer = startCompareElapsedTimer(index + 1, ids.length, id, startedAt, batchStartedAt);
       try {
-        await generateCompareModel(id, bodyBase);
+        const outcome = await generateCompareModel(id, bodyBase);
+        if (outcome?.timedOut) {
+          const stoppedMessage = `${modelLabel(id, id)} の応答が制限時間を超えました。`;
+          interruptionMessage = `${stoppedMessage} ブラウザの応答待ちを終了しました。待機中のモデルは開始していません。サービスの状態を確認してから再試行してください。`;
+          compareResults = generationCore.failQueuedCompareResults(
+            compareResults,
+            activeCompareModelIds,
+            `${stoppedMessage} このモデルは実行していません。`,
+          );
+          renderCompareResults();
+          break;
+        }
       } finally {
         window.clearInterval(elapsedTimer);
       }
@@ -330,7 +346,8 @@ async function regenerateCompareModel(id) {
     updateCompareResultProgress(id, "pending", pendingMessage);
     updateCompareButtonState();
     elapsedTimer = startCompareElapsedTimer(1, 1, id, startedAt);
-    await generateCompareModel(id, bodyBase);
+    const outcome = await generateCompareModel(id, bodyBase);
+    if (outcome?.timedOut) interruptionMessage = `${modelLabel(id, id)} の再生成応答が制限時間を超えました。`;
     if (compareResults.some((item) => item.model === id && item.state === "success")) incrementSeedInputIfNeeded(els.compareSeed, els.compareSeedAutoIncrement);
   } catch (error) {
     interruptionMessage = `再生成を中断しました: ${humanizeError(error)}`;

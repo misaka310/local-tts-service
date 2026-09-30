@@ -220,6 +220,10 @@ def test_api_smoke(tmp_path) -> None:
         and item["supportsStyleStrength"] is True
         for item in models.json()["models"]
     )
+    model_timeouts = {item["id"]: item["generationTimeoutSec"] for item in models.json()["models"]}
+    assert model_timeouts["irodori_v2"] == 480
+    assert model_timeouts["qwen3_tts_clone_0_6b"] == 1800
+    assert model_timeouts["irodori_v3_voicedesign"] == 3600
 
     direct_runtime = app.state.service.runtimes["irodori_voicedesign_direct"]
     released_models: list[str] = []
