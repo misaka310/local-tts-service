@@ -266,6 +266,12 @@ test("generation core owns voice validation, chunk attachment, and user-facing e
     {},
     { validateVoice: () => "voice duration is invalid" },
   ), "voice duration is invalid");
+  assert.equal(core.validateRequest(
+    { model: { available: true }, text: "日本語です" },
+    capabilities,
+    {},
+    { validateText: () => "english text required" },
+  ), "english text required");
   assert.deepEqual(core.attachChunking({ text: "hello" }, { softChunkChars: 120 }), {
     text: "hello",
     chunking: { softChunkChars: 120 },

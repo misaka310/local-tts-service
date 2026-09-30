@@ -153,7 +153,7 @@ reference/voices/<voiceId>/voice.txt
 ### ASMR向けの使い分け
 
 - **Ming Omni TTS 0.5B**: 話し方メモに「very low volume, close microphone, slow, breathy, gentle ASMR style」のような指示を入れます。参照音声なしならvoice design、参照音声を選べばその声へ寄せたzero-shot voice cloneとして同じstyle指示を併用します。
-- **Orpheus 3B ASMR**: 英語本文を入力します。`<sigh>`、`<yawn>`、`<gasp>`など上流Orpheusの表現タグを本文中に入れられます。短すぎる本文は上流のstreaming buffer制約で無音になる可能性があるため、1文以上の入力を推奨します。
+- **Orpheus 3B ASMR**: 英語本文を入力します。通常生成とモデル比較では、言語欄を表示していない場合にモデル既定の英語を送ります。`<sigh>`、`<yawn>`、`<gasp>`など上流Orpheusの表現タグを本文中に入れられます。短すぎる本文は上流のstreaming buffer制約で無音になる可能性があるため、1文以上の入力を推奨します。
 
 ## 実生成検証
 
@@ -234,6 +234,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-mode
 - モデルID: `orpheus_3b_asmr`
 - 参照音声: 不要
 - 既定言語: 英語
+- 英語向けモデルのため、日本語本文はUI側で生成前に拒否し、長時間の無意味なCPU推論へ入れない
 - 実行コード: `freddyaboulton/orpheus-cpp`、revision `ed126bea531ea9d53ef7564b00e8bc23f8f9aebe`
 - 音声モデル: `HummingbirdCake/Orpheus-3B-ASMR-Q4_K_M-GGUF` の `orpheus-3b-asmr-q4_k_m.gguf`、revision `22892bc82fc22d5db827b005db658e778dcf7847`
 - デコーダ: `onnx-community/snac_24khz-ONNX` の `onnx/decoder_model.onnx`、revision `e0b0016bc39c9d144e51aba2f275f59b7a6874d6`

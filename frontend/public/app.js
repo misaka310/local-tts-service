@@ -673,7 +673,7 @@ function validateRequest(model, voice, text, instruction) {
       referenceTextRequired: "このモデルでは voice.wav と voice.txt の両方が必要です。",
       instructionRequired: "instruction / 話し方メモを入力してください。",
     },
-    { validateVoice: gptReferenceError },
+    { validateVoice: gptReferenceError, validateText: (targetModel, targetText) => modelId(targetModel) === "orpheus_3b_asmr" && /[ぁ-んァ-ヶ一-龯々ー]/u.test(String(targetText || "")) ? "Orpheus 3B ASMR は英語向けモデルです。英語の読み上げテキストで生成してください。" : "" },
   );
 }
 

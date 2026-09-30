@@ -76,6 +76,26 @@ def test_asmr_request_contract_allows_no_reference(tmp_path: Path) -> None:
     assert ming.instruction == "ASMR whisper, very low volume, close microphone, slow and breathy"
 
 
+def test_orpheus_rejects_japanese_before_loading_model(tmp_path: Path) -> None:
+    import pytest
+    from scripts.wsl_asmr_tts_adapters import generate_orpheus_asmr
+    from scripts.wsl_tts_infer import WslTtsRequest
+
+    request = WslTtsRequest(
+        model="orpheus_3b_asmr",
+        model_id="nyuuzyou/Orpheus-3B-ASMR",
+        text="こんにちは。",
+        reference_audio_path=None,
+        reference_text_path=None,
+        reference_text=None,
+        output_path=tmp_path / "out.wav",
+        seed=1,
+        language="en",
+    )
+    with pytest.raises(ValueError, match="English text only"):
+        generate_orpheus_asmr(request)
+
+
 def test_asmr_dispatch_and_setup_targets_are_wired() -> None:
     from scripts.wsl_tts_bridge import environment_key_for_model
     from scripts.wsl_tts_runner import GENERATORS

@@ -6,6 +6,7 @@ import importlib.metadata
 import importlib.util
 import os
 from pathlib import Path
+import re
 import sys
 import types
 import wave
@@ -121,6 +122,8 @@ def _load_orpheus_model():
 
 
 def generate_orpheus_asmr(request: WslTtsRequest) -> None:
+    if re.search(r"[぀-ヿ㐀-鿿]", request.text):
+        raise ValueError("orpheus_3b_asmr supports English text only; Japanese/CJK text is not supported")
     model_dir = _model_dir("orpheus_asmr")
     if not model_dir.is_dir():
         raise FileNotFoundError(f"Orpheus ASMR model directory not found: {model_dir}")

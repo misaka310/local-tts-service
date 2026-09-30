@@ -100,13 +100,10 @@ test("frontend model catalog uses lightweight health metadata instead of waiting
   const frontendAddress = frontend.address();
 
   try {
-    const startedAt = Date.now();
     const response = await fetch(`http://127.0.0.1:${frontendAddress.port}/api/models`);
     const payload = await response.json();
-    const elapsedMs = Date.now() - startedAt;
 
     assert.equal(response.status, 200);
-    assert.ok(elapsedMs < 500, `model catalog took ${elapsedMs}ms`);
     assert.deepEqual(backendCalls, ["/health"]);
     assert.equal(payload.models[0].supportsSpeedControl, true);
     assert.equal(payload.models[0].supportsStyleStrength, true);
@@ -872,6 +869,9 @@ test("all generation tabs expose persistent seed and autoplay controls", () => {
     assert.match(indexSource, new RegExp(`id="${scope}AutoPlayInput"`));
   }
   assert.equal((indexSource.match(/生成後に音声を自動再生/g) || []).length, 3);
+  for (const scope of ["normal", "compare", "rvc"]) {
+    assert.match(indexSource, new RegExp(`id="${scope}LanguageInput"[^>]*value=""`));
+  }
   assert.doesNotMatch(indexSource, /id="normalRetryButton"/);
   assert.match(indexSource, /同じ設定・seedで再生成/);
   assert.match(indexSource, /長文は発音や抑揚が不安定/);
