@@ -57,7 +57,7 @@ local-tts.bat
 {
   "deployment": {
     "role": "frontend",
-    "workerBaseUrl": "http://192.168.1.50:5177"
+    "workerBaseUrl": "http://worker.example.invalid:5177"
   },
   "frontend": { "host": "127.0.0.1", "port": 5177 }
 }

@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
+import testSupport from "./test-support.cjs";
+
+const { windowsFixturePath } = testSupport;
 
 globalThis.LocalTtsChunking = {
   clampInteger(value, fallback, min, max) {
@@ -556,10 +559,10 @@ test("compare and RVC controllers bind delegated and device events through injec
   deviceEvents.dispatch("devicechange");
   rvcElements.voiceModel.dispatch("change");
   rvcElements.reloadModels.dispatch("click");
-  rvcElements.externalAudioPathHistory.value = "C:\\audio\\saved.wav";
+  rvcElements.externalAudioPathHistory.value = windowsFixturePath("C", "audio", "saved.wav");
   rvcElements.externalAudioPathHistory.dispatch("change");
   rvcElements.convert.dispatch("click");
   rvcElements.history.dispatch("click", { target: { closest: () => ({ dataset: { restoreRvcHistory: "2" } }) } });
   rvcElements.clearHistory.dispatch("click");
-  assert.deepEqual(rvcCalls, ["loadMicDevices", "selectVoiceModel", "reloadModels", "selectFilePath:C:\\audio\\saved.wav", "convert", "restore:2", "clearHistory"]);
+  assert.deepEqual(rvcCalls, ["loadMicDevices", "selectVoiceModel", "reloadModels", `selectFilePath:${windowsFixturePath("C", "audio", "saved.wav")}`, "convert", "restore:2", "clearHistory"]);
 });

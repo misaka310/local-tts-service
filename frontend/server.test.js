@@ -32,6 +32,7 @@ import {
 } from "./server.js";
 import { callTtsJson, LONG_TTS_REQUEST_TIMEOUT_MS } from "./server/http-utils.js";
 import { buildFfmpegVoiceDenoiseArgs, readWaveDurationSec, resolveFfmpegPath } from "./server/audio-utils.js";
+import testSupport from "./test-support.cjs";
 import { normalizeRvcInputOptions } from "./server/rvc/validation.js";
 import { resolveRvcAudioPath as resolveInjectedRvcAudioPath } from "./server/rvc/artifact-store.js";
 import { listRvcModels } from "./server/rvc/model-catalog.js";
@@ -43,6 +44,8 @@ import {
   registerYoutubeReferenceCandidate,
   resolveYoutubeCandidateAudioPath,
 } from "./youtube-reference.js";
+
+const { windowsFixturePath } = testSupport;
 
 function makeWavBuffer(durationSec = 3, sampleRate = 16000) {
   const samples = Math.max(1, Math.floor(durationSec * sampleRate));
@@ -128,7 +131,7 @@ test("frontend speak proxy preserves independent speed and style controls", asyn
       model: upstreamBody.model,
       runtime: "mock",
       audioUrl: "http://127.0.0.1/audio/mock.wav",
-      audioPath: "C:/mock.wav",
+      audioPath: windowsFixturePath("C", "mock.wav"),
     }));
   });
   await new Promise((resolve) => backend.listen(0, "127.0.0.1", resolve));
@@ -177,7 +180,7 @@ test("frontend does not require a reference voice for Irodori models that declar
       model: upstreamBody.model,
       runtime: "irodori_voicedesign_direct",
       audioUrl: "http://127.0.0.1/audio/mock.wav",
-      audioPath: "C:/mock.wav",
+      audioPath: windowsFixturePath("C", "mock.wav"),
     }));
   });
   await new Promise((resolve) => backend.listen(0, "127.0.0.1", resolve));
@@ -229,8 +232,8 @@ test("resolveReferenceVoiceAudioPath returns voice.wav for a safe voice id", () 
 });
 
 test("resolveReferenceVoiceAudioPath rejects traversal and invalid ids", () => {
-  assert.throws(() => resolveReferenceVoiceAudioPath("C:\\repo", "../bad"), /参照音声名/);
-  assert.throws(() => resolveReferenceVoiceAudioPath("C:\\repo", "bad/name"), /参照音声名/);
+  assert.throws(() => resolveReferenceVoiceAudioPath(windowsFixturePath("C", "repo"), "../bad"), /参照音声名/);
+  assert.throws(() => resolveReferenceVoiceAudioPath(windowsFixturePath("C", "repo"), "bad/name"), /参照音声名/);
 });
 
 test("parseReferenceVoiceTextRequest accepts only the text update route", () => {
@@ -653,17 +656,17 @@ test("YouTube candidate registration copies the selected WAV and transcript", as
 test("normalizeRvcParams requires user-provided model paths and validates ranges", () => {
   assert.throws(() => normalizeRvcParams({ indexRate: "0.5", f0upKey: "2" }), /model path is required/i);
   const params = normalizeRvcParams({
-    modelPath: "C:\\models\\sample.pth",
-    indexPath: "C:\\models\\sample.index",
+    modelPath: windowsFixturePath("C", "models", "sample.pth"),
+    indexPath: windowsFixturePath("C", "models", "sample.index"),
     indexRate: "0.5",
     f0upKey: "2"
   });
   assert.equal(params.indexRate, 0.5);
   assert.equal(params.f0method, "rmvpe");
   assert.equal(params.f0upKey, 2);
-  assert.equal(params.modelPath, path.resolve("C:\\models\\sample.pth"));
-  assert.throws(() => normalizeRvcParams({ modelPath: "C:\\models\\sample.pth", indexPath: "C:\\models\\sample.index", indexRate: 2 }), /index_rate/i);
-  assert.throws(() => normalizeRvcParams({ modelPath: "C:\\models\\sample.pth", indexPath: "C:\\models\\sample.index", f0method: "bad method" }), /f0method/i);
+  assert.equal(params.modelPath, path.resolve(windowsFixturePath("C", "models", "sample.pth")));
+  assert.throws(() => normalizeRvcParams({ modelPath: windowsFixturePath("C", "models", "sample.pth"), indexPath: windowsFixturePath("C", "models", "sample.index"), indexRate: 2 }), /index_rate/i);
+  assert.throws(() => normalizeRvcParams({ modelPath: windowsFixturePath("C", "models", "sample.pth"), indexPath: windowsFixturePath("C", "models", "sample.index"), f0method: "bad method" }), /f0method/i);
 });
 
 test("normalizeSpeakChunking validates request chunking overrides", () => {
@@ -738,31 +741,31 @@ test("selected RVC model is staged into the runtime assets/weights folder withou
 
 test("RVC configuration can be injected without mutating process environment", () => {
   const context = createRvcContext({
-    repoRoot: "C:\\isolated-repo",
-    outputDir: "C:\\isolated-output",
-    env: { LOCAL_TTS_RVC_ROOT: "C:\\rvc", LOCAL_TTS_RVC_MODEL_PATH: "C:\\models\\voice.pth" },
+    repoRoot: windowsFixturePath("C", "isolated-repo"),
+    outputDir: windowsFixturePath("C", "isolated-output"),
+    env: { LOCAL_TTS_RVC_ROOT: windowsFixturePath("C", "rvc"), LOCAL_TTS_RVC_MODEL_PATH: windowsFixturePath("C", "models", "voice.pth") },
   });
-  assert.equal(context.paths.outputDir, path.resolve("C:\\isolated-output"));
-  assert.equal(context.defaults.cwd, path.resolve("C:\\rvc", "vendor", "rvc"));
-  assert.equal(context.defaults.modelPath, "C:\\models\\voice.pth");
-  assert.equal(normalizeRvcParams({ indexPath: "C:\\models\\voice.index" }, context).modelPath, path.resolve("C:\\models\\voice.pth"));
+  assert.equal(context.paths.outputDir, path.resolve(windowsFixturePath("C", "isolated-output")));
+  assert.equal(context.defaults.cwd, path.resolve(windowsFixturePath("C", "rvc"), "vendor", "rvc"));
+  assert.equal(context.defaults.modelPath, windowsFixturePath("C", "models", "voice.pth"));
+  assert.equal(normalizeRvcParams({ indexPath: windowsFixturePath("C", "models", "voice.index") }, context).modelPath, path.resolve(windowsFixturePath("C", "models", "voice.pth")));
 });
 
 test("RVC requests cannot override the server-managed Demucs executable", () => {
-  const context = createRvcContext({ repoRoot: "C:\\repo", env: {} });
+  const context = createRvcContext({ repoRoot: windowsFixturePath("C", "repo"), env: {} });
   for (const key of ["demucsPython", "demucs_python"]) {
-    const options = normalizeRvcInputOptions({ inputSource: "mic", [key]: "C:\\attacker\\python.exe" }, context.defaults);
+    const options = normalizeRvcInputOptions({ inputSource: "mic", [key]: windowsFixturePath("C", "attacker", "python.exe") }, context.defaults);
     assert.equal(options.demucsPython, context.defaults.demucsPython);
   }
 });
 
 test("RVC artifact and runner boundaries use injected paths and executables", () => {
-  const context = createRvcContext({ repoRoot: "C:\\repo", outputDir: "C:\\artifacts", env: {} });
-  assert.equal(resolveInjectedRvcAudioPath(context, "converted", "result.wav"), path.resolve("C:\\artifacts", "converted", "result.wav"));
+  const context = createRvcContext({ repoRoot: windowsFixturePath("C", "repo"), outputDir: windowsFixturePath("C", "artifacts"), env: {} });
+  assert.equal(resolveInjectedRvcAudioPath(context, "converted", "result.wav"), path.resolve(windowsFixturePath("C", "artifacts"), "converted", "result.wav"));
   assert.throws(() => resolveInjectedRvcAudioPath(context, "converted", "../result.wav"), /invalid rvc audio filename/i);
-  const command = buildInjectedRvcCommand({ pythonPath: "C:\\python.exe", cwd: "C:\\rvc" }, { modelPath: "C:\\models\\voice.pth", indexPath: "C:\\models\\voice.index", indexRate: 0.5, f0method: "rmvpe", f0upKey: 0, filterRadius: 3, resampleSr: 0, rmsMixRate: 1, protect: 0.33 }, "in.wav", "out.wav");
-  assert.equal(command.command, "C:\\python.exe");
-  assert.equal(command.cwd, "C:\\rvc");
+  const command = buildInjectedRvcCommand({ pythonPath: windowsFixturePath("C", "python.exe"), cwd: windowsFixturePath("C", "rvc") }, { modelPath: windowsFixturePath("C", "models", "voice.pth"), indexPath: windowsFixturePath("C", "models", "voice.index"), indexRate: 0.5, f0method: "rmvpe", f0upKey: 0, filterRadius: 3, resampleSr: 0, rmsMixRate: 1, protect: 0.33 }, "in.wav", "out.wav");
+  assert.equal(command.command, windowsFixturePath("C", "python.exe"));
+  assert.equal(command.cwd, windowsFixturePath("C", "rvc"));
   assert.equal(command.args[command.args.indexOf("--model_name") + 1], "voice.pth");
 });
 
@@ -804,8 +807,8 @@ test("RVC conversion reports TTS as the first failed operation before RVC starts
 
 test("rvcParamStem changes by index_rate for separate output files", () => {
   const base = normalizeRvcParams({
-    modelPath: "C:\\models\\sample.pth",
-    indexPath: "C:\\models\\sample.index",
+    modelPath: windowsFixturePath("C", "models", "sample.pth"),
+    indexPath: windowsFixturePath("C", "models", "sample.index"),
     indexRate: 0.35
   });
   assert.notEqual(rvcParamStem(base), rvcParamStem({ ...base, indexRate: 0 }));
@@ -814,13 +817,13 @@ test("rvcParamStem changes by index_rate for separate output files", () => {
 
 test("buildRvcCommand passes model filename and absolute index path", () => {
   const params = normalizeRvcParams({
-    modelPath: "C:\\models\\sample.pth",
-    indexPath: "C:\\models\\sample.index",
+    modelPath: windowsFixturePath("C", "models", "sample.pth"),
+    indexPath: windowsFixturePath("C", "models", "sample.index"),
     indexRate: 0.75,
     f0upKey: 6,
     protect: 0.45
   });
-  const built = buildRvcCommand(params, "C:\\in\\a.wav", "C:\\out\\b.wav");
+  const built = buildRvcCommand(params, windowsFixturePath("C", "in", "a.wav"), windowsFixturePath("C", "out", "b.wav"));
   assert.equal(built.args[built.args.indexOf("--model_name") + 1], "sample.pth");
   assert.equal(built.args[built.args.indexOf("--index_path") + 1], params.indexPath);
   assert.equal(built.args[built.args.indexOf("--index_rate") + 1], "0.75");
@@ -866,20 +869,20 @@ test("RVC audio responses include content length and support byte ranges", async
 });
 
 test("external audio inputs convert non-wav formats before RVC", () => {
-  assert.equal(shouldConvertAudioInputToWav("C:\\in\\sample.wav"), false);
-  assert.equal(shouldConvertAudioInputToWav("C:\\in\\sample.WAV"), false);
-  assert.equal(shouldConvertAudioInputToWav("C:\\in\\sample.m4a"), true);
-  assert.equal(shouldConvertAudioInputToWav("C:\\in\\sample.mp3"), true);
+  assert.equal(shouldConvertAudioInputToWav(windowsFixturePath("C", "in", "sample.wav")), false);
+  assert.equal(shouldConvertAudioInputToWav(windowsFixturePath("C", "in", "sample.WAV")), false);
+  assert.equal(shouldConvertAudioInputToWav(windowsFixturePath("C", "in", "sample.m4a")), true);
+  assert.equal(shouldConvertAudioInputToWav(windowsFixturePath("C", "in", "sample.mp3")), true);
 
-  const args = buildFfmpegWavArgs("C:\\in\\sample.m4a", "C:\\out\\sample.wav");
-  assert.deepEqual(args, ["-hide_banner", "-loglevel", "error", "-y", "-i", "C:\\in\\sample.m4a", "-ac", "1", "-ar", "40000", "C:\\out\\sample.wav"]);
+  const args = buildFfmpegWavArgs(windowsFixturePath("C", "in", "sample.m4a"), windowsFixturePath("C", "out", "sample.wav"));
+  assert.deepEqual(args, ["-hide_banner", "-loglevel", "error", "-y", "-i", windowsFixturePath("C", "in", "sample.m4a"), "-ac", "1", "-ar", "40000", windowsFixturePath("C", "out", "sample.wav")]);
 });
 
 test("post-RVC denoise keeps the original and applies a light voice filter", () => {
-  const args = buildFfmpegVoiceDenoiseArgs("C:\\in\\converted.wav", "C:\\out\\converted-denoised.wav");
-  assert.deepEqual(args.slice(0, 6), ["-hide_banner", "-loglevel", "error", "-y", "-i", "C:\\in\\converted.wav"]);
+  const args = buildFfmpegVoiceDenoiseArgs(windowsFixturePath("C", "in", "converted.wav"), windowsFixturePath("C", "out", "converted-denoised.wav"));
+  assert.deepEqual(args.slice(0, 6), ["-hide_banner", "-loglevel", "error", "-y", "-i", windowsFixturePath("C", "in", "converted.wav")]);
   assert.equal(args[args.indexOf("-af") + 1], "highpass=f=70,lowpass=f=16000,afftdn=nr=8:nf=-50:tn=1");
-  assert.equal(args.at(-1), "C:\\out\\converted-denoised.wav");
+  assert.equal(args.at(-1), windowsFixturePath("C", "out", "converted-denoised.wav"));
 });
 
 test("WSL zero-shot models are included in the model catalog with unavailable reasons", () => {
@@ -1139,7 +1142,7 @@ test("frontend deployment rewrites worker-local TTS audio URL to the local proxy
       result: {
         requestId: "remote-audio",
         audioUrl: "http://127.0.0.1:8730/audio/remote-audio.wav",
-        audioPath: "C:/worker/runtime/audio/remote-audio.wav",
+         audioPath: windowsFixturePath("C", "worker", "runtime", "audio", "remote-audio.wav"),
       },
     }));
   });
@@ -1346,7 +1349,7 @@ test("frontend deployment routes RVC defaults to worker before local RVC context
     ttsBaseUrl: "http://127.0.0.1:1",
     deploymentRole: "frontend",
     workerBaseUrl: `http://127.0.0.1:${workerAddress.port}`,
-    rvcContext: { rootDir: "Z:/definitely-missing-rvc-runtime" },
+    rvcContext: { rootDir: windowsFixturePath("Z", "definitely-missing-rvc-runtime") },
   });
   await new Promise((resolve) => frontend.listen(0, "127.0.0.1", resolve));
   const frontendAddress = frontend.address();

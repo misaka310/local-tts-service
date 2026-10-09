@@ -1,7 +1,12 @@
 import { createServer } from "../server.js";
+import testSupport from "../test-support.cjs";
 
-const CHROME_PATH = process.env.CHROME_PATH || "C:/Program Files/Google/Chrome/Application/chrome.exe";
+const { resolveChromeExecutable, windowsFixturePath } = testSupport;
+const CHROME_PATH = resolveChromeExecutable();
 const SAMPLE_TEXT = "これは音声変換の動作確認です。自然な発音と聞き取りやすさを確認します。";
+const SAMPLE_AUDIO_PATH = windowsFixturePath("C", "audio", "sample.m4a");
+const SECOND_AUDIO_PATH = windowsFixturePath("C", "audio", "second.wav");
+const SAMPLE_AUDIO_OPTION = `#rvcExternalAudioPathHistory option[value="${SAMPLE_AUDIO_PATH.replaceAll("\\", "\\\\")}"]`;
 
 function ensure(condition, message) {
   if (!condition) throw new Error(message);
@@ -142,21 +147,21 @@ async function main() {
           resampleSr: 0,
           rmsMixRate: 1,
           protect: 0.33,
-          modelPath: "C:\\models\\rvc\\voice-a\\voice-a.pth",
-          indexPath: "C:\\models\\rvc\\voice-a\\voice-a.index",
+          modelPath: windowsFixturePath("C", "models", "rvc", "voice-a", "voice-a.pth"),
+          indexPath: windowsFixturePath("C", "models", "rvc", "voice-a", "voice-a.index"),
           inputSource: "tts",
           externalAudioPath: "",
           cleanExternalAudio: false,
           demucsModel: "htdemucs_ft"
         },
-        modelRoot: "C:\\models\\rvc",
+        modelRoot: windowsFixturePath("C", "models", "rvc"),
         readyCount: exposeRvcModels ? 2 : 0,
         guideUrl: "/rvc-model-guide.html",
         models: exposeRvcModels ? [
-          { id: "voice-a", label: "Voice A", modelPath: "C:\\models\\rvc\\voice-a\\voice-a.pth", indexPath: "C:\\models\\rvc\\voice-a\\voice-a.index", ready: true, errorReason: "" },
-          { id: "voice-b", label: "Voice B", modelPath: "C:\\models\\rvc\\voice-b\\voice-b.pth", indexPath: "C:\\models\\rvc\\voice-b\\voice-b.index", ready: true, errorReason: "" }
+          { id: "voice-a", label: "Voice A", modelPath: windowsFixturePath("C", "models", "rvc", "voice-a", "voice-a.pth"), indexPath: windowsFixturePath("C", "models", "rvc", "voice-a", "voice-a.index"), ready: true, errorReason: "" },
+          { id: "voice-b", label: "Voice B", modelPath: windowsFixturePath("C", "models", "rvc", "voice-b", "voice-b.pth"), indexPath: windowsFixturePath("C", "models", "rvc", "voice-b", "voice-b.index"), ready: true, errorReason: "" }
         ] : [
-          { id: "incomplete", label: "Incomplete Voice", modelPath: "C:\\models\\rvc\\incomplete\\voice.pth", indexPath: "", ready: false, errorReason: ".index がありません" }
+          { id: "incomplete", label: "Incomplete Voice", modelPath: windowsFixturePath("C", "models", "rvc", "incomplete", "voice.pth"), indexPath: "", ready: false, errorReason: ".index がありません" }
         ]
       })
     });
@@ -205,7 +210,7 @@ async function main() {
         ok: true,
         recording: {
           filename: `mic-e2e-${recordingUploadCount}.wav`,
-          path: `C:\\rvc\\mic-e2e-${recordingUploadCount}.wav`,
+          path: windowsFixturePath("C", "rvc", `mic-e2e-${recordingUploadCount}.wav`),
           url: `/api/rvc/audio/intermediate/mic-e2e-${recordingUploadCount}.wav`,
           durationSec: 1.2,
           scriptText: requestBody.scriptText || "",
@@ -245,12 +250,12 @@ async function main() {
           tts: {},
           intermediate: {
             filename: "prepared-e2e.wav",
-            path: "C:\\rvc\\prepared-e2e.wav",
+            path: windowsFixturePath("C", "rvc", "prepared-e2e.wav"),
             url: "/api/rvc/audio/intermediate/prepared-e2e.wav"
           },
           converted: {
             filename: `converted-e2e-${convertCount}.wav`,
-            path: `C:\\rvc\\converted-e2e-${convertCount}.wav`,
+            path: windowsFixturePath("C", "rvc", `converted-e2e-${convertCount}.wav`),
             url: `/api/rvc/audio/converted/converted-e2e-${convertCount}.wav`
           },
           rvc: requestBody.rvc || {}
@@ -272,7 +277,7 @@ async function main() {
           original: { filename: requestBody.filename },
           denoised: {
             filename: denoisedFilename,
-            path: `C:\\rvc\\${denoisedFilename}`,
+            path: windowsFixturePath("C", "rvc", denoisedFilename),
             url: `/api/rvc/audio/converted/${denoisedFilename}`
           }
         }
@@ -486,14 +491,14 @@ async function main() {
     await ensureHidden(page.locator('#rvcTextInput'), "RVC text should hide in wav mode");
     ensure(await page.locator('#rvcIntermediateTitle').textContent() === "ファイル入力音声", "file mode title mismatch");
     ensure(await page.locator('#rvcExternalAudioPathHistory').evaluate((element) => element.tagName) === 'SELECT', "RVC saved paths must use a real select control");
-    await page.locator('#rvcExternalAudioPathInput').fill('C:\\audio\\sample.m4a');
+    await page.locator('#rvcExternalAudioPathInput').fill(SAMPLE_AUDIO_PATH);
     await page.locator('#rvcExternalAudioPathInput').dispatchEvent('change');
-    ensure(await page.locator('#rvcExternalAudioPathHistory option[value="C:\\\\audio\\\\sample.m4a"]').count() === 1, "RVC file path history option missing");
-    await page.locator('#rvcExternalAudioPathInput').fill('C:\\audio\\second.wav');
+    ensure(await page.locator(SAMPLE_AUDIO_OPTION).count() === 1, "RVC file path history option missing");
+    await page.locator('#rvcExternalAudioPathInput').fill(SECOND_AUDIO_PATH);
     await page.locator('#rvcExternalAudioPathInput').dispatchEvent('change');
     ensure(await page.locator('#rvcExternalAudioPathHistory option:not([value=""])').count() === 2, "RVC saved path selector should list every saved path");
-    await page.locator('#rvcExternalAudioPathHistory').selectOption('C:\\audio\\sample.m4a');
-    ensure(await page.locator('#rvcExternalAudioPathInput').inputValue() === 'C:\\audio\\sample.m4a', "selecting an RVC saved path should update the input path");
+    await page.locator('#rvcExternalAudioPathHistory').selectOption(SAMPLE_AUDIO_PATH);
+    ensure(await page.locator('#rvcExternalAudioPathInput').inputValue() === SAMPLE_AUDIO_PATH, "selecting an RVC saved path should update the input path");
 
     await page.locator('input[name="rvcInputSource"][value="mic"]').click();
     await ensureVisible(page.locator('#rvcMicControls'), "RVC mic controls should return in mic mode");
@@ -537,9 +542,9 @@ async function main() {
     ensure(Math.abs(rvcLayout.formTop - rvcLayout.logTop) <= 2, "RVC form and execution log should align at the top");
     ensure(rvcLayout.convertWidth >= rvcLayout.paramsWidth - 40, "RVC convert button should fill the parameter panel");
 
-    ensure(await page.locator('#rvcExternalAudioPathHistory option[value="C:\\\\audio\\\\sample.m4a"]').count() === 1, "RVC file path history should persist after reload");
+    ensure(await page.locator(SAMPLE_AUDIO_OPTION).count() === 1, "RVC file path history should persist after reload");
     await page.locator('input[name="rvcInputSource"][value="file"]').click();
-    ensure(await page.locator('#rvcExternalAudioPathInput').inputValue() === 'C:\\audio\\sample.m4a', "switching back to file mode should restore the selected RVC file path");
+    ensure(await page.locator('#rvcExternalAudioPathInput').inputValue() === SAMPLE_AUDIO_PATH, "switching back to file mode should restore the selected RVC file path");
 
     if (process.env.RVC_LAYOUT_SCREENSHOT) {
       await page.locator('input[name="rvcInputSource"][value="tts"]').click();
@@ -552,7 +557,7 @@ async function main() {
     await page.waitForSelector('#rvcPage.active');
     await ensureVisible(page.locator('#rvcMissingModelPanel'), "RVC model setup panel should replace the unusable workspace when no model is ready");
     await ensureHidden(page.locator('#rvcWorkspace'), "RVC conversion controls should hide when no model is ready");
-    ensure((await page.locator('#rvcModelDirectoryPath').textContent()) === 'C:\\models\\rvc', "RVC model placement path should be shown exactly");
+    ensure((await page.locator('#rvcModelDirectoryPath').textContent()) === windowsFixturePath("C", "models", "rvc"), "RVC model placement path should be shown exactly");
     ensure((await page.locator('#rvcModelGuideLink').getAttribute('href')) === '/rvc-model-guide.html', "RVC model guide link is missing");
     ensure((await page.locator('#rvcModelScanNote').textContent())?.includes('.index がありません'), "incomplete RVC model reason should be shown");
 

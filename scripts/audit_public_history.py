@@ -128,8 +128,6 @@ def resolve_git() -> str:
     if candidate:
         return candidate
     windows_candidates = [
-        Path("C:/Program Files/Git/cmd/git.exe"),
-        Path("C:/Program Files/Git/mingw64/bin/git.exe"),
         Path(os.environ.get("ProgramFiles", "")) / "Git" / "cmd" / "git.exe",
         Path(os.environ.get("ProgramFiles", "")) / "Git" / "mingw64" / "bin" / "git.exe",
         Path(os.environ.get("ProgramFiles(x86)", "")) / "Git" / "cmd" / "git.exe",

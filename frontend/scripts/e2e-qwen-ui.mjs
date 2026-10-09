@@ -1,6 +1,8 @@
 import { createServer } from "../server.js";
+import testSupport from "../test-support.cjs";
 
-const CHROME_PATH = process.env.CHROME_PATH || "C:/Program Files/Google/Chrome/Application/chrome.exe";
+const { resolveChromeExecutable, windowsFixturePath } = testSupport;
+const CHROME_PATH = resolveChromeExecutable();
 
 function ensure(condition, message) {
   if (!condition) throw new Error(message);
@@ -406,21 +408,21 @@ async function main() {
           resampleSr: 0,
           rmsMixRate: 1,
           protect: 0.33,
-          modelPath: "C:\\models\\sample-rvc-model.pth",
-          indexPath: "C:\\models\\added.index",
+          modelPath: windowsFixturePath("C", "models", "sample-rvc-model.pth"),
+          indexPath: windowsFixturePath("C", "models", "added.index"),
           inputSource: "mic",
           externalAudioPath: "",
           cleanExternalAudio: false,
           demucsModel: "htdemucs_ft"
         },
-        modelRoot: "C:\\models\\rvc",
+        modelRoot: windowsFixturePath("C", "models", "rvc"),
         readyCount: 1,
         guideUrl: "/rvc-model-guide.html",
         models: [{
           id: "sample-rvc",
           label: "sample-rvc",
-          modelPath: "C:\\models\\sample-rvc-model.pth",
-          indexPath: "C:\\models\\added.index",
+          modelPath: windowsFixturePath("C", "models", "sample-rvc-model.pth"),
+          indexPath: windowsFixturePath("C", "models", "added.index"),
           ready: true,
           errorReason: ""
         }]
