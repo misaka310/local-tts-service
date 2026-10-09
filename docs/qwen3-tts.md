@@ -25,8 +25,8 @@
 
 ## 想定保存先
 
-- Hugging Face cache:
-  - `C:/Users/<user>/.cache/huggingface/hub/models--Qwen--Qwen3-TTS-12Hz-.../snapshots/<revision>/`
+- Hugging Face cache (relative to the `HF_HOME` cache root):
+  - `hub/models--Qwen--Qwen3-TTS-12Hz-.../snapshots/<revision>/`
 - ローカル vendor:
   - `runtime/vendor/qwen3-tts/<model directory>/`
 

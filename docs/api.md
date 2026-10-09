@@ -288,6 +288,8 @@ Compatibility alias for speech generation.
 
 Returns frontend defaults for RVC conversion.
 
+The paths below use `<model-root>` as a placeholder for the configured model directory. Actual responses contain paths from the server environment.
+
 ```json
 {
   "ok": true,
@@ -306,15 +308,15 @@ Returns frontend defaults for RVC conversion.
     "cleanExternalAudio": false,
     "demucsModel": "htdemucs_ft"
   },
-  "modelRoot": "C:\\repo\\models\\rvc",
+  "modelRoot": "<model-root>/models/rvc",
   "readyCount": 1,
   "guideUrl": "/rvc-model-guide.html",
   "models": [
     {
       "id": "my-voice",
       "label": "my_voice",
-      "modelPath": "C:\\repo\\models\\rvc\\my_voice\\my_voice.pth",
-      "indexPath": "C:\\repo\\models\\rvc\\my_voice\\my_voice.index",
+      "modelPath": "<model-root>/models/rvc/my_voice/my_voice.pth",
+      "indexPath": "<model-root>/models/rvc/my_voice/my_voice.index",
       "ready": true,
       "errorReason": ""
     }

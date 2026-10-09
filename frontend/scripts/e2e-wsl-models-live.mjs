@@ -3,8 +3,10 @@ import { promises as fs } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { createServer } from "../server.js";
+import testSupport from "../test-support.cjs";
 
-const CHROME_PATH = process.env.CHROME_PATH || "C:/Program Files/Google/Chrome/Application/chrome.exe";
+const { resolveChromeExecutable } = testSupport;
+const CHROME_PATH = resolveChromeExecutable();
 const TARGET_TEXT = "こんにちは。音声生成の確認です。日本語を自然に読み上げられるか確認しています。";
 const FRONTEND_DIR = process.cwd();
 const REPO_ROOT = path.resolve(FRONTEND_DIR, "..");

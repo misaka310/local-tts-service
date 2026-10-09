@@ -580,14 +580,14 @@ def test_load_config_defaults_deployment_to_standalone(tmp_path) -> None:
 def test_load_config_accepts_frontend_worker_url_and_env_override(tmp_path, monkeypatch) -> None:
     _write_minimal_config(
         tmp_path,
-        {"role": "frontend", "workerBaseUrl": "http://192.168.1.50:5177"},
+        {"role": "frontend", "workerBaseUrl": "http://worker.example.invalid:5177"},
     )
     monkeypatch.setenv("LOCAL_TTS_DEPLOYMENT_ROLE", "worker")
-    monkeypatch.setenv("LOCAL_TTS_WORKER_BASE_URL", "http://100.64.0.10:5177")
+    monkeypatch.setenv("LOCAL_TTS_WORKER_BASE_URL", "http://worker.example.invalid:5177")
 
     cfg = load_config(tmp_path)
 
-    assert cfg.deployment == {"role": "worker", "workerBaseUrl": "http://100.64.0.10:5177"}
+    assert cfg.deployment == {"role": "worker", "workerBaseUrl": "http://worker.example.invalid:5177"}
 
 
 def test_load_config_frontend_requires_worker_url(tmp_path) -> None:
@@ -600,10 +600,10 @@ def test_load_config_frontend_requires_worker_url(tmp_path) -> None:
 @pytest.mark.parametrize(
     "worker_url",
     [
-        "ftp://192.168.1.50:5177",
-        "http://user@192.168.1.50:5177",
-        "http://192.168.1.50:5177/path?x=1",
-        "http://192.168.1.50:5177/#fragment",
+        "ftp://worker.example.invalid:5177",
+        "http://user@worker.example.invalid:5177",
+        "http://worker.example.invalid:5177/path?x=1",
+        "http://worker.example.invalid:5177/#fragment",
     ],
 )
 def test_load_config_rejects_unsafe_worker_urls(tmp_path, worker_url) -> None:

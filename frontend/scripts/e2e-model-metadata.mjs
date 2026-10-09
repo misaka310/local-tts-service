@@ -1,6 +1,8 @@
 import { createServer } from "../server.js";
+import testSupport from "../test-support.cjs";
 
-const CHROME_PATH = process.env.CHROME_PATH || "C:/Program Files/Google/Chrome/Application/chrome.exe";
+const { resolveChromeExecutable } = testSupport;
+const CHROME_PATH = resolveChromeExecutable();
 
 function ensure(condition, message) {
   if (!condition) throw new Error(message);
