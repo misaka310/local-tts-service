@@ -230,7 +230,7 @@
       return;
     }
     objectUrl = previewUrl;
-    const audio = $("#voiceFilePreview");
+    const audio = document.querySelector("audio#voiceFilePreview");
     if (audio instanceof HTMLAudioElement) audio.src = objectUrl;
     const badge = $("#voiceFileBadge");
     if (badge) {
