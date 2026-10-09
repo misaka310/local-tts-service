@@ -338,9 +338,9 @@ Assert-True ($dryRunText -match 'torchaudio==2\.8\.0\+cpu') 'standard setup dry 
 Assert-True ($dryRunText -match 'background-removal') 'standard setup must include background removal'
 Assert-True ($dryRunText -match 'setup repo-local Irodori') 'standard setup must include Irodori'
 
-Assert-True ($ciText -match 'actions/checkout@[0-9a-f]{40}\s+# v6') 'CI must use an immutable Node 24-compatible checkout v6 action'
-Assert-True ($ciText -match 'actions/setup-python@[0-9a-f]{40}\s+# v6') 'CI must use an immutable Node 24-compatible Python setup v6 action'
-Assert-True ($ciText -match 'actions/setup-node@[0-9a-f]{40}\s+# v6') 'CI must use an immutable Node 24-compatible Node setup v6 action'
+Assert-True ($ciText -match 'actions/checkout@[0-9a-f]{40}\s+# v(?:6|7)(?:\.\d+\.\d+)?\b') 'CI must use an immutable Node 24-compatible checkout v6 or v7 action'
+Assert-True ($ciText -match 'actions/setup-python@[0-9a-f]{40}\s+# v(?:6|7)(?:\.\d+\.\d+)?\b') 'CI must use an immutable Node 24-compatible Python setup v6 or v7 action'
+Assert-True ($ciText -match 'actions/setup-node@[0-9a-f]{40}\s+# v(?:6|7)(?:\.\d+\.\d+)?\b') 'CI must use an immutable Node 24-compatible Node setup v6 or v7 action'
 Assert-True ($ciText -match '(?m)^\s*- main\s*$') 'CI must target the main branch'
 Assert-True ($ciText -notmatch '(?m)^\s*- public-release\s*$') 'CI must not target the retired public-release branch'
 Assert-True ($ciText -match 'python -m pytest --rootdir=\. -c config/pytest\.ini tests') 'CI must run backend tests with relocated pytest config'
