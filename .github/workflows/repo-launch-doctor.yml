@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check out target repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: target
           fetch-depth: 0
@@ -31,7 +31,7 @@ jobs:
           python-version: "3.11"
 
       - name: Check out Repo Launch Doctor
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: misaka310/repo-launch-doctor
           ref: a1607d8b2e9c5bf8ca1c25482cf21787af9e7487
