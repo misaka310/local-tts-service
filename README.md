@@ -1,2 +1,135 @@
 # local-tts-service
-複数のローカル音声合成モデルを、音声生成・比較・参照音声・RVCまでブラウザから操作できるWindows向けTTSアプリ。
+
+[![CI](https://github.com/misaka310/local-tts-service/actions/workflows/ci.yml/badge.svg)](https://github.com/misaka310/local-tts-service/actions/workflows/ci.yml)
+
+Windows PC上で複数の音声合成モデルをまとめて使うためのローカルアプリです。文章の読み上げ、モデルの聞き比べ、参照音声を使った生成、RVCによる声質変換をブラウザから操作できます。
+
+> **非公式・非提携について**
+> このプロジェクトは独立して開発された非公式ツールであり、READMEに記載する各音声合成モデル、音声変換技術、外部ツールの開発元・配布元による公式製品、提携製品、承認製品、スポンサー製品ではありません。各名称・商標・モデル・配布物の権利と利用条件は各権利者・配布元に帰属します。
+
+<p align="center">
+  <img src="docs/assets/system-overview.png" alt="local-tts-serviceの処理フロー概要" width="100%">
+</p>
+
+通常のTTS生成と、生成済み音声などへ必要なときだけ使うRVC声質変換を、独立した機能として示しています。
+
+https://github.com/user-attachments/assets/48682a8c-f6a2-4d1a-a645-62f03fe7d533
+
+## できること
+
+- 文章から音声を生成する
+- 同じ文章を複数モデルで生成して聞き比べる（生成中のモデルと経過時間を表示）
+- マイク録音や音声ファイルを参照音声として登録する
+- 対応する動画URLから短い参照音声候補を作る
+- TTS音声、音声ファイル、マイク録音をRVCで変換する
+- 比較画面の文章・話し方メモと生成履歴をブラウザ内に保存して再利用する
+
+対応モデルにはQwen3-TTS、Irodori v2 / v3 / v4 / v4.1（公式SmallとAnime fine-tune）、GPT-SoVITS、F5-TTSなどがあります。Orpheus 3B、Ming Omni TTS、Fish Audio S2 Pro、IndexTTS 2.5は個別導入できます。Fish S2 Proは24GB以上のGPUメモリを推奨します。通常生成とモデル比較では、画面に言語指定を出していない場合は各モデルの既定言語を使います。導入方法は[追加モデルのガイド](docs/fish-s2-pro-indextts-2-5.md)と[セットアップガイド](docs/setup.md)、F5-TTSの条件は[F5-TTSガイド](docs/f5-tts.md)を参照してください。
+
+## 必要環境
+
+- Windows 10 / 11（64bit）
+- NVIDIA GPU推奨
+- モデルと実行環境を保存できる空き容量
+- 自動セットアップを使う場合だけインターネット接続
+
+Python 3.11、Node.js、Gitはセットアップ時にアプリ内へ導入されるため、通常は手動インストール不要です。PyTorchとtorchaudioも、NVIDIA GPU環境ではCUDA 12.8版、GPUがない環境ではCPU版の同一バージョンを導入します。必要ファイルを事前配置した環境では、サービス起動と音声生成をネットワークなしで実行できます。CPUでも起動できますが、音声生成には時間がかかります。
+
+## セットアップと起動
+
+Gitを利用できる場合は、PowerShellでリポジトリを取得して起動します。
+
+```powershell
+git clone https://github.com/misaka310/local-tts-service.git
+cd local-tts-service
+.\local-tts.bat
+```
+
+Gitを利用しない場合は、GitHubの「Code」からZIPをダウンロードして展開し、リポジトリ直下の`local-tts.bat`をダブルクリックします。
+
+必要なツールやモデルが未配置の場合は自動セットアップしてからブラウザを開きます。この明示的な取得処理ではインターネットを使用し、ダウンロード量によっては**30分〜1時間半程度**かかることがあります。
+
+必要ファイルが配置済みなら、通常起動は外部からモデルやTokenizerを取得しません。既定モデルを起動時に検査・事前ロードし、「生成する」を押した時点では生成処理だけを実行します。
+
+外部連携からは、サービスを終了せず対応モデルの常駐workerだけを明示的に解放してGPUメモリを返すこともできます。詳細は[API仕様](docs/api.md)を参照してください。
+
+起動中は、このアプリ専用のターミナルが1枚開いたままになります。そのターミナルで`Ctrl+C`を押すか、ウィンドウを閉じるとアプリも終了します。
+
+起動環境を修復する場合:
+
+```bat
+local-tts.bat -ForceSetup
+```
+
+`-ForceSetup` は既存の設定・参照音声・生成物を残したまま実行環境を再確認します。アプリ更新後に実行環境も更新する場合は、一度この修復セットアップを実行してください。
+
+起動できない原因を確認する場合:
+
+```bat
+local-tts.bat -Check
+```
+
+詳しい導入条件や追加モデルについては、[セットアップガイド](docs/setup.md)を参照してください。常駐運用では、ログオン時起動と定期ヘルスチェックによる自動復旧も設定できます。
+
+### 2台のPCで使う
+
+新PCを画面専用、旧PCを生成workerとして分離できます。モデル、WSL、RVC、参照音声、生成物は旧PC側だけに置き、新PCは旧PCのprivate-network gatewayへ接続します。設定例とFirewall/Tailscaleの注意点は[セットアップガイド](docs/setup.md#2台のpcで使う)を参照してください。
+
+## 完全オフライン利用
+
+必要ファイルを配置すれば、通常起動と音声生成はネットワークなしで利用できます。不足時は起動時にファイル名と配置先を表示します。配置一覧は[セットアップガイド](docs/setup.md#irodori-v3の完全オフライン配置)を参照してください。
+
+## 最初の音声を作る
+
+1. ブラウザで「通常生成」を開きます。
+2. 利用可能なモデルを選びます。
+3. 読ませる文章を入力します。
+4. モデルに応じて話し方メモまたは参照音声を設定します。両方に対応するモデルは、どちらか一方が必要です。
+5. 「生成する」を押します。
+
+既定の `Irodori v3` は参照音声なしで試せます。`Irodori v4.1 Small` と `Irodori v4.1 Anime` は参照音声と話し方メモの両方に対応します。`Qwen 1.7B`を選ぶ場合は、参照音声と一致する書き起こしが必要です。
+
+画面ごとの操作方法は [利用ガイド](./docs/user-guide.md) を参照してください。
+
+## データの保存場所
+
+設定、モデル、参照音声、生成物はローカルPC内に保存されます。主な保存先は次の通りです。
+
+- ローカル設定: `config/config.local.json`
+- モデル・実行環境・生成物: `runtime/`
+- 参照音声: `reference/voices/`
+- RVCモデル: `models/rvc/`
+
+これらのローカルデータはGit管理対象外です。
+
+## 利用上の注意
+
+モデル本体、外部ツール、参照音声、動画、生成物には、それぞれの配布元や権利者の利用条件が適用されます。本人の同意または適切な利用権限がある音声・動画だけを使用してください。
+
+## 困ったとき
+
+- [トラブルシューティング](./docs/troubleshooting.md)
+- [セットアップガイド](./docs/setup.md)
+- [利用ガイド](./docs/user-guide.md)
+
+## 開発と品質確認
+
+```powershell
+python -m pytest --rootdir=. -c config/pytest.ini tests
+cd frontend
+npm run check
+npm test
+```
+
+CIではバックエンド、セットアップdry-run、管理プロセス、公開履歴監査、フロントエンド、ブラウザE2Eを実行します。FastAPI app factoryは依存を差し替えた単体テストを持ち、Ruffのimport・modernization・bugbear規則と70%のfocused coverageを要求します。
+
+## 開発者向け資料
+
+- [開発・テスト手順](./docs/development.md)
+- [API](./docs/api.md)
+- [構成](./docs/architecture.md)
+- [フロントエンド構成](./docs/frontend.md)
+
+## ライセンス
+
+このリポジトリのコードは [MIT License](./LICENSE) です。モデル、重み、外部リポジトリ、音声素材にはそれぞれ別の利用条件が適用されます。

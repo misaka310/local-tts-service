@@ -1,0 +1,11 @@
+Create an extremely clear product capability diagram for a GitHub README, exactly 1536x1024, 3:2 landscape, white background, dark navy text, restrained blue and teal accents, very large rounded cards, large Japanese labels, no logos, no watermark, no decorative clutter. Title: 「local-tts-service の全体像」. This is a simple capability overview, not a dense architecture diagram. Use exactly two independent horizontal flows plus one small reference-audio note. No crossed arrows, no arrows aimed at section borders, and no tiny text.
+
+TOP FLOW, solid arrows, heading 「音声を生成」:
+Two input cards 「文章」 and 「参照音声」 feed into one large card 「TTSモデルを選択」. Inside that card list exactly, in large text on separate lines: 「Qwen3-TTS」, 「Irodori」, 「GPT-SoVITS」. Continue with solid arrows to 「TTS生成音声」 and then to one large destination card 「再生 / モデル比較 / 生成履歴 / ローカル保存」. This complete top flow is the primary feature and must have no connection through RVC.
+
+BOTTOM FLOW, dashed arrows, heading 「声質を変換（任意）」:
+One wide input card 「生成済みTTS / 音声ファイル / マイク録音」 → 「RVC 声質変換」 → 「変換後音声」 → 「再生 / 生成履歴 / ローカル保存」. Keep this bottom flow visually separate from the top flow. It is an optional second capability, not a step required for TTS generation. Do not draw an arrow from the top flow into the bottom flow; the input label itself explains that generated TTS can be selected later.
+
+Add one compact but readable note card near the 「参照音声」 input, with no complex arrows: 「参照音声はマイク・音声ファイル・対応動画URLから登録」. If an arrow is used, use only one short arrow from this note directly to the 「参照音声」 card.
+
+All cards and text must remain comfortably readable at 750px display width. Use no additional nodes, labels, explanations, containers, or decorative text. The intended message must be immediately obvious: the top row generates TTS and works by itself; the bottom row optionally converts voice quality afterward or from another audio source.
