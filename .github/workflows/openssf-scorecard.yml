@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      security-events: write
+      contents: read
       id-token: write
     steps:
       - name: Checkout code
@@ -55,21 +55,44 @@ jobs:
           results_file: results.sarif
           results_format: sarif
           publish_results: true
-      - name: Keep actionable findings for GitHub Security
-        run: >-
-          python3 .github/scripts/filter-scorecard-sarif.py
-          --input results.sarif
-          --output results-code-scanning.sarif
-          --solo-maintainer
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: openssf-scorecard-sarif
-          path: |
-            results.sarif
-            results-code-scanning.sarif
+          path: results.sarif
+          retention-days: 5
+  security-sarif:
+    name: Filter actionable findings for GitHub Security
+    needs: analysis
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download Scorecard SARIF
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: openssf-scorecard-sarif
+          path: scorecard-results
+      - name: Keep actionable findings for GitHub Security
+        run: >-
+          python3 .github/scripts/filter-scorecard-sarif.py
+          --input scorecard-results/results.sarif
+          --output scorecard-results/results-code-scanning.sarif
+          --solo-maintainer
+      - name: Upload filtered artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: openssf-scorecard-filtered-sarif
+          path: scorecard-results/results-code-scanning.sarif
           retention-days: 5
       - name: Upload to code-scanning
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
-          sarif_file: results-code-scanning.sarif
+          sarif_file: scorecard-results/results-code-scanning.sarif
