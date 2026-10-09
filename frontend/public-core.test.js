@@ -87,6 +87,61 @@ test("reference voice success renders the voice ID as text, not markup", async (
   assert.deepEqual(panel.children[2].children.map((button) => button.dataset.success), ["normal", "manage", "again"]);
 });
 
+test("reference audio preview refuses a non-blob object URL", async () => {
+  const source = await readFile(new URL("./public/reference-voices-ux.js", import.meta.url), "utf-8");
+  const listeners = new Map();
+  const input = {
+    files: [{ name: "voice.wav" }],
+    value: "",
+    addEventListener(type, listener) { listeners.set(type, listener); },
+  };
+  class AudioElement {
+    constructor() { this.src = ""; }
+    addEventListener() {}
+    pause() {}
+    removeAttribute() {}
+    load() {}
+  }
+  const audio = new AudioElement();
+  const status = { textContent: "" };
+  const saveButton = { disabled: false, addEventListener() {} };
+  const nodes = new Map([
+    ["#voiceFileInput", input],
+    ["#voiceFilePreview", audio],
+    ["#voiceFileStatus", status],
+    ["#voiceFileSaveButton", saveButton],
+    ["#voiceFileIdInput", { value: "voice_id" }],
+    ["#voiceFileTextInput", { value: "こんにちは" }],
+  ]);
+  const document = {
+    querySelector(selector) { return nodes.get(selector) || null; },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+  };
+  const window = {
+    location: { href: "http://localhost/", origin: "http://localhost" },
+    addEventListener() {},
+    dispatchEvent() {},
+  };
+  const revoked = [];
+  let generatedUrl = "javascript:alert(1)";
+  class URLMock extends URL {
+    static createObjectURL() { return generatedUrl; }
+    static revokeObjectURL(value) { revoked.push(value); }
+  }
+
+  vm.runInNewContext(source, { document, window, URL: URLMock, HTMLAudioElement: AudioElement, requestAnimationFrame: (callback) => callback() });
+  listeners.get("change")({ target: input });
+
+  assert.equal(audio.src, "");
+  assert.deepEqual(revoked, ["javascript:alert(1)"]);
+  assert.match(status.textContent, /プレビューURL/);
+
+  generatedUrl = "blob:http://localhost/voice-preview";
+  listeners.get("change")({ target: input });
+  assert.equal(audio.src, generatedUrl);
+});
+
 test("low latency Irodori v3 stays a runtime profile, not a separate license entry", () => {
   assert.equal(modelCatalog.modelLabel("irodori_v3_low_latency"), "Irodori v3 低遅延 (8-step)");
   assert.ok(modelCatalog.DESIRED_MODELS.includes("irodori_v3_low_latency"));

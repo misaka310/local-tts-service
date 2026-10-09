@@ -46,6 +46,15 @@
     return String(selectedFile?.name || "").split(".").pop()?.toLowerCase() || "";
   }
 
+  function isSafeAudioPreviewUrl(value) {
+    try {
+      const url = new URL(value, window.location.href);
+      return url.protocol === "blob:" && url.origin === window.location.origin;
+    } catch {
+      return false;
+    }
+  }
+
   function existingVoiceIds() {
     return new Set($$('[data-voice-manage-id]').map((item) => String(item.dataset.voiceManageId || "")));
   }
@@ -212,9 +221,17 @@
       updateFileState();
       return;
     }
-    objectUrl = URL.createObjectURL(selectedFile);
+    const previewUrl = URL.createObjectURL(selectedFile);
+    if (!isSafeAudioPreviewUrl(previewUrl)) {
+      URL.revokeObjectURL(previewUrl);
+      selectedFile = null;
+      if (status) status.textContent = "音声ファイルのプレビューURLを検証できませんでした。ファイルを選び直してください。";
+      updateFileState();
+      return;
+    }
+    objectUrl = previewUrl;
     const audio = $("#voiceFilePreview");
-    if (audio) audio.src = objectUrl;
+    if (audio instanceof HTMLAudioElement) audio.src = objectUrl;
     const badge = $("#voiceFileBadge");
     if (badge) {
       badge.textContent = "選択済み";
