@@ -1,6 +1,7 @@
 # local-tts-service
 
 [![CI](https://github.com/misaka310/local-tts-service/actions/workflows/ci.yml/badge.svg)](https://github.com/misaka310/local-tts-service/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/misaka310/local-tts-service/badge)](https://scorecard.dev/viewer/?uri=github.com/misaka310/local-tts-service)
 
 Windows PC上で複数の音声合成モデルをまとめて使うためのローカルアプリです。文章の読み上げ、モデルの聞き比べ、参照音声を使った生成、RVCによる声質変換をブラウザから操作できます。
 
