@@ -27,6 +27,9 @@ ORPHEUS_SNAC_REV="e0b0016bc39c9d144e51aba2f275f59b7a6874d6"
 ORPHEUS_SNAC_REPO="onnx-community/snac_24khz-ONNX"
 ORPHEUS_SNAC_FILE="onnx/decoder_model.onnx"
 MING_MODEL_REV="9154772e7fbc585907b6237e3190790676f28975"
+UV_VERSION="0.12.18"
+UV_X86_64_SHA256="89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16"
+UV_AARCH64_SHA256="afb6291f3f0a6b4521fc67b947822506c41dde5b60d2189dd8f3695b2ac8c9e7"
 
 mkdir -p "$VENV_ROOT" "$VENDOR_ROOT" "$MODEL_ROOT" "$LOG_ROOT" "$MANIFEST_ROOT"
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
@@ -58,9 +61,43 @@ if ! hf auth whoami >/dev/null 2>&1; then
   exit 2
 fi
 
+install_uv() {
+  local platform expected_sha256 asset temp_dir
+  case "$(uname -m)" in
+    x86_64|amd64)
+      platform="x86_64-unknown-linux-gnu"
+      expected_sha256="$UV_X86_64_SHA256"
+      ;;
+    aarch64|arm64)
+      platform="aarch64-unknown-linux-gnu"
+      expected_sha256="$UV_AARCH64_SHA256"
+      ;;
+    *)
+      log "Unsupported WSL architecture for the uv bootstrap: $(uname -m)" >&2
+      return 2
+      ;;
+  esac
+
+  asset="uv-${platform}.tar.gz"
+  temp_dir="$(mktemp -d)"
+  (
+    trap 'rm -rf -- "$temp_dir"' EXIT
+    local archive="$temp_dir/$asset"
+    local url="https://releases.astral.sh/github/uv/releases/download/$UV_VERSION/$asset"
+    curl --fail --location --proto '=https' --tlsv1.2 --silent --show-error "$url" -o "$archive"
+    if ! printf '%s  %s\n' "$expected_sha256" "$archive" | sha256sum --check --status; then
+      echo "uv $UV_VERSION archive checksum verification failed" >&2
+      exit 1
+    fi
+    tar -xzf "$archive" -C "$temp_dir"
+    install -D -m 0755 "$temp_dir/uv-$platform/uv" "$HOME/.local/bin/uv"
+    install -D -m 0755 "$temp_dir/uv-$platform/uvx" "$HOME/.local/bin/uvx"
+  )
+}
+
 if ! command -v uv >/dev/null 2>&1; then
   log "Installing uv in the WSL user account"
-  curl -LsSf https://astral.sh/uv/install.sh | sh
+  install_uv
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 fi
 uv python install 3.11

@@ -50,6 +50,8 @@ FishAudioはS1-miniに対応する上記revisionを使用します。現行S2向
 共通条件:
 
 - Python 3.11（`uv python install 3.11`）
+- `uv`がない場合はセットアップ時にuv 0.12.18を導入する。WSLのx86_64 / aarch64向け公式アーカイブをSHA-256照合してから展開する。その他のCPUアーキテクチャでは導入を停止する
+- `uv`導入には`curl`、`sha256sum`、`tar`が必要
 - PyTorch 2.8.0 / torchvision 0.23.0 / torchaudio 2.8.0
 - CUDA 12.8 wheel
 - 1リクエストごとにWSLプロセスを起動し、モデルを同時常駐させない

@@ -375,6 +375,19 @@ def test_wsl_t5gemma_setup_and_availability_include_dependency_cache_checks() ->
     assert "t5gemma_offline_infer.py" in check_source
 
 
+def test_missing_uv_bootstrap_pins_and_verifies_official_linux_artifact() -> None:
+    setup_source = (ROOT / "scripts" / "setup_wsl_tts_models.sh").read_text(encoding="utf-8")
+
+    assert 'UV_VERSION="0.12.18"' in setup_source
+    assert 'platform="x86_64-unknown-linux-gnu"' in setup_source
+    assert '89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16' in setup_source
+    assert 'platform="aarch64-unknown-linux-gnu"' in setup_source
+    assert 'afb6291f3f0a6b4521fc67b947822506c41dde5b60d2189dd8f3695b2ac8c9e7' in setup_source
+    assert 'sha256sum --check --status' in setup_source
+    assert setup_source.index('sha256sum --check --status') < setup_source.index('tar -xzf "$archive"')
+    assert 'curl -LsSf https://astral.sh/uv/install.sh | sh' not in setup_source
+
+
 def test_optional_asmr_models_are_registered_and_setup_is_explicit() -> None:
     config = load_config(ROOT)
 
