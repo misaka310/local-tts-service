@@ -1,0 +1,82 @@
+{
+  "id": "voxcpm2_tts_workflow",
+  "revision": 0,
+  "last_node_id": 2,
+  "last_link_id": 1,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "VoxCPM2_TTS",
+      "pos": [100, 100],
+      "size": [400, 300],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {"name": "model_name", "type": "COMBO", "widget": {"name": "model_name"}},
+        {"name": "lora_name", "type": "COMBO", "widget": {"name": "lora_name"}},
+        {"name": "voice_description", "type": "STRING", "widget": {"name": "voice_description"}},
+        {"name": "text", "type": "STRING", "widget": {"name": "text"}},
+        {"name": "cfg_value", "type": "FLOAT", "widget": {"name": "cfg_value"}},
+        {"name": "inference_timesteps", "type": "INT", "widget": {"name": "inference_timesteps"}},
+        {"name": "max_tokens", "type": "INT", "widget": {"name": "max_tokens"}},
+        {"name": "normalize_text", "type": "BOOLEAN", "widget": {"name": "normalize_text"}},
+        {"name": "seed", "type": "INT", "widget": {"name": "seed"}},
+        {"name": "force_offload", "type": "BOOLEAN", "widget": {"name": "force_offload"}},
+        {"name": "dtype", "type": "COMBO", "widget": {"name": "dtype"}},
+        {"name": "device", "type": "COMBO", "widget": {"name": "device"}},
+        {"name": "torch_compile", "type": "BOOLEAN", "widget": {"name": "torch_compile"}}
+      ],
+      "outputs": [
+        {
+          "localized_name": "Generated Audio",
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [1]
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "VoxCPM2",
+        "None",
+        "",
+        "Hello, welcome to VoxCPM!",
+        2.0,
+        10,
+        4096,
+        true,
+        42,
+        false,
+        "auto",
+        "cuda",
+        false
+      ]
+    },
+    {
+      "id": 2,
+      "type": "SaveAudio",
+      "pos": [600, 100],
+      "size": [300, 150],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {"name": "audio", "type": "AUDIO", "link": 1},
+        {"name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}},
+        {"name": "audioUI", "type": "AUDIO_UI", "widget": {"name": "audioUI"}}
+      ],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "tts_e2e_voxcpm2"
+      ]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 0, "AUDIO"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}

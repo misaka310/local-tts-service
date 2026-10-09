@@ -1,0 +1,279 @@
+# セットアップガイド
+
+## 必要環境
+
+- Windows 10 / 11（64bit）
+- NVIDIA GPU推奨
+- モデルと実行環境を保存できる空き容量
+- 自動取得を使う場合だけインターネット接続
+
+Python 3.11、Node.js、Gitはアプリ内の `runtime/tools/` へ自動導入されるため、通常はWindowsへ別途インストールする必要はありません。
+
+## 初回セットアップと起動
+
+リポジトリ直下の `local-tts.bat` をダブルクリックします。
+
+```powershell
+local-tts.bat
+```
+
+必要な環境が不足している場合は自動でセットアップし、完了後にサービスとブラウザを起動します。準備済みの場合はセットアップを繰り返さず、そのまま起動します。
+
+初回セットアップの主な内容:
+
+- `config/config.example.json` から `config/config.local.json` を作成
+- 固定版Python 3.11を公式配布元から取得し、SHA-256検証後にアプリ内へ導入
+- Python仮想環境、依存パッケージ、Windows用のアプリ内VC++ランタイムを導入
+- NVIDIA GPU検出時に検証済みCUDA版PyTorchを導入
+- 固定版Node.jsを公式配布元から取得し、SHA-256検証後に保存
+- 固定版MinGitを公式配布元から取得し、SHA-256検証後に保存
+- frontend依存を導入
+- Qwen3-TTS Voice Clone 1.7Bモデルを取得
+- Irodori v2 / v3 / v3 VoiceDesign / v4 / v4.1 Small / v4.1 Anime、codec、Tokenizerをリポジトリ内へ導入
+- FFmpegを導入
+- yt-dlpとfaster-whisperを確認
+- BGM・伴奏除去用のDemucs環境を導入
+- サービスを起動してブラウザを開く
+
+動画URLから参照音声を作るためのツールもセットアップに含まれます。文字起こしモデルやBGM・伴奏除去モデルは、機能を初めて使った時に追加ダウンロードされる場合があります。
+
+## 2台のPCで使う
+
+新PCを操作画面、旧PCを生成workerに分けられます。モデル、WSL、RVC、参照音声、生成物、Hugging Face資格情報は旧PCだけに置きます。
+
+旧PCの`config/config.local.json`ではworker roleを指定し、FastAPIはloopbackのまま、Node gatewayだけをLAN/Tailscaleへbindします。
+
+```json
+{
+  "host": "127.0.0.1",
+  "deployment": { "role": "worker", "workerBaseUrl": "" },
+  "frontend": { "host": "0.0.0.0", "port": 5177 }
+}
+```
+
+新PCでは`config/config.example.json`を`config/config.local.json`へコピーしてからfrontend roleと旧PCのURLを設定します。
+
+```json
+{
+  "deployment": {
+    "role": "frontend",
+    "workerBaseUrl": "http://192.168.1.50:5177"
+  },
+  "frontend": { "host": "127.0.0.1", "port": 5177 }
+}
+```
+
+frontend roleの初回セットアップはNode.jsとfrontend packageだけを準備し、Python、CUDA/PyTorch、WSL、モデル、FFmpeg、Demucs、RVC環境を新PCへ導入しません。旧PCがまだ起動していなくても新PCのUIは起動でき、生成操作時には旧PC workerへ接続できない旨を表示します。旧PCが後から起動すれば、新PC側を再起動せずそのまま生成できます。worker roleでは通常起動時にブラウザを開きません。
+
+旧PCのIPはDHCP予約で固定するかTailscaleアドレスを使います。Windows Firewallは旧PCのgatewayポートを新PCまたは信頼済みprivate networkからだけ許可してください。ルーターのポート開放は不要です。`referenceVoicesDir`を変更している場合も、worker gatewayとFastAPIは同じ保存先を正本として使用します。
+
+ログオン時起動と定期復旧を使う場合は、どちらのPCでも同じ`install-local-tts-startup-task.ps1`を使えます。登録されるwatchdogはdeployment roleを判定し、frontendでは新PCのローカルUI、workerでは旧PCのgatewayとbackend、standaloneではbackendとUIを確認し、不足しているプロセスだけを復旧します。
+
+## Irodori v3の完全オフライン配置
+
+別PCなどで取得済みの実行環境とモデルを配置すれば、通常起動と生成はネットワークなしで動作します。Irodori v3には次が必要です。
+
+```text
+runtime/venv-irodori/Scripts/python.exe
+runtime/vendor/Irodori-TTS-upstream/
+runtime/models/irodori/Irodori-TTS-500M-v3/model.safetensors
+runtime/models/irodori/Semantic-DACVAE-Japanese-32dim/weights.pth
+runtime/models/irodori/tokenizers/llm-jp-3-150m/tokenizer.json
+runtime/models/irodori/tokenizers/llm-jp-3-150m/tokenizer_config.json
+runtime/models/irodori/tokenizers/llm-jp-3-150m/special_tokens_map.json
+```
+
+起動時にcheckpoint、codec、Tokenizer、専用Python、Irodoriコードを検査し、既定のIrodori v3を事前ロードします。不足時は「○○がありません」と配置先を表示し、生成ボタンでは取得や初期化を行いません。通常起動と生成はHugging Faceのログイン状態や認証トークンに依存しません。
+
+### Irodori v4.1
+
+`Irodori v4.1 Small` と `Irodori v4.1 Anime` は既存のIrodori常駐runtimeで動作します。初回セットアップでは次の完全なモデルsnapshotを取得し、各モデルに同梱されたTokenizerもローカルから使用します。
+
+```text
+runtime/models/irodori/Irodori-TTS-v4.1-Small/
+runtime/models/irodori/Irodori-TTS-v4.1-Anime/
+```
+
+どちらも参照音声による声寄せ、話し方メモ、速度・表現強度、seedを利用できます。Animeはv4.1 Smallのfine-tuneで、captionや絵文字による表現制御は公式Smallと異なる出方になる場合があります。既存のIrodori v4 Smallとv2/v3は削除せず、そのまま選択できます。
+
+## 2回目以降
+
+同じ `local-tts.bat` をダブルクリックします。
+
+通常起動ではモデルやTokenizerをダウンロードせず、全WSLモデルの外部確認も行いません。バックエンド起動中に既定のIrodori v3をローカルから事前ロードし、準備完了後にブラウザを開きます。
+
+## 修復セットアップ
+
+途中でセットアップに失敗した場合や、必要な環境を作り直す場合:
+
+```powershell
+local-tts.bat -ForceSetup
+```
+
+既存のローカル設定、参照音声、モデル、生成物を削除せず、不足している依存関係を再確認します。
+
+## 診断
+
+起動できない場合:
+
+```powershell
+local-tts.bat -Check
+```
+
+より詳しい外部サービス確認は開発者向けスクリプトを直接使います。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-tts.ps1 -Deep -CheckOptionalServices
+```
+
+## 標準セットアップに含まれるもの
+
+| 機能・モデル | 初回セットアップ後 | 追加作業 |
+|---|---:|---|
+| Qwen3-TTS Voice Clone 1.7B | 使用可能 | 参照音声と一致する書き起こし |
+| Irodori v2 / v3 / v3 VoiceDesign / v4 / v4.1 Small / v4.1 Anime | 使用可能 | なし |
+| 動画URL候補抽出 | 使用可能 | 初回利用時に音声認識モデルを取得する場合あり |
+| BGM・伴奏除去 | 使用可能 | 初回利用時にDemucsモデルを取得する場合あり |
+| Qwen3-TTS Voice Clone 0.6B | 未導入 | 追加モデルと参照音声 |
+| F5-TTS Zero-shot | 未導入 | 専用環境・日本語モデル・参照音声 |
+| GPT-SoVITS | 無効 | vendorセットアップと設定変更 |
+| RVC | 声モデル未配置 | `.pth` と `.index` を配置 |
+| Chatterbox Multilingual V3 / Fun-CosyVoice 3.0 | 未導入 | Windows向け個別セットアップと参照音声 |
+| WSL追加モデル | 無効 | 個別セットアップ |
+| VoxCPM2互換 | 無効 | ComfyUIと設定追加 |
+
+## RVCモデルを追加する
+
+RVCの声モデルは自動ダウンロードされません。同じモデルの `.pth` と `.index` をモデルごとのフォルダーへ配置します。
+
+```text
+models/rvc/my_voice/
+├── my_voice.pth
+└── my_voice.index
+```
+
+RVCタブがこのフォルダーを自動検出します。使用可能な組がない場合は、変換画面の代わりに配置先と作成ガイドが表示されます。
+
+## 参照音声を登録する
+
+ブラウザの「参照音声」から次の方法を選べます。
+
+1. マイクで録音
+2. 音声ファイルから登録
+3. 動画URLから登録
+
+参照音声は次の場所に保存されます。
+
+```text
+reference/voices/<voiceId>/voice.wav
+reference/voices/<voiceId>/voice.txt
+```
+
+音声内で実際に話している文章を正確に入力してください。目安は3〜10秒、1人の声、BGM・反響・ノイズが少ない音声です。
+
+## 任意モデルを追加する
+
+### Qwen3-TTS Voice Clone 0.6B
+
+標準セットアップはVoice Clone 1.7Bだけを取得します。0.6Bも使う場合は、設定に登録されたQwen3-TTS Baseモデルを追加取得します。既にある1.7Bのファイルは再利用されます。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-local-tts.ps1 -DownloadQwenModels
+```
+
+0.6Bは公開revisionへ固定して取得します。必要な参照音声は `voice.wav` と、その内容に一致する `voice.txt` です。詳細は[Qwen3-TTSガイド](./qwen3-tts.md)を参照してください。
+
+### F5-TTS
+
+日本語Zero-shotモデルは標準セットアップに含まれません。F5専用環境へコード・重みを導入します。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-f5-tts.ps1
+```
+
+生成には `voice.wav` と、その内容に一致する `voice.txt` が必要です。日本語重みは非商用条件です。配布元のmodel cardとHub metadataのlicense表記が異なるため、再配布時は配布元の最新条件を確認してください。詳細は[F5-TTSガイド](./f5-tts.md)を参照してください。
+
+### Windows向け感情表現モデル
+
+Chatterbox Multilingual V3とFun-CosyVoice 3.0 0.5Bは、既存環境を変更せずモデル別の専用venvへ導入します。初回のみ公式コード、固定revisionの重み、CosyVoice用WeTextデータを取得します。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-local-expressive-tts.ps1 -Model all
+```
+
+個別に確認する場合は次を実行します。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-expressive-tts.ps1 -Model chatterbox
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-local-expressive-tts.ps1 -Model cosyvoice
+```
+
+どちらも参照音声が必要です。Chatterboxは日本語`ja`と表現強度を直接使います。CosyVoiceは通常の日本語入力を内部でカタカナへ正規化し、感情指示と話速を推論へ渡します。GPU空きが不足している場合は既存GPU処理を止めず、その要求だけCPUへ切り替えます。親プロセスの`CUDA_VISIBLE_DEVICES`によるGPU制限を保持し、`config/config.local.json`の`gpu.expressiveTtsVisibleDevices`を指定した場合は両方の範囲内から選びます。親の制限が空なら`auto`はCPUを使います。セットアップ後の生成はリポジトリ内のモデルとWeTextデータだけを使います。
+
+### WSLモデル
+
+Sarashina2.2-TTS、FireRedTTS-2、T5Gemma-TTS、FishAudio S1-miniはWSL内の個別環境へ導入します。これら4モデルはまとめて導入できます。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model all
+```
+
+ASMR向けのOrpheus 3BとMing Omni TTSは大容量の任意モデルなので標準セットアップには含めません。両方まとめて、または個別に導入します。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model asmr
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model orpheus_asmr
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-wsl-tts-models.ps1 -Model ming_omni_tts
+```
+
+Orpheusは参照音声不要・英語優先で、`orpheus-cpp`とCPU版`llama-cpp-python`、Q4_K_M GGUF、SNAC ONNX decoderを専用環境へ固定配置します。Mingは話し方メモだけでも生成でき、任意で参照音声を併用できます。どちらもセットアップ完了後の通常生成ではモデルやdecoderを外部取得しません。
+
+詳細は [wsl-tts-models.md](./wsl-tts-models.md) を参照してください。
+
+### GPT-SoVITS
+
+GPT-SoVITSを使う場合は、開発者向けセットアップを実行して `config/config.local.json` で有効化します。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-gpt-sovits.ps1
+```
+
+### VoxCPM2互換
+
+VoxCPM2互換は標準設定に含まれません。ComfyUIの配置先と起動設定を `config/config.local.json` へ追加してください。
+
+## プロセス管理
+
+起動したサービスの情報は `runtime/processes/` に保存され、同じ起動セッションのWindows Job Objectにも登録されます。通常起動では、このアプリ専用のクラシックコンソールを1枚作成します。専用コンソールはサービスの実行中に開いたままになり、そこで`Ctrl+C`を押すか専用コンソールを閉じると、そのセッションで開始したサービスだけを終了します。起動元のPowerShellやWindows Terminalとは分離されているため、それらを閉じる必要はありません。次回起動時は、PID、起動時刻、コマンド識別情報、リポジトリパスが一致する、このアプリが管理する旧プロセスだけを整理してから再起動します。
+
+同じポートを無関係なアプリが使用している場合、そのプロセスは終了せず、起動を中断して使用中のURLを表示します。別アプリを終了するかポート設定を変更してください。
+
+常駐運用では、次のスクリプトでWindows Scheduled Taskを登録できます。タスクはログオン時に起動し、既定では5分ごとにdeployment roleに対応するhealth endpointを確認します。サービスが正常なら即終了し、停止している場合だけ管理対象スタックを復旧します。タスクはリポジトリ同梱のGUI型no-window launcherからPowerShellを起動し、Windows Terminalを表示せずに出力を`runtime/logs/scheduled-watchdog.stdout.log`と`runtime/logs/scheduled-watchdog.stderr.log`へ保存します。ログは直近の実行内容で置き換わります。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-local-tts-startup-task.ps1
+```
+
+監視間隔は`-IntervalMinutes`で変更できます。タスク名は既定で`LocalTTS Managed Stack`です。
+
+## ローカルデータ
+
+次のデータはGit管理対象外です。
+
+- `config/config.local.json`
+- `runtime/`
+- `reference/voices/`
+- `models/rvc/` 内のモデル本体
+- 生成音声、キャッシュ、ログ
+
+設定例やソースコードへ個人用の絶対パスやトークンを書き込まないでください。
+
+## クリーンインストール検証
+
+新規Windows環境で依存関係、モデル取得、起動、実WAV生成まで確認する場合:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-clean-install.ps1
+```
+
+詳細は [clean-install-verification.md](./clean-install-verification.md) を参照してください。

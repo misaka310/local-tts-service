@@ -1,0 +1,565 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import vm from "node:vm";
+
+globalThis.LocalTtsChunking = {
+  clampInteger(value, fallback, min, max) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.min(max, Math.max(min, Math.round(parsed))) : fallback;
+  },
+};
+globalThis.window = globalThis;
+await import("./public/model-catalog.js");
+await import("./public/model-capabilities.js");
+await import("./public/generation-core.js");
+await import("./public/store.js");
+await import("./public/rvc/rvc-form.js");
+await import("./public/rvc/rvc-mic-recorder.js");
+await import("./public/rvc/rvc-result.js");
+await import("./public/audio-controller.js");
+await import("./public/normal-controller.js");
+await import("./public/compare-controller.js");
+await import("./public/rvc/rvc-controller.js");
+
+const core = globalThis.LocalTts.generationCore;
+const modelCatalog = globalThis.LocalTtsModelCatalog;
+const capabilities = globalThis.LocalTtsModelCapabilities;
+
+function fakeElement() {
+  const listeners = new Map();
+  return {
+    checked: false,
+    value: "",
+    disabled: false,
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, []);
+      listeners.get(type).push(listener);
+    },
+    dispatch(type, event = {}) {
+      for (const listener of listeners.get(type) || []) listener({ target: this, ...event });
+    },
+    listenerCount(type) {
+      return (listeners.get(type) || []).length;
+    },
+  };
+}
+
+test("reference voice success renders the voice ID as text, not markup", async () => {
+  const source = await readFile(new URL("./public/reference-voices-ux.js", import.meta.url), "utf-8");
+  const listeners = new Map();
+  const createElement = (tagName) => ({
+    tagName: String(tagName).toLowerCase(),
+    className: "",
+    type: "",
+    dataset: {},
+    children: [],
+    classList: { toggle() {} },
+    append(...children) { this.children.push(...children); },
+    addEventListener() {},
+    setAttribute() {},
+    scrollIntoView() {},
+  });
+  const panel = createElement("div");
+  panel.hidden = true;
+  panel.replaceChildren = (...children) => { panel.children = children; };
+  const document = {
+    querySelector(selector) { return selector === "#voiceRegistrationSuccess" ? panel : null; },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+    createElement,
+  };
+  const window = {
+    addEventListener(type, listener) { listeners.set(type, listener); },
+    dispatchEvent() {},
+  };
+
+  vm.runInNewContext(source, { document, window, URL, requestAnimationFrame: (callback) => callback() });
+  const voiceId = '<img src=x onerror="alert(1)">';
+  listeners.get("local-tts:reference-voice-registered")({ detail: { voiceId } });
+
+  assert.equal(panel.hidden, false);
+  assert.equal(Object.hasOwn(panel, "innerHTML"), false);
+  assert.equal(panel.children[0].tagName, "h2");
+  assert.equal(panel.children[1].tagName, "p");
+  assert.equal(panel.children[1].textContent, `参照音声「${voiceId}」を登録しました。音声クローン対応モデルで使用できます。`);
+  assert.equal(panel.children[1].children.length, 0);
+  assert.deepEqual(panel.children[2].children.map((button) => button.dataset.success), ["normal", "manage", "again"]);
+});
+
+test("reference audio preview refuses a non-blob object URL", async () => {
+  const source = await readFile(new URL("./public/reference-voices-ux.js", import.meta.url), "utf-8");
+  const listeners = new Map();
+  const input = {
+    files: [{ name: "voice.wav" }],
+    value: "",
+    addEventListener(type, listener) { listeners.set(type, listener); },
+  };
+  class AudioElement {
+    constructor() { this.src = ""; }
+    addEventListener() {}
+    pause() {}
+    removeAttribute() {}
+    load() {}
+  }
+  const audio = new AudioElement();
+  const status = { textContent: "" };
+  const saveButton = { disabled: false, addEventListener() {} };
+  const nodes = new Map([
+    ["#voiceFileInput", input],
+    ["#voiceFilePreview", audio],
+    ["audio#voiceFilePreview", audio],
+    ["#voiceFileStatus", status],
+    ["#voiceFileSaveButton", saveButton],
+    ["#voiceFileIdInput", { value: "voice_id" }],
+    ["#voiceFileTextInput", { value: "こんにちは" }],
+  ]);
+  const document = {
+    querySelector(selector) { return nodes.get(selector) || null; },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+  };
+  const window = {
+    location: { href: "http://localhost/", origin: "http://localhost" },
+    addEventListener() {},
+    dispatchEvent() {},
+  };
+  const revoked = [];
+  let generatedUrl = "javascript:alert(1)";
+  class URLMock extends URL {
+    static createObjectURL() { return generatedUrl; }
+    static revokeObjectURL(value) { revoked.push(value); }
+  }
+
+  vm.runInNewContext(source, { document, window, URL: URLMock, HTMLAudioElement: AudioElement, requestAnimationFrame: (callback) => callback() });
+  listeners.get("change")({ target: input });
+
+  assert.equal(audio.src, "");
+  assert.deepEqual(revoked, ["javascript:alert(1)"]);
+  assert.match(status.textContent, /プレビューURL/);
+
+  generatedUrl = "blob:http://localhost/voice-preview";
+  listeners.get("change")({ target: input });
+  assert.equal(audio.src, generatedUrl);
+});
+
+test("low latency Irodori v3 stays a runtime profile, not a separate license entry", () => {
+  assert.equal(modelCatalog.modelLabel("irodori_v3_low_latency"), "Irodori v3 低遅延 (8-step)");
+  assert.ok(modelCatalog.DESIRED_MODELS.includes("irodori_v3_low_latency"));
+  assert.deepEqual(modelCatalog.profileFor("irodori_v3_low_latency").badges, ["低遅延", "8-step", "実験"]);
+  const normal = modelCatalog.metadataFor("irodori_v3");
+  const lowLatency = modelCatalog.metadataFor("irodori_v3_low_latency");
+  assert.equal(lowLatency.modelUrl, normal.modelUrl);
+  assert.equal(lowLatency.licenseGroup, normal.licenseGroup);
+  assert.equal(lowLatency.commercialStatus, normal.commercialStatus);
+});
+
+test("every real selectable model must declare normalized license metadata and license UI stays in the guide", async () => {
+  const allowedCommercialStatuses = new Set(["商用可", "非商用", "条件付き", "要別契約", "要確認"]);
+  const modelUrlGroups = new Map();
+
+  for (const id of modelCatalog.MODEL_ORDER.filter((id) => id !== "mock")) {
+    const metadata = modelCatalog.metadataFor(id);
+    assert.ok(metadata, `${id} must declare MODEL_METADATA`);
+    for (const field of ["licenseGroup", "commercialStatus", "license", "commercial", "termsUrl", "modelUrl", "codeUrl", "languages", "reference"]) {
+      assert.ok(String(metadata[field] || "").trim(), `${id} must declare ${field}`);
+    }
+    assert.ok(allowedCommercialStatuses.has(metadata.commercialStatus), `${id} has invalid commercialStatus`);
+    for (const field of ["termsUrl", "modelUrl", "codeUrl"]) {
+      assert.match(metadata[field], /^https:\/\//, `${id} ${field} must be an official https URL`);
+    }
+    const groups = modelUrlGroups.get(metadata.modelUrl) || new Set();
+    groups.add(metadata.licenseGroup);
+    modelUrlGroups.set(metadata.modelUrl, groups);
+  }
+
+  for (const [modelUrl, groups] of modelUrlGroups) {
+    assert.equal(groups.size, 1, `same distributed model must not create duplicate license groups: ${modelUrl}`);
+  }
+
+  assert.equal(modelCatalog.metadataFor("irodori_v2").commercialStatus, "商用可");
+  assert.equal(modelCatalog.metadataFor("fireredtts2").commercialStatus, "商用可");
+  assert.equal(modelCatalog.metadataFor("ming_omni_tts_0_5b").commercialStatus, "商用可");
+  assert.equal(modelCatalog.metadataFor("fun_cosyvoice3_0_5b").commercialStatus, "商用可");
+  assert.equal(modelCatalog.metadataFor("f5_tts_zero_shot").commercialStatus, "非商用");
+  assert.match(modelCatalog.metadataFor("f5_tts_zero_shot").license, /CC BY-NC 4\.0/);
+  assert.match(modelCatalog.metadataFor("f5_tts_zero_shot").license, /CC BY-NC-SA 4\.0/);
+  assert.match(modelCatalog.metadataFor("f5_tts_zero_shot").commercial, /表記が異なる/);
+  assert.equal(modelCatalog.metadataFor("sarashina2_2_tts").commercialStatus, "非商用");
+  assert.equal(modelCatalog.metadataFor("orpheus_3b_asmr").commercialStatus, "要確認");
+  assert.equal(modelCatalog.metadataFor("gpt_sovits_zero_shot").licenseGroup, modelCatalog.metadataFor("gpt_sovits_finetuned").licenseGroup);
+
+  const fish = modelCatalog.metadataFor("fish_s2_pro");
+  assert.equal(fish.license, "Fish Audio Research License");
+  assert.equal(fish.commercialStatus, "要別契約");
+  assert.match(fish.commercial, /別途書面ライセンス/);
+  assert.match(fish.compute, /16GB VRAMのGPU/);
+  assert.match(fish.verification, /参照音声付き実生成成功/);
+
+  const index = modelCatalog.metadataFor("indextts_2_5");
+  assert.equal(index.license, "bilibili Model Use License Agreement");
+  assert.equal(index.commercialStatus, "条件付き");
+  assert.match(index.commercial, /1億MAU/);
+  assert.match(index.compute, /16GB VRAMのGPU/);
+  assert.match(index.verification, /参照音声付き実生成成功/);
+
+  const compareSource = await readFile(new URL("./public/compare-page.js", import.meta.url), "utf-8");
+  const normalSource = await readFile(new URL("./public/normal-page.js", import.meta.url), "utf-8");
+  const indexSource = await readFile(new URL("./public/index.html", import.meta.url), "utf-8");
+  const guideLicenseSource = await readFile(new URL("./public/guide-license-list.js", import.meta.url), "utf-8");
+  assert.doesNotMatch(compareSource, /usageTermsHtml/);
+  assert.doesNotMatch(normalSource, /renderNormalModelMetadata|normalModelInfo/);
+  assert.doesNotMatch(indexSource, /id="normalModelInfo"/);
+  assert.match(indexSource, /id="guideModelLicenseTitle"/);
+  assert.match(indexSource, /id="guideModelLicenseList"/);
+  assert.doesNotMatch(indexSource, /Fish Audio Research License|bilibili Model Use License Agreement/);
+  assert.match(indexSource, /guide-license-list\.js/);
+  assert.match(guideLicenseSource, /licenseGroup/);
+  assert.match(guideLicenseSource, /commercialStatus/);
+  assert.match(guideLicenseSource, /seen\.has/);
+  assert.match(guideLicenseSource, /guide-license-row/);
+  assert.match(guideLicenseSource, /詳細 ↗/);
+});
+
+test("model lists keep available models first without scrambling their configured order", async () => {
+  const models = [
+    { id: "unavailable-a", available: false, enabled: true },
+    { id: "available-a", available: true, enabled: true },
+    { id: "disabled-a", available: true, enabled: false },
+    { id: "available-b", available: true, enabled: true },
+  ];
+  assert.deepEqual(
+    modelCatalog.sortModelsAvailableFirst(models).map((model) => model.id),
+    ["available-a", "available-b", "unavailable-a", "disabled-a"],
+  );
+
+  const appSource = await readFile(new URL("./public/app.js", import.meta.url), "utf-8");
+  const compareSource = await readFile(new URL("./public/compare-page.js", import.meta.url), "utf-8");
+  assert.match(appSource, /sortModelsAvailableFirst\(prioritizedModels\)/);
+  assert.match(compareSource, /sortModelsAvailableFirst\(desiredModels\)/);
+});
+
+test("copy feedback uses a visible toast", async () => {
+  const sharedUiSource = await readFile(new URL("./public/shared-ui.js", import.meta.url), "utf-8");
+  const styleSource = await readFile(new URL("./public/style.css", import.meta.url), "utf-8");
+  assert.match(sharedUiSource, /showToast\("コピーしました"\)/);
+  assert.match(sharedUiSource, /role", "status"/);
+  assert.match(styleSource, /\.local-tts-toast\.visible/);
+});
+
+test("audio autoplay waits for readiness and retries one interrupted play", async () => {
+  const listeners = new Map();
+  let playCalls = 0;
+  const audio = {
+    src: "http://127.0.0.1/audio/test.wav",
+    currentSrc: "http://127.0.0.1/audio/test.wav",
+    readyState: 0,
+    error: null,
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type).add(listener);
+    },
+    removeEventListener(type, listener) {
+      listeners.get(type)?.delete(listener);
+    },
+    async play() {
+      playCalls += 1;
+      if (playCalls === 1) {
+        const error = new Error("The play() request was interrupted by a call to pause().");
+        error.name = "AbortError";
+        throw error;
+      }
+    },
+  };
+  const playback = globalThis.LocalTts.audioController.playWhenReady(audio, { timeoutMs: 1000 });
+  setTimeout(() => {
+    audio.readyState = 4;
+    for (const listener of listeners.get("canplay") || []) listener({ target: audio });
+  }, 0);
+  assert.equal(await playback, true);
+  assert.equal(playCalls, 2);
+});
+
+test("normalizes seed and auto increment deterministically", () => {
+  assert.equal(core.normalizeSeed("12"), 12);
+  assert.equal(core.normalizeSeed("invalid"), 1);
+  assert.deepEqual(core.incrementSeed("12", true), { value: 13, changed: true });
+});
+
+test("bounds compare requests by the model timeout and a response grace period", () => {
+  assert.equal(core.generationRequestTimeoutMs({ generationTimeoutSec: 300 }), 315000);
+  assert.equal(core.generationRequestTimeoutMs({ generationTimeoutSec: 0 }), 1815000);
+  assert.equal(core.generationRequestTimeoutMs({}), 1815000);
+});
+
+test("recognizes browser and runtime generation timeouts", () => {
+  assert.equal(core.isGenerationTimeout({ name: "TimeoutError" }), true);
+  assert.equal(core.isGenerationTimeout({ message: "external command timed out after 1800s" }), true);
+  assert.equal(core.isGenerationTimeout({ message: "Failed to fetch" }), false);
+});
+
+test("stops queued compare models without discarding their previous audio", () => {
+  const activeModelIds = new Set(["timed-out", "queued-with-audio", "queued-without-audio"]);
+  const results = [
+    { model: "timed-out", state: "failed", result: {} },
+    { model: "queued-with-audio", state: "queued", result: { audioUrl: "/audio/old.wav" } },
+    { model: "queued-without-audio", state: "queued", result: {} },
+    { model: "unselected", state: "queued", result: {} },
+  ];
+
+  assert.deepEqual(core.failQueuedCompareResults(results, activeModelIds, "一括生成を停止しました。"), [
+    { model: "timed-out", state: "failed", result: {} },
+    { model: "queued-with-audio", state: "stale", result: { audioUrl: "/audio/old.wav" }, message: "一括生成を停止しました。" },
+    { model: "queued-without-audio", state: "failed", result: {}, message: "一括生成を停止しました。" },
+    { model: "unselected", state: "queued", result: {} },
+  ]);
+});
+
+test("compare generation applies the runtime deadline and stops the remaining queue on timeout", async () => {
+  const compareSource = await readFile(new URL("./public/compare-page.js", import.meta.url), "utf-8");
+  assert.match(compareSource, /signal:\s*AbortSignal\.timeout\(generationCore\.generationRequestTimeoutMs\(model\)\)/);
+  assert.match(compareSource, /if \(outcome\?\.timedOut\)/);
+  assert.match(compareSource, /failQueuedCompareResults\(/);
+});
+
+test("normalizes long-text chunk settings", () => {
+  assert.deepEqual(core.normalizeChunkSettings({ targetChars: 200, hardMaxChars: 400 }), {
+    targetChars: 200,
+    hardMaxChars: 400,
+    chunking: { softChunkChars: 200, maxChunkChars: 270, hardLimitChars: 400, pauseBetweenChunksMs: 250 },
+  });
+});
+
+test("validates required, optional, and unsupported reference voice capability", () => {
+  const required = { available: true, requiresReferenceAudio: true };
+  assert.equal(core.validateRequest({ model: required, text: "hello" }, capabilities), "reference voice is required");
+  assert.equal(core.validateRequest({ model: required, voice: { voiceId: "v" }, text: "hello" }, capabilities), "");
+  assert.equal(core.validateRequest({ model: { available: true }, text: "hello" }, capabilities), "");
+});
+
+test("voice design requires either an instruction or a supported reference voice", () => {
+  const hybrid = {
+    available: true,
+    supportsVoiceDesign: true,
+    supportsInstruction: true,
+    supportsReferenceVoice: true,
+  };
+  assert.equal(core.validateRequest({ model: hybrid, text: "hello" }, capabilities), "instruction is required");
+  assert.equal(core.validateRequest({ model: hybrid, voice: { voiceId: "v" }, text: "hello" }, capabilities), "");
+  assert.equal(core.validateRequest({ model: hybrid, text: "hello", instruction: "calm" }, capabilities), "");
+
+  const designOnly = { ...hybrid, supportsReferenceVoice: false };
+  assert.equal(
+    core.validateRequest({ model: designOnly, voice: { voiceId: "ignored" }, text: "hello" }, capabilities),
+    "instruction is required",
+  );
+});
+
+test("standalone style strength stays usable without an instruction", () => {
+  assert.equal(capabilities.requiresPromptForStyleStrength({ supportsStyleStrength: true }), false);
+  assert.equal(capabilities.requiresPromptForStyleStrength({ supportsStyleStrength: true, supportsInstruction: true }), true);
+  assert.equal(capabilities.requiresPromptForStyleStrength({ supportsStyleStrength: true, supportsCaption: true }), true);
+});
+
+test("builds request body from advertised model capabilities", () => {
+  const model = { id: "model", supportsReferenceVoice: true, supportsInstruction: true, supportsSpeedControl: true };
+  assert.deepEqual(core.buildRequestBody({ model, voice: { voiceId: "voice" }, text: " hi ", instruction: " calm ", seed: "3", controls: { speedScale: 1.1 } }, capabilities, (item) => item.id), {
+    text: "hi", model: "model", format: "wav", voiceId: "voice", instruction: "calm", seed: 3, speedScale: 1.1,
+  });
+});
+
+test("tracks compare generation state transitions", () => {
+  assert.deepEqual(core.transitionCompareResult({}, { type: "start" }), { status: "loading" });
+  assert.deepEqual(core.transitionCompareResult({}, { type: "success", result: { audioUrl: "/a.wav" } }), { status: "success", result: { audioUrl: "/a.wav" } });
+  assert.deepEqual(core.transitionCompareResult({}, { type: "failure", message: "bad" }), { status: "error", message: "bad" });
+});
+
+test("storage adapter safely restores objects and history lists", () => {
+  const values = new Map();
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  const adapter = globalThis.LocalTts.store.createStorage(storage);
+  adapter.save("history", [{ id: 1 }, { id: 2 }]);
+  assert.deepEqual(adapter.loadList("history", 1), [{ id: 1 }]);
+  values.set("settings", "invalid");
+  assert.deepEqual(adapter.loadObject("settings", { safe: true }), { safe: true });
+});
+
+test("RVC input, params, microphone state, and results are normalized", () => {
+  assert.equal(globalThis.LocalTts.rvcForm.normalizeInputSource("mic"), "mic");
+  assert.equal(globalThis.LocalTts.rvcForm.normalizeInputSource("unknown"), "tts");
+  assert.equal(globalThis.LocalTts.rvcForm.buildParams({ pitch: "2" }).pitch, 2);
+  assert.equal(globalThis.LocalTts.rvcMicRecorder.transition("recording", "stop"), "processing");
+  assert.equal(globalThis.LocalTts.rvcMicRecorder.transition("processing", "saved"), "ready");
+  assert.deepEqual(globalThis.LocalTts.rvcResult.normalizeResult({ audioUrl: "/a.wav" }), {
+    audioUrl: "/a.wav", denoisedAudioUrl: "", filename: "", diagnostics: {},
+  });
+});
+
+test("generation core owns voice validation, chunk attachment, and user-facing errors", () => {
+  const model = { available: true, requiresReferenceAudio: true };
+  const voice = { voiceId: "voice" };
+  assert.equal(core.validateRequest(
+    { model, voice, text: "hello" },
+    capabilities,
+    {},
+    { validateVoice: () => "voice duration is invalid" },
+  ), "voice duration is invalid");
+  assert.equal(core.validateRequest(
+    { model: { available: true }, text: "日本語です" },
+    capabilities,
+    {},
+    { validateText: () => "english text required" },
+  ), "english text required");
+  assert.deepEqual(core.attachChunking({ text: "hello" }, { softChunkChars: 120 }), {
+    text: "hello",
+    chunking: { softChunkChars: 120 },
+  });
+  assert.match(core.humanizeError({ message: "CUDA out of memory" }), /GPUメモリ不足/);
+  assert.match(core.humanizeError({ message: "Failed to fetch" }), /local-tts\.bat/);
+});
+
+test("normal controller owns page event binding and binds only once", () => {
+  const calls = [];
+  const elements = {
+    text: fakeElement(), instruction: fakeElement(), model: fakeElement(), voice: fakeElement(), language: fakeElement(), seed: fakeElement(),
+    useReference: fakeElement(), seedAutoIncrement: fakeElement(), saveHistory: fakeElement(), autoPlay: fakeElement(),
+    speedScale: fakeElement(), styleStrength: fakeElement(), referencePreview: fakeElement(), generate: fakeElement(), regenerate: fakeElement(),
+    history: fakeElement(), clearHistory: fakeElement(),
+  };
+  const normal = globalThis.LocalTts.normalController.createNormalController({
+    elements,
+    actions: {
+      refreshText: () => calls.push("refreshText"), saveSettings: () => calls.push("saveSettings"), updateModel: () => calls.push("updateModel"),
+      updateReference: () => calls.push("updateReference"), updateSynthesis: () => calls.push("updateSynthesis"), previewReference: () => calls.push("previewReference"),
+      generate: () => calls.push("generate"), regenerate: () => calls.push("regenerate"), restoreHistory: (index) => calls.push(`restore:${index}`),
+      clearHistory: () => calls.push("clearHistory"),
+    },
+  });
+  normal.bind();
+  normal.bind();
+  assert.equal(elements.generate.listenerCount("click"), 1);
+  elements.text.dispatch("input");
+  elements.useReference.dispatch("change");
+  elements.generate.dispatch("click");
+  elements.history.dispatch("click", { target: { closest: () => ({ dataset: { restoreNormalHistory: "3" } }) } });
+  assert.deepEqual(calls, ["refreshText", "updateModel", "saveSettings", "updateReference", "updateModel", "generate", "restore:3"]);
+});
+
+test("normal generation result hides internal-only memo and runtime metadata", async () => {
+  const html = await readFile(new URL("./public/index.html", import.meta.url), "utf-8");
+  const normalPage = await readFile(new URL("./public/normal-page.js", import.meta.url), "utf-8");
+  assert.doesNotMatch(html, /評価メモ/);
+  assert.doesNotMatch(normalPage, /runtime：/);
+  assert.doesNotMatch(normalPage, /normalResultMemo/);
+});
+
+test("Chatterbox enables standalone expression strength while instructed models still require text", async () => {
+  const normalPage = await readFile(new URL("./public/normal-page.js", import.meta.url), "utf-8");
+  assert.match(normalPage, /requiresPromptForStyleStrength\(model\)\) return true/);
+  assert.match(normalPage, /return Boolean\(String\(els\.normalInstruction\?\.value \|\| ""\)\.trim\(\)\)/);
+});
+
+test("advanced voice controls and primary seed controls follow the cross-screen hierarchy", async () => {
+  const html = await readFile(new URL("./public/index.html", import.meta.url), "utf-8");
+  for (const scope of ["normal", "compare", "rvc"]) {
+    const detailsStart = html.indexOf(`id="${scope}AdvancedSettings"`);
+    const guidance = html.indexOf(`id="${scope}AdvancedGuidance"`);
+    const instruction = html.indexOf(`id="${scope}InstructionInput"`);
+    const emojiSlot = html.indexOf(`id="irodoriEmojiSlot-${scope}"`);
+    const detailsEnd = html.indexOf("</details>", detailsStart);
+    assert.ok(detailsStart >= 0, `${scope} advanced settings must exist`);
+    assert.ok(guidance > detailsStart && guidance < detailsEnd, `${scope} advanced guidance must be inside advanced settings`);
+    assert.ok(instruction > detailsStart && instruction < detailsEnd, `${scope} instruction must be inside advanced settings`);
+    assert.ok(emojiSlot > detailsStart && emojiSlot < detailsEnd, `${scope} emoji controls must be inside advanced settings`);
+  }
+  const compareReference = html.indexOf('id="compareReferenceVoiceSelect"');
+  const compareSeed = html.indexOf('id="compareSeedInput"');
+  const compareSeedIncrement = html.indexOf('id="compareSeedAutoIncrementInput"');
+  const compareAdvanced = html.indexOf('id="compareAdvancedSettings"');
+  assert.ok(compareReference >= 0 && compareReference < compareAdvanced, "comparison reference voice must remain a normal visible control");
+  assert.ok(compareSeed >= 0 && compareSeed < compareAdvanced, "comparison seed must be a primary control like normal generation");
+  assert.ok(compareSeedIncrement > compareSeed && compareSeedIncrement < compareAdvanced, "comparison seed increment must stay compact beside its seed");
+  const rvcSeed = html.indexOf('id="rvcSeedInput"');
+  const rvcSeedIncrement = html.indexOf('id="rvcSeedAutoIncrementInput"');
+  assert.ok(rvcSeed >= 0 && rvcSeedIncrement > rvcSeed, "RVC seed increment must stay in the same compact seed field");
+  assert.doesNotMatch(html, />Demucs</);
+});
+
+test("new generation keeps existing audio controls available until replacement is ready", async () => {
+  const normalPage = await readFile(new URL("./public/normal-page.js", import.meta.url), "utf-8");
+  const comparePage = await readFile(new URL("./public/compare-page.js", import.meta.url), "utf-8");
+  const rvcPage = await readFile(new URL("./public/rvc-page.js", import.meta.url), "utf-8");
+  assert.doesNotMatch(normalPage, /setNormalGenerationActive\(true\);\s*els\.normalResultCard\.hidden = true/);
+  assert.doesNotMatch(comparePage, /state: "pending", message: "再生成中です。", result: \{\}/);
+  assert.doesNotMatch(rvcPage, /setRvcGenerationActive\(true\);\s*resetRvcResult\(\)/);
+});
+
+test("guide starts from the already-open app and RVC has a recent history panel", async () => {
+  const html = await readFile(new URL("./public/index.html", import.meta.url), "utf-8");
+  assert.match(html, /この画面が開いていれば起動は完了しています/);
+  assert.doesNotMatch(html, /初めて使う人へ/);
+  assert.match(html, /id="rvcHistoryList"/);
+  assert.match(html, /id="rvcClearHistoryButton"/);
+});
+
+test("RVC model onboarding and reference voice ID rename controls are present", async () => {
+  const html = await readFile(new URL("./public/index.html", import.meta.url), "utf-8");
+  const guide = await readFile(new URL("./public/rvc-model-guide.html", import.meta.url), "utf-8");
+  const referenceVoices = await readFile(new URL("./public/reference-voices.js", import.meta.url), "utf-8");
+  assert.match(html, /id="rvcMissingModelPanel"/);
+  assert.match(html, /id="rvcVoiceModelSelect"/);
+  assert.match(html, /id="rvcModelDirectoryPath"/);
+  assert.match(guide, /models\\rvc\\my_voice/);
+  assert.match(referenceVoices, /voiceExistingIdRenameButton/);
+  assert.match(referenceVoices, /reference-voice-renamed/);
+});
+
+test("compare and RVC controllers bind delegated and device events through injected dependencies", () => {
+  const compareCalls = [];
+  const compareElements = {
+    text: fakeElement(), instruction: fakeElement(), seed: fakeElement(), voice: fakeElement(), seedAutoIncrement: fakeElement(), autoPlay: fakeElement(),
+    referencePreview: fakeElement(), generate: fakeElement(), selectAll: fakeElement(), clear: fakeElement(), results: fakeElement(), history: fakeElement(), clearHistory: fakeElement(),
+  };
+  const compare = globalThis.LocalTts.compareController.createCompareController({
+    elements: compareElements,
+    actions: {
+      refreshText: () => compareCalls.push("refreshText"), saveSettings: () => compareCalls.push("saveSettings"), updateSelection: () => compareCalls.push("updateSelection"),
+      previewReference: () => compareCalls.push("previewReference"), generate: () => compareCalls.push("generate"), selectAll: () => compareCalls.push("selectAll"),
+      clearSelection: () => compareCalls.push("clearSelection"), regenerateModel: (id) => compareCalls.push(`regenerate:${id}`), adoptModel: (id) => compareCalls.push(`adopt:${id}`),
+      restoreHistory: (index) => compareCalls.push(`restore:${index}`), clearHistory: () => compareCalls.push("clearHistory"),
+    },
+  });
+  compare.bind();
+  compareElements.results.dispatch("click", { target: { closest: (selector) => selector.includes("regenerate") ? { dataset: { regenerateModel: "m1" } } : null } });
+  assert.deepEqual(compareCalls, ["regenerate:m1"]);
+
+  const rvcCalls = [];
+  const deviceEvents = fakeElement();
+  const rvcElements = {
+    inputSources: [fakeElement()], text: fakeElement(), instruction: fakeElement(), micScript: fakeElement(), model: fakeElement(), voiceModel: fakeElement(), reloadModels: fakeElement(), voice: fakeElement(), language: fakeElement(), seed: fakeElement(),
+    seedAutoIncrement: fakeElement(), autoPlay: fakeElement(), externalAudioPath: fakeElement(), externalAudioPathHistory: fakeElement(), demucsModel: fakeElement(), indexRatePreset: fakeElement(),
+    f0UpKeyPreset: fakeElement(), protectPreset: fakeElement(), micDevice: fakeElement(), referencePreview: fakeElement(), convert: fakeElement(), denoise: fakeElement(),
+    micStart: fakeElement(), micStop: fakeElement(), micRerecord: fakeElement(), micUse: fakeElement(), micHistory: fakeElement(), history: fakeElement(), clearHistory: fakeElement(),
+  };
+  const rvc = globalThis.LocalTts.rvcController.createRvcController({
+    elements: rvcElements,
+    deviceEvents,
+    actions: {
+      refreshText: () => rvcCalls.push("refreshText"), saveInputSource: () => rvcCalls.push("saveInputSource"), saveSettings: () => rvcCalls.push("saveSettings"),
+      updateModel: () => rvcCalls.push("updateModel"), selectVoiceModel: () => rvcCalls.push("selectVoiceModel"), reloadModels: () => rvcCalls.push("reloadModels"), rememberFilePath: () => rvcCalls.push("rememberFilePath"), selectFilePath: (value) => rvcCalls.push(`selectFilePath:${value}`), saveMicDevice: () => rvcCalls.push("saveMicDevice"),
+      loadMicDevices: () => rvcCalls.push("loadMicDevices"), previewReference: () => rvcCalls.push("previewReference"), convert: () => rvcCalls.push("convert"),
+      denoise: () => rvcCalls.push("denoise"), startRecording: () => rvcCalls.push("startRecording"), stopRecording: () => rvcCalls.push("stopRecording"),
+      useRecording: () => rvcCalls.push("useRecording"), selectRecording: () => rvcCalls.push("selectRecording"), restoreHistory: (index) => rvcCalls.push(`restore:${index}`), clearHistory: () => rvcCalls.push("clearHistory"),
+    },
+  });
+  rvc.bind();
+  deviceEvents.dispatch("devicechange");
+  rvcElements.voiceModel.dispatch("change");
+  rvcElements.reloadModels.dispatch("click");
+  rvcElements.externalAudioPathHistory.value = "C:\\audio\\saved.wav";
+  rvcElements.externalAudioPathHistory.dispatch("change");
+  rvcElements.convert.dispatch("click");
+  rvcElements.history.dispatch("click", { target: { closest: () => ({ dataset: { restoreRvcHistory: "2" } }) } });
+  rvcElements.clearHistory.dispatch("click");
+  assert.deepEqual(rvcCalls, ["loadMicDevices", "selectVoiceModel", "reloadModels", "selectFilePath:C:\\audio\\saved.wav", "convert", "restore:2", "clearHistory"]);
+});

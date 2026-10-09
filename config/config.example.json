@@ -1,0 +1,232 @@
+{
+  "host": "127.0.0.1",
+  "port": 8730,
+  "publicBaseUrl": "",
+  "deployment": {
+    "role": "standalone",
+    "workerBaseUrl": ""
+  },
+  "gpu": {
+    "expressiveTtsVisibleDevices": "",
+    "gptSovitsVisibleDevices": ""
+  },
+  "defaultModel": "irodori_v3",
+  "defaultReferenceVoice": "",
+  "referenceVoicesDir": "./reference/voices",
+  "audioOutputDir": "./runtime/audio",
+  "chunking": {
+    "softChunkChars": 120,
+    "maxChunkChars": 200,
+    "hardLimitChars": 260,
+    "pauseBetweenChunksMs": 250
+  },
+  "corsAllowedOrigins": [
+    "http://127.0.0.1",
+    "http://localhost",
+    "http://127.0.0.1:5177",
+    "http://localhost:5177"
+  ],
+  "stack": {
+    "stopManagedProcessesBeforeStart": true,
+    "killPortsBeforeStart": false,
+    "portsToKill": [8730, 5177],
+    "startupTimeoutSec": 180,
+    "pollIntervalSec": 1.0
+  },
+  "externalServices": {
+    "gptSovits": {
+      "enabled": false,
+      "rootDir": "./runtime/vendor/GPT-SoVITS-clean",
+      "pythonExecutable": "./runtime/venvs/gpt-sovits/Scripts/python.exe",
+      "configPath": "./runtime/gpt-sovits/tts_infer.yaml",
+      "startupTimeoutSec": 900,
+      "apiUrl": "http://127.0.0.1:9880/tts"
+    }
+  },
+  "frontend": {
+    "host": "127.0.0.1",
+    "port": 5177,
+    "ttsBaseUrl": "http://127.0.0.1:8730"
+  },
+  "rvc": {
+    "rootDir": "",
+    "pythonPath": "",
+    "cwd": "",
+    "modelPath": "",
+    "indexPath": "",
+    "externalAudioPath": ""
+  },
+  "models": {
+    "qwen3_tts_clone_0_6b": {
+      "runtime": "qwen3_tts",
+      "label": "Qwen3-TTS Voice Clone 0.6B",
+      "family": "qwen3_tts",
+      "modelId": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+      "requiresReferenceAudio": true,
+      "requiresReferenceText": true,
+      "supportsSeed": true,
+      "supportsLanguage": true,
+      "supportsVoiceClone": true,
+      "supportsReferenceVoice": true,
+      "defaultLanguage": "Japanese"
+    },
+    "qwen3_tts_clone_1_7b": {
+      "runtime": "qwen3_tts",
+      "label": "Qwen3-TTS Voice Clone 1.7B",
+      "family": "qwen3_tts",
+      "modelId": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "requiresReferenceAudio": true,
+      "requiresReferenceText": true,
+      "supportsSeed": true,
+      "supportsLanguage": true,
+      "supportsVoiceClone": true,
+      "supportsReferenceVoice": true,
+      "defaultLanguage": "Japanese"
+    },
+    "mock": {
+      "runtime": "mock_wav",
+      "requiresReferenceAudio": false
+    },
+    "irodori_v2": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v2",
+      "family": "irodori",
+      "modelId": "Aratako/Irodori-TTS-500M-v2",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-500M-v2/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsReferenceVoice": true,
+      "supportsCaption": false,
+      "supportsInstruction": false,
+      "supportsSeed": true,
+      "supportsSpeedControl": false,
+      "supportsStyleStrength": false,
+      "supportsVoiceDesign": false
+    },
+    "irodori_v3": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v3",
+      "family": "irodori",
+      "modelId": "Aratako/Irodori-TTS-500M-v3",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-500M-v3/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsCaption": false,
+      "supportsInstruction": false,
+      "supportsSeed": true,
+      "supportsSpeedControl": true,
+      "supportsStyleStrength": false,
+      "supportsVoiceDesign": false,
+      "supportsReferenceVoice": true
+    },
+    "irodori_v3_low_latency": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v3 低遅延 (8-step)",
+      "family": "irodori",
+      "modelId": "Aratako/Irodori-TTS-500M-v3",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-500M-v3/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsCaption": false,
+      "supportsInstruction": false,
+      "supportsSeed": true,
+      "supportsSpeedControl": true,
+      "supportsStyleStrength": false,
+      "supportsVoiceDesign": false,
+      "supportsReferenceVoice": true,
+      "notes": "8-step / sway / reference latent cache の低遅延プロファイル。通常のIrodori v3とは別モデルとして選択します。",
+      "runtimeOptions": {
+        "optimizationProfile": "low_latency_8",
+        "codecPrecision": "bf16"
+      }
+    },
+    "irodori_v3_voicedesign": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v3 VoiceDesign",
+      "family": "irodori",
+      "modelId": "Aratako/Irodori-TTS-600M-v3-VoiceDesign",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-600M-v3-VoiceDesign/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsCaption": true,
+      "supportsInstruction": true,
+      "supportsSeed": true,
+      "supportsSpeedControl": true,
+      "supportsStyleStrength": true,
+      "supportsVoiceDesign": true,
+      "supportsReferenceVoice": true
+    },
+    "irodori_v4_small": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v4 Small",
+      "family": "irodori",
+      "modelId": "Aratako/Irodori-TTS-v4-Small",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-v4-Small/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsCaption": true,
+      "supportsInstruction": true,
+      "supportsSeed": true,
+      "supportsSpeedControl": true,
+      "supportsStyleStrength": true,
+      "supportsVoiceDesign": true,
+      "supportsReferenceVoice": true
+    },
+    "irodori_v4_1_small": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v4.1 Small",
+      "family": "irodori",
+      "modelId": "Aratako/Irodori-TTS-v4.1-Small",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-v4.1-Small/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsCaption": true,
+      "supportsInstruction": true,
+      "supportsSeed": true,
+      "supportsSpeedControl": true,
+      "supportsStyleStrength": true,
+      "supportsVoiceDesign": true,
+      "supportsReferenceVoice": true,
+      "notes": "公式Irodori v4.1 Small。v4のDuration Predictor改良版で、参照音声・話し方メモ・絵文字表現を利用できます。"
+    },
+    "irodori_v4_1_anime": {
+      "runtime": "irodori_voicedesign_direct",
+      "label": "Irodori v4.1 Anime",
+      "family": "irodori",
+      "modelId": "phasefield-audio/Irodori-TTS-v4.1-Anime",
+      "checkpoint": "./runtime/models/irodori/Irodori-TTS-v4.1-Anime/model.safetensors",
+      "requiresReferenceAudio": false,
+      "supportsCaption": true,
+      "supportsInstruction": true,
+      "supportsSeed": true,
+      "supportsSpeedControl": true,
+      "supportsStyleStrength": true,
+      "supportsVoiceDesign": true,
+      "supportsReferenceVoice": true,
+      "notes": "Irodori v4.1 Smallをアニメ調日本語音声でfine-tuneしたモデル。captionと絵文字制御は公式v4.1と挙動が異なる場合があります。"
+    }
+  },
+  "runtimes": {
+    "mock_wav": {
+      "durationSec": 1.2,
+      "sampleRate": 24000
+    },
+    "irodori_voicedesign_direct": {
+      "pythonExecutable": "./runtime/venv-irodori/Scripts/python.exe",
+      "wrapperDir": "./runtime/vendor/Irodori-TTS-upstream",
+      "checkpoint": "",
+      "timeoutSec": 1800,
+      "startupTimeoutSec": 1800,
+      "idleTimeoutSec": 600,
+      "modelDevice": "auto",
+      "modelPrecision": "auto",
+      "codecDevice": "auto",
+      "codecPrecision": "fp32",
+      "codecRepo": "./runtime/models/irodori/Semantic-DACVAE-Japanese-32dim/weights.pth",
+      "textProcessorRepo": "llm-jp/llm-jp-3-150m",
+      "textProcessorDir": "./runtime/models/irodori/tokenizers/llm-jp-3-150m"
+    },
+    "qwen3_tts": {
+      "device": "auto",
+      "dtype": "auto",
+      "attnImplementation": "",
+      "hfCacheDir": "./runtime/hf-cache",
+      "vendorDir": "./runtime/models/huggingface",
+      "allowDownload": false
+    }
+  }
+}
