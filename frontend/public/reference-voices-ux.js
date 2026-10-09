@@ -86,7 +86,7 @@
     selectedFile = null;
     const input = $("#voiceFileInput");
     if (input) input.value = "";
-    const audio = $("#voiceFilePreview");
+    const audio = document.querySelector("audio#voiceFilePreview");
     if (audio) {
       audio.pause();
       audio.removeAttribute("src");

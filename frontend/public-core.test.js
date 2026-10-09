@@ -108,6 +108,7 @@ test("reference audio preview refuses a non-blob object URL", async () => {
   const nodes = new Map([
     ["#voiceFileInput", input],
     ["#voiceFilePreview", audio],
+    ["audio#voiceFilePreview", audio],
     ["#voiceFileStatus", status],
     ["#voiceFileSaveButton", saveButton],
     ["#voiceFileIdInput", { value: "voice_id" }],
