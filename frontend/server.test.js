@@ -1400,6 +1400,41 @@ test("worker TTS generation JSON requests use the long-timeout transport", async
   }
 });
 
+test("standalone TTS generation rewrites backend audio URL to the frontend audio proxy", async () => {
+  const backend = http.createServer((req, res) => {
+    req.resume();
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({
+      ok: true,
+      audioUrl: `http://127.0.0.1:${backend.address().port}/audio/generated.wav`,
+      model: "irodori_v4_1_small",
+    }));
+  });
+  await new Promise((resolve) => backend.listen(0, "127.0.0.1", resolve));
+  const backendAddress = backend.address();
+  const frontend = createServer({
+    host: "127.0.0.1",
+    port: 0,
+    ttsBaseUrl: `http://127.0.0.1:${backendAddress.port}`,
+  });
+  await new Promise((resolve) => frontend.listen(0, "127.0.0.1", resolve));
+  const frontendAddress = frontend.address();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${frontendAddress.port}/api/speak`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "irodori_v4_1_small", text: "audio proxy check" }),
+    });
+    const payload = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(payload.result.audioUrl, "/audio/generated.wav");
+  } finally {
+    await new Promise((resolve) => frontend.close(resolve));
+    await new Promise((resolve) => backend.close(resolve));
+  }
+});
+
 test("frontend TTS generation proxy uses the long-timeout transport", async () => {
   let seenUrl = "";
   const worker = http.createServer((req, res) => {

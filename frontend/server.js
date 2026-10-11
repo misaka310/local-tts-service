@@ -336,6 +336,17 @@ async function route(req, res, config) {
         });
         return;
       }
+      if (typeof speak.body.audioUrl === "string") {
+        try {
+          const backendBase = new URL(config.ttsBaseUrl);
+          const audioUrl = new URL(speak.body.audioUrl, backendBase);
+          if (audioUrl.origin === backendBase.origin && audioUrl.pathname.startsWith("/audio/")) {
+            speak.body.audioUrl = `${audioUrl.pathname}${audioUrl.search}`;
+          }
+        } catch {
+          // Preserve an upstream value that is not a valid URL.
+        }
+      }
       sendJson(res, 200, { ok: true, result: speak.body });
       return;
     }
