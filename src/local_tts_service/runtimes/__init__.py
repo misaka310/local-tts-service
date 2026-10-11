@@ -5,6 +5,7 @@ from .irodori_voicedesign_direct import IrodoriVoiceDesignDirectRuntime
 from .mock_wav import MockWavRuntime
 from .external_cli import ExternalCliRuntime
 from .qwen3_tts import Qwen3TTSRuntime
+from .speech_cpp import SpeechCppRuntime
 
 __all__ = [
     "BaseRuntime",
@@ -16,4 +17,5 @@ __all__ = [
     "MockWavRuntime",
     "ExternalCliRuntime",
     "Qwen3TTSRuntime",
+    "SpeechCppRuntime",
 ]

@@ -13,6 +13,7 @@ from .runtimes import (
     IrodoriVoiceDesignDirectRuntime,
     MockWavRuntime,
     Qwen3TTSRuntime,
+    SpeechCppRuntime,
 )
 
 RUNTIME_ALIASES = {
@@ -159,6 +160,27 @@ def build_runtime_registry(config: Any) -> dict[str, Any]:
                     "./runtime/cache/irodori-reference-latents",
                 )
             ),
+        )
+
+    speech_cpp_cfg = config.runtimes.get("speech_cpp", {})
+    if isinstance(speech_cpp_cfg, dict) and speech_cpp_cfg:
+        runtimes["speech_cpp"] = SpeechCppRuntime(
+            output_dir=config.audio_output_dir,
+            models=config.models,
+            root_dir=config.root_dir,
+            executable=resolve_path(
+                config.root_dir,
+                speech_cpp_cfg.get("executable", ""),
+                "speech_cpp.executable",
+            ),
+            model_path=resolve_path(
+                config.root_dir,
+                speech_cpp_cfg.get("modelPath", ""),
+                "speech_cpp.modelPath",
+            ),
+            backend=str(speech_cpp_cfg.get("backend", "cuda")),
+            device=int(speech_cpp_cfg.get("device", 0)),
+            timeout_sec=int(speech_cpp_cfg.get("timeoutSec", 1800)),
         )
 
     qwen3_tts_cfg = config.runtimes.get("qwen3_tts", {})
