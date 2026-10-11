@@ -1214,6 +1214,58 @@ test("frontend deployment streams ranged worker audio without buffering as json"
   }
 });
 
+test("audio proxy cancels the upstream stream when the browser aborts playback", async () => {
+  let resolveUpstreamClosed;
+  const upstreamClosed = new Promise((resolve) => { resolveUpstreamClosed = resolve; });
+  const worker = http.createServer((req, res) => {
+    req.on("close", () => resolveUpstreamClosed());
+    res.writeHead(206, {
+      "Content-Type": "audio/wav",
+      "Accept-Ranges": "bytes",
+      "Content-Range": "bytes 0-999999/1000000",
+    });
+    res.write(Buffer.alloc(4096, 1));
+    const timer = setInterval(() => res.write(Buffer.alloc(4096, 2)), 20);
+    res.on("close", () => clearInterval(timer));
+  });
+  await new Promise((resolve) => worker.listen(0, "127.0.0.1", resolve));
+  const workerAddress = worker.address();
+  const frontend = createServer({
+    host: "127.0.0.1",
+    port: 0,
+    ttsBaseUrl: `http://127.0.0.1:${workerAddress.port}`,
+    deploymentRole: "standalone",
+  });
+  await new Promise((resolve) => frontend.listen(0, "127.0.0.1", resolve));
+  const frontendAddress = frontend.address();
+
+  try {
+    await new Promise((resolve, reject) => {
+      const request = http.get({
+        hostname: "127.0.0.1",
+        port: frontendAddress.port,
+        path: "/audio/generated.wav",
+        headers: { Range: "bytes=0-" },
+      });
+      request.on("response", (response) => {
+        response.once("data", () => {
+          response.destroy();
+          resolve();
+        });
+      });
+      request.on("error", reject);
+    });
+
+    await Promise.race([
+      upstreamClosed,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("upstream audio request was not cancelled")), 750)),
+    ]);
+  } finally {
+    await new Promise((resolve) => frontend.close(resolve));
+    await new Promise((resolve) => worker.close(resolve));
+  }
+});
+
 test("frontend deployment reports an actionable error when worker is unreachable", async () => {
   const frontend = createServer({
     host: "127.0.0.1",
