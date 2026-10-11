@@ -140,9 +140,38 @@ export async function proxyWorkerRequest(req, res, workerBaseUrl, url) {
   }
   await new Promise((resolve, reject) => {
     const stream = Readable.fromWeb(upstream.body);
-    stream.on("error", reject);
-    res.on("finish", resolve);
-    res.on("error", reject);
+    let settled = false;
+
+    const cleanup = () => {
+      stream.off("error", onStreamError);
+      res.off("finish", onFinish);
+      res.off("close", onClose);
+      res.off("error", onResponseError);
+    };
+    const settle = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback(value);
+    };
+    const onFinish = () => settle(resolve);
+    const onClose = () => {
+      if (!res.writableFinished && !stream.destroyed) stream.destroy();
+      settle(resolve);
+    };
+    const onStreamError = (error) => {
+      if (res.destroyed) settle(resolve);
+      else settle(reject, error);
+    };
+    const onResponseError = (error) => {
+      if (!stream.destroyed) stream.destroy();
+      settle(reject, error);
+    };
+
+    stream.on("error", onStreamError);
+    res.on("finish", onFinish);
+    res.on("close", onClose);
+    res.on("error", onResponseError);
     stream.pipe(res);
   });
 }
