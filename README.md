@@ -25,7 +25,7 @@ https://github.com/user-attachments/assets/48682a8c-f6a2-4d1a-a645-62f03fe7d533
 - TTS音声、音声ファイル、マイク録音をRVCで変換する
 - 比較画面の文章・話し方メモと生成履歴をブラウザ内に保存して再利用する
 
-対応モデルにはQwen3-TTS、Irodori v2 / v3 / v4 / v4.1（公式SmallとAnime fine-tune）、GPT-SoVITS、F5-TTSなどがあります。Orpheus 3B、Ming Omni TTS、Fish Audio S2 Pro、IndexTTS 2.5は個別導入できます。Fish S2 Proは24GB以上のGPUメモリを推奨します。通常生成とモデル比較では、画面に言語指定を出していない場合は各モデルの既定言語を使います。導入方法は[追加モデルのガイド](docs/fish-s2-pro-indextts-2-5.md)と[セットアップガイド](docs/setup.md)、F5-TTSの条件は[F5-TTSガイド](docs/f5-tts.md)を参照してください。
+対応モデルにはQwen3-TTS、Irodori v2 / v3 / v4 / v4.1（公式SmallとAnime fine-tune）、GPT-SoVITS、F5-TTSなどがあります。Irodori v3は任意で`speech.cpp / audio.cpp`のGGUF backendも利用できます（[導入・実測](docs/speech-cpp.md)）。Orpheus 3B、Ming Omni TTS、Fish Audio S2 Pro、IndexTTS 2.5は個別導入できます。Fish S2 Proは24GB以上のGPUメモリを推奨します。通常生成とモデル比較では、画面に言語指定を出していない場合は各モデルの既定言語を使います。導入方法は[追加モデルのガイド](docs/fish-s2-pro-indextts-2-5.md)と[セットアップガイド](docs/setup.md)、F5-TTSの条件は[F5-TTSガイド](docs/f5-tts.md)を参照してください。
 
 ## 必要環境
 
