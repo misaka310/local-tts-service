@@ -14,7 +14,7 @@ Windows PC上で複数の音声合成モデルをまとめて使うためのロ�
 
 通常のTTS生成と、生成済み音声などへ必要なときだけ使うRVC声質変換を、独立した機能として示しています。
 
-https://github.com/user-attachments/assets/48682a8c-f6a2-4d1a-a645-62f03fe7d533
+https://github.com/user-attachments/assets/84b9d6e9-85c9-446b-afa8-4920a43e1a57
 
 ## できること
 
