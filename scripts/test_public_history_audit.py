@@ -9,6 +9,8 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 AUDIT_SCRIPT = SCRIPT_DIR / "audit_public_history.py"
 
+from audit_public_history import PUBLIC_DEMO_VIDEO_BLOB_SHA, PUBLIC_DEMO_VIDEO_PATH, path_finding_types
+
 
 def run(command: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
@@ -34,6 +36,13 @@ def git(repo: Path, *args: str) -> None:
 
 
 def main() -> int:
+    assert path_finding_types(PUBLIC_DEMO_VIDEO_PATH, blob_sha=PUBLIC_DEMO_VIDEO_BLOB_SHA) == []
+    assert "media-model-or-archive" in path_finding_types(PUBLIC_DEMO_VIDEO_PATH)
+    assert "media-model-or-archive" in path_finding_types(PUBLIC_DEMO_VIDEO_PATH, blob_sha="0" * 40)
+    assert "media-model-or-archive" in path_finding_types("docs/assets/other-demo.mp4")
+    assert "media-model-or-archive" in path_finding_types("docs/assets/other-demo.wav")
+    assert "local-or-private-path" in path_finding_types("runtime/demo.mp4")
+
     with tempfile.TemporaryDirectory(prefix="local-tts-history-audit-test-") as temp_dir:
         repo = Path(temp_dir)
         git(repo, "init")

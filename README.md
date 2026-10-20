@@ -119,17 +119,6 @@ local-tts.bat -Check
 - [セットアップガイド](./docs/setup.md)
 - [利用ガイド](./docs/user-guide.md)
 
-## 開発と品質確認
-
-```powershell
-python -m pytest --rootdir=. -c config/pytest.ini tests
-cd frontend
-npm run check
-npm test
-```
-
-CIではバックエンド、セットアップdry-run、管理プロセス、公開履歴監査、フロントエンド、ブラウザE2Eを実行します。FastAPI app factoryは依存を差し替えた単体テストを持ち、Ruffのimport・modernization・bugbear規則と70%のfocused coverageを要求します。
-
 ## 開発者向け資料
 
 - [開発・テスト手順](./docs/development.md)

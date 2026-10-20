@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+import hashlib
 import json
 import os
 import re
@@ -14,6 +15,9 @@ from pathlib import Path, PurePosixPath
 from typing import Iterable
 
 MAX_TEXT_BLOB_BYTES = 2 * 1024 * 1024
+
+PUBLIC_DEMO_VIDEO_PATH = "docs/assets/local-tts-qwen3-1.7b-cat-final-under-5mb.mp4"
+PUBLIC_DEMO_VIDEO_BLOB_SHA = "5dbabce1296d4a4183f2057ee6612843dae5c30c"
 
 SENSITIVE_EXTENSIONS = {
     ".wav",
@@ -168,11 +172,14 @@ def normalize_path(raw_path: str) -> str:
     return raw_path.replace("\\", "/").lstrip("./")
 
 
-def path_finding_types(raw_path: str) -> list[str]:
+def path_finding_types(raw_path: str, *, blob_sha: str = "") -> list[str]:
     path = normalize_path(raw_path)
     lower = path.lower()
     types: list[str] = []
-    if PurePosixPath(lower).suffix in SENSITIVE_EXTENSIONS:
+    # Only the exact previously approved public demo blob is exempt.
+    # A different video at this path is flagged, as is every other media file.
+    approved_demo = lower == PUBLIC_DEMO_VIDEO_PATH and blob_sha == PUBLIC_DEMO_VIDEO_BLOB_SHA
+    if PurePosixPath(lower).suffix in SENSITIVE_EXTENSIONS and not approved_demo:
         types.append("media-model-or-archive")
     if (
         lower in {"config.local.json", "config/config.local.json"}
@@ -232,6 +239,13 @@ def list_working_files(repo_root: Path) -> list[str]:
     return sorted(set(git_lines(repo_root, "ls-files", "--cached", "--others", "--exclude-standard")))
 
 
+def public_demo_working_blob_sha(path: str, full_path: Path) -> str:
+    if path.lower() != PUBLIC_DEMO_VIDEO_PATH or not full_path.is_file():
+        return ""
+    data = full_path.read_bytes()
+    return hashlib.sha1(f"blob {len(data)}\0".encode("ascii") + data).hexdigest()
+
+
 def scan_working_tree(repo_root: Path) -> tuple[list[PathFinding], list[ContentFinding], int]:
     path_findings: list[PathFinding] = []
     content_findings: list[ContentFinding] = []
@@ -241,7 +255,8 @@ def scan_working_tree(repo_root: Path) -> tuple[list[PathFinding], list[ContentF
         full_path = repo_root / Path(path)
         if not full_path.is_file():
             continue
-        path_findings.extend(PathFinding(kind, path) for kind in path_finding_types(path))
+        blob_sha = public_demo_working_blob_sha(path, full_path)
+        path_findings.extend(PathFinding(kind, path) for kind in path_finding_types(path, blob_sha=blob_sha))
         if not is_text_candidate(path) or full_path.stat().st_size > MAX_TEXT_BLOB_BYTES:
             continue
         try:
@@ -268,7 +283,7 @@ def scan_history(repo_root: Path) -> tuple[list[PathFinding], list[ContentFindin
             continue
         path = normalize_path(raw_path)
         object_path_count += 1
-        path_findings.extend(PathFinding(kind, path, object_id) for kind in path_finding_types(path))
+        path_findings.extend(PathFinding(kind, path, object_id) for kind in path_finding_types(path, blob_sha=object_id))
 
         if object_id in scanned_blobs or not is_text_candidate(path):
             continue

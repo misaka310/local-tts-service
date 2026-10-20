@@ -34,7 +34,7 @@
 
 ## 公開リポの安全
 
-- `config/config.local.json`、`runtime/`、`reference/voices/`、音声・動画・モデル重み・トークン・個人パスをコミットしない。
+- `config/config.local.json`、`runtime/`、`reference/voices/`、音声・動画・モデル重み・トークン・個人パスをコミットしない。唯一の既存例外は、明示公開済みの `docs/assets/local-tts-qwen3-1.7b-cat-final-under-5mb.mp4`（詳細は `docs/security.md`）。
 - `reference/workflows/` は公開ワークフローとしてGit管理する。
 - 公開前にpublic history監査を実行し、working treeの検出を0件にする。履歴書き換えは明示承認なしで行わない。
 
