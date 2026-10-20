@@ -879,6 +879,7 @@ async function main() {
     ensure(firstAudio.readyState >= 2, `first audio not ready enough: ${firstAudio.readyState}`);
     ensure(firstAudio.duration > 0, `first audio duration should be > 0, got ${firstAudio.duration}`);
     ensure(await page.locator("#normalSeedAutoIncrementInput").isChecked(), "normal seed auto-update should stay enabled after opting in");
+    await page.waitForFunction(() => document.querySelector("#normalSeedInput")?.value === "1002", null, { timeout: 15000 });
     ensure(await page.locator("#normalSeedInput").inputValue() === "1002", "normal seed did not increment after successful generation");
     const firstNormalSpeakBody = speakBodies.at(-1);
     ensure(firstNormalSpeakBody?.chunking?.softChunkChars === 160, "normal generation did not send the selected chunk target");
