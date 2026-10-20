@@ -303,6 +303,9 @@ async function main() {
 
     await page.locator('.top-tab[data-tab="history"]').click();
     await page.waitForSelector('#historyPage.active');
+    // The history view renders on the next task after the tab activates.
+    // Wait for either the empty state or a saved card before checking visibility.
+    await page.locator('#historyList .history-empty-state, #historyList .history-card').first().waitFor({ state: 'visible' });
     await ensureVisible(page.locator('#historyList'), "history list missing");
     await ensureVisible(page.locator('#historySearchInput'), "history search missing");
 
