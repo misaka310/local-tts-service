@@ -1,0 +1,16 @@
+[
+ {"seconds":8,"heading":"はじめに","title":"音声生成をもっと手軽に","detail":"Windows向けローカルTTS統合アプリ","subtitle":"ローカルTTSで、好きな声の音声を作ります。","type":"intro"},
+ {"seconds":8,"heading":"アプリを起動","title":"ブラウザで音声を作成","detail":"起動したら「通常生成」画面へ","subtitle":"local-tts.batからアプリを起動します。","type":"launch"},
+ {"seconds":9,"heading":"モデルを選択","title":"Qwen3-TTS を選択","detail":"Voice Cloneモデルを使用","subtitle":"Qwen3-TTS 1.7B Voice Cloneを選びます。","type":"select"},
+ {"seconds":8,"heading":"参照音声を登録","title":"音声ファイルを読み込む","detail":"利用権限がある音声のみ使います","subtitle":"声の参考にするWAVファイルを登録。","type":"ref"},
+ {"seconds":8,"heading":"参照文を登録","title":"読み上げ内容を対応させる","detail":"参照音声と一致する文章を設定","subtitle":"参照音声と一致する書き起こしも入力します。","type":"reftext"},
+ {"seconds":10,"heading":"文章を入力","title":"話してほしい文章を書く","detail":"日本語の例文を設定","subtitle":"生成したい日本語の文章を入力します。","type":"prompt"},
+ {"seconds":8,"heading":"生成を開始","title":"「生成する」を押す","detail":"ローカルのモデルで推論します","subtitle":"準備ができたら、生成ボタンを押します。","type":"generate"},
+ {"seconds":9,"heading":"生成中の表示","title":"完了まで待つ","detail":"モデルや環境により所要時間は異なります","subtitle":"進行状況と経過時間を確認できます。","type":"progress"},
+ {"seconds":10,"heading":"出力音声を再生","title":"生成音声を聞いてみよう","detail":"音声プレイヤーで試聴できます","subtitle":"完成した音声を再生して確認します。","type":"listen"},
+ {"seconds":9,"heading":"猫キャラのリアクション","title":"耳で聞きながら、目でも楽しむ","detail":"猫キャラ・字幕の演出を再現","subtitle":"猫キャラの口パクとまばたきの演出。","type":"cat"},
+ {"seconds":9,"heading":"音声を保存","title":"気に入った音声を残す","detail":"WAV形式で保存できます","subtitle":"気に入った音声はダウンロードして保存。","type":"save"},
+ {"seconds":9,"heading":"複数モデルを比較","title":"音声を聞き比べる","detail":"モデルの出力を比較する機能もあります","subtitle":"複数モデルで同じ文章を比較できます。","type":"compare","menu":1},
+ {"seconds":9,"heading":"使い方のおさらい","title":"4ステップで音声生成","detail":"選ぶ → 参照 → 入力 → 生成","subtitle":"声を選んで、文章を入力し、音声を作る。","type":"intro"},
+ {"seconds":9,"heading":"おわりに","title":"音声をもっと自由に","detail":"詳しい手順はGitHubのREADMEへ","subtitle":"ご覧いただき、ありがとうございました。","type":"end"}
+]

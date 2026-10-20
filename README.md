@@ -14,7 +14,15 @@ Windows PC上で複数の音声合成モデルをまとめて使うためのロ�
 
 通常のTTS生成と、生成済み音声などへ必要なときだけ使うRVC声質変換を、独立した機能として示しています。
 
-https://github.com/user-attachments/assets/84b9d6e9-85c9-446b-afa8-4920a43e1a57
+### デモ動画（再制作版）
+
+旧GitHub添付動画の配信終了に伴い、保存されていた操作構成から再制作した説明動画です。**元映像の復元・実機操作の録画ではなく、UIを再現した操作イメージ**です。ナレーションは新たに日本語音声で収録しています。
+
+<video controls preload="metadata" width="854" src="https://raw.githubusercontent.com/misaka310/local-tts-service/main/docs/assets/local-tts-qwen3-1.7b-rebuilt.mp4"></video>
+
+[動画を直接開く（MP4・約1.5MB）](https://raw.githubusercontent.com/misaka310/local-tts-service/main/docs/assets/local-tts-qwen3-1.7b-rebuilt.mp4)
+
+
 
 ## できること
 
