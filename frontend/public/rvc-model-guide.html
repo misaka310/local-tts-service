@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RVCモデルの用意</title>
+  <link rel="icon" href="./favicon.svg">
+  <style>
+    :root { color-scheme: light; font-family: "Segoe UI", "Noto Sans JP", sans-serif; color: #172235; background: #f4f7fb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { width: min(860px, calc(100% - 32px)); margin: 40px auto; }
+    article { padding: 28px; border: 1px solid #d8e2f0; border-radius: 18px; background: #fff; box-shadow: 0 18px 45px rgba(20,39,75,.08); }
+    h1 { margin-top: 0; font-size: 28px; }
+    h2 { margin-top: 30px; font-size: 19px; }
+    p, li { line-height: 1.8; }
+    code, pre { font-family: Consolas, monospace; }
+    pre { overflow: auto; padding: 16px; border-radius: 12px; background: #172235; color: #fff; }
+    .note { padding: 14px 16px; border: 1px solid #bfd7ff; border-radius: 12px; background: #eef5ff; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+    a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; border-radius: 10px; color: #0b5ed7; font-weight: 800; text-decoration: none; border: 1px solid #b9cff1; }
+    a.primary { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+  </style>
+</head>
+<body>
+<main>
+  <article>
+    <h1>RVCモデルを用意する</h1>
+    <p>このアプリはRVCモデルの学習は行いません。RVC対応の学習ツールでモデルを作成し、出力された <code>.pth</code> と <code>.index</code> をこのリポジトリへ配置します。</p>
+
+    <h2>1. モデルを作成する</h2>
+    <p>本人の声、または利用許可を得た音声だけを使ってRVCモデルを学習してください。学習ツールでは最終的にモデル本体の <code>.pth</code> と検索用の <code>.index</code> を書き出します。</p>
+    <p class="note">学習方法が必要な場合は、利用しているRVC学習ツールの「Train / 学習」と「Export / モデル書き出し」の手順を確認してください。</p>
+
+    <h2>2. モデルごとのフォルダーへ配置する</h2>
+    <pre>models\rvc\my_voice\
+├─ my_voice.pth
+└─ my_voice.index</pre>
+    <p>フォルダー名が画面のRVCモデル名になります。複数モデルを使う場合は、モデルごとにフォルダーを分けます。</p>
+    <pre>models\rvc\
+├─ voice_a\
+│  ├─ voice_a.pth
+│  └─ voice_a.index
+└─ voice_b\
+   ├─ voice_b.pth
+   └─ voice_b.index</pre>
+
+    <h2>3. RVCタブで再読み込みする</h2>
+    <p>配置後、RVC変換タブの「配置後に再読み込み」を押してください。使用可能なモデルが見つかると、RVCモデル選択欄から切り替えられます。</p>
+
+    <h2>認識されない場合</h2>
+    <ul>
+      <li><code>.pth</code> と <code>.index</code> の両方が同じフォルダーにあるか確認する</li>
+      <li>拡張子が別名になっていないか確認する</li>
+      <li>モデルを直接 <code>models\rvc</code> に置く場合は、2ファイルのベース名を同じにする</li>
+      <li>RVC実行環境自体が未導入の場合はセットアップ手順も確認する</li>
+    </ul>
+
+    <div class="actions">
+      <a class="primary" href="./index.html">ローカルTTSへ戻る</a>
+      <a href="https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI" target="_blank" rel="noopener">RVC WebUIを確認する</a>
+    </div>
+  </article>
+</main>
+</body>
+</html>

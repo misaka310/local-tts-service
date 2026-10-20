@@ -1,0 +1,71 @@
+{
+  "host": "127.0.0.1",
+  "port": 8730,
+  "defaultModel": "qwen3_tts_clone_1_7b",
+  "referenceVoicesDir": "./reference/voices",
+  "audioOutputDir": "./runtime/audio",
+  "chunking": {
+    "softChunkChars": 120,
+    "maxChunkChars": 200,
+    "hardLimitChars": 260,
+    "pauseBetweenChunksMs": 250
+  },
+  "stack": {
+    "stopManagedProcessesBeforeStart": true,
+    "killPortsBeforeStart": false,
+    "portsToKill": [8730, 5177],
+    "startupTimeoutSec": 180,
+    "pollIntervalSec": 1.0
+  },
+  "frontend": {
+    "host": "127.0.0.1",
+    "port": 5177,
+    "ttsBaseUrl": "http://127.0.0.1:8730"
+  },
+  "models": {
+    "qwen3_tts_clone_0_6b": {
+      "runtime": "qwen3_tts",
+      "label": "Qwen3-TTS Voice Clone 0.6B",
+      "family": "qwen3_tts",
+      "modelId": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+      "requiresReferenceAudio": true,
+      "requiresReferenceText": true,
+      "supportsSeed": true,
+      "supportsLanguage": true,
+      "supportsVoiceClone": true,
+      "supportsReferenceVoice": true,
+      "defaultLanguage": "Japanese"
+    },
+    "qwen3_tts_clone_1_7b": {
+      "runtime": "qwen3_tts",
+      "label": "Qwen3-TTS Voice Clone 1.7B",
+      "family": "qwen3_tts",
+      "modelId": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "requiresReferenceAudio": true,
+      "requiresReferenceText": true,
+      "supportsSeed": true,
+      "supportsLanguage": true,
+      "supportsVoiceClone": true,
+      "supportsReferenceVoice": true,
+      "defaultLanguage": "Japanese"
+    },
+    "mock": {
+      "runtime": "mock_wav",
+      "requiresReferenceAudio": false
+    }
+  },
+  "runtimes": {
+    "mock_wav": {
+      "durationSec": 1.2,
+      "sampleRate": 24000
+    },
+    "qwen3_tts": {
+      "device": "auto",
+      "dtype": "auto",
+      "attnImplementation": "",
+      "hfCacheDir": "",
+      "vendorDir": "./runtime/vendor/qwen3-tts",
+      "allowDownload": false
+    }
+  }
+}

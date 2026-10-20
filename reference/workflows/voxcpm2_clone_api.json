@@ -1,0 +1,116 @@
+{
+  "id": "voxcpm2_clone_workflow",
+  "revision": 0,
+  "last_node_id": 3,
+  "last_link_id": 2,
+  "nodes": [
+    {
+      "id": 3,
+      "type": "LoadAudio",
+      "pos": [100, 100],
+      "size": [300, 120],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {"name": "audio", "type": "STRING", "widget": {"name": "audio"}}
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [1]
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 1,
+      "type": "VoxCPM2_Clone",
+      "pos": [450, 100],
+      "size": [400, 450],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {"name": "reference_audio", "type": "AUDIO", "link": 1},
+        {"name": "model_name", "type": "COMBO", "widget": {"name": "model_name"}},
+        {"name": "lora_name", "type": "COMBO", "widget": {"name": "lora_name"}},
+        {"name": "voice_description", "type": "STRING", "widget": {"name": "voice_description"}},
+        {"name": "text", "type": "STRING", "widget": {"name": "text"}},
+        {"name": "prompt_text", "type": "STRING", "widget": {"name": "prompt_text"}},
+        {"name": "cfg_value", "type": "FLOAT", "widget": {"name": "cfg_value"}},
+        {"name": "inference_timesteps", "type": "INT", "widget": {"name": "inference_timesteps"}},
+        {"name": "max_tokens", "type": "INT", "widget": {"name": "max_tokens"}},
+        {"name": "normalize_text", "type": "BOOLEAN", "widget": {"name": "normalize_text"}},
+        {"name": "enable_denoiser", "type": "BOOLEAN", "widget": {"name": "enable_denoiser"}},
+        {"name": "seed", "type": "INT", "widget": {"name": "seed"}},
+        {"name": "force_offload", "type": "BOOLEAN", "widget": {"name": "force_offload"}},
+        {"name": "dtype", "type": "COMBO", "widget": {"name": "dtype"}},
+        {"name": "device", "type": "COMBO", "widget": {"name": "device"}},
+        {"name": "enable_asr", "type": "BOOLEAN", "widget": {"name": "enable_asr"}},
+        {"name": "retry_max_attempts", "type": "INT", "widget": {"name": "retry_max_attempts"}},
+        {"name": "retry_threshold", "type": "FLOAT", "widget": {"name": "retry_threshold"}},
+        {"name": "torch_compile", "type": "BOOLEAN", "widget": {"name": "torch_compile"}}
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [2]
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "VoxCPM2",
+        "None",
+        "",
+        "Hello from VoxCPM2 clone!",
+        "Hello",
+        2.0,
+        10,
+        4096,
+        true,
+        true,
+        42,
+        false,
+        "auto",
+        "cuda",
+        false,
+        3,
+        6.0,
+        false
+      ]
+    },
+    {
+      "id": 2,
+      "type": "SaveAudio",
+      "pos": [900, 100],
+      "size": [300, 150],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {"name": "audio", "type": "AUDIO", "link": 2},
+        {"name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}},
+        {"name": "audioUI", "type": "AUDIO_UI", "widget": {"name": "audioUI"}}
+      ],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "tts_e2e_voxcpm2_clone"
+      ]
+    }
+  ],
+  "links": [
+    [1, 3, 0, 1, 0, "AUDIO"],
+    [2, 1, 0, 2, 0, "AUDIO"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}
