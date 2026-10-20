@@ -34,9 +34,36 @@ function makeWavDataUrl(durationSec = 0.25, sampleRate = 16000) {
 
 async function audioState(locator) {
   return locator.evaluate(async (audio) => {
-    audio.load();
-    await audio.play();
-    await new Promise((resolve) => setTimeout(resolve, 450));
+    // Inspect buffered audio without calling play() or interrupting app autoplay.
+    if (audio.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      audio.preload = "auto";
+      if (audio.networkState === HTMLMediaElement.NETWORK_EMPTY) audio.load();
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          cleanup();
+          reject(new Error("audio metadata did not become playable"));
+        }, 10000);
+        const cleanup = () => {
+          clearTimeout(timeout);
+          audio.removeEventListener("loadeddata", check);
+          audio.removeEventListener("canplay", check);
+          audio.removeEventListener("error", fail);
+        };
+        const check = () => {
+          if (audio.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+          cleanup();
+          resolve();
+        };
+        const fail = () => {
+          cleanup();
+          reject(new Error(audio.error?.message || "audio loading failed"));
+        };
+        audio.addEventListener("loadeddata", check);
+        audio.addEventListener("canplay", check);
+        audio.addEventListener("error", fail);
+        check();
+      });
+    }
     const src = audio.currentSrc || audio.src || "";
     return {
       hasSrc: Boolean(src),
