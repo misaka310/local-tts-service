@@ -30,6 +30,7 @@
 - `reference/`
 - `*.wav`, `*.mp3`, `*.flac`
 - `*.safetensors` などモデル重み
+- 例外: `docs/assets/local-tts-qwen3-1.7b-cat-final-under-5mb.mp4` は明示的に公開した操作デモ動画で、GitHub Pages/READMEの再生に必要なため、Git blob SHA `5dbabce1296d4a4183f2057ee6612843dae5c30c` とパスがともに一致する場合だけ公開履歴監査で許可する。差し替え動画やその他の動画・音声は引き続き禁止。
 
 ## プロセス終了
 - 通常起動では、この起動のWindows Job Objectに入れたプロセスと、`runtime/processes/`のPID、起動時刻、コマンド識別情報、リポジトリパス、起動セッションが一致するプロセスだけを終了
