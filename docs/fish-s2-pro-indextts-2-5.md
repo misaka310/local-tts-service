@@ -56,7 +56,7 @@ Fish S2 Proの公式推論ガイドは**24GB以上のVRAMを推奨**する。16G
 .\scripts\verify-wsl-tts-models.ps1 -Model indextts_2_5 -VoiceId sakura_01 -CudaVisibleDevices 1
 ```
 
-既存の `reference/voices/<id>/voice.wav` を選択して `/v1/speak` を呼ぶ。Fishのみ `voice.txt` が必須。実生成は新規WAVの生成時間、長さ、チャンネル、RMS、無音率、SHA-256を `runtime/audio/model-smoke/manifest.json` に記録する。可能なら音声を実際に聴くかASRで本文の一致も確認する。WAVができただけでは品質保証としない。
+既存の `reference/voices/<id>/voice.wav` を選択して `/v1/speak` を呼ぶ。Fishのみ `voice.txt` が必須。CUDAが使えないWSL環境ではsemantic段・codec段を自動でCPUに切り替える（`LOCAL_TTS_FISH_S2_SEMANTIC_DEVICE` / `LOCAL_TTS_FISH_S2_CODEC_DEVICE` で `cpu` / `cuda` を強制指定可能）。10秒を超える参照音声には3–10秒の `voice_short.wav` / `voice_short.txt` が必要。実生成は新規WAVの生成時間、長さ、チャンネル、RMS、無音率、SHA-256を `runtime/audio/model-smoke/manifest.json` に記録する。可能なら音声を実際に聴くかASRで本文の一致も確認する。WAVができただけでは品質保証としない。
 
 ## 既存モデルを守る
 

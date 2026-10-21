@@ -8,6 +8,16 @@ import tempfile
 from scripts.wsl_tts_infer import WslTtsRequest, _model_dir, _run, _vendor_dir
 
 
+def _requested_or_available_device(env_name: str) -> str:
+    """Pick the inference device: explicit env override, or CUDA when usable."""
+    import torch
+
+    device = os.environ.get(env_name, "").strip().lower()
+    if device in {"cpu", "cuda"}:
+        return device
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
 def generate_fish_s2_pro(request: WslTtsRequest) -> None:
     """Run the official Fish S2 Pro three-stage reference-cloning CLI."""
     if not request.reference_audio_path or not request.reference_text:
@@ -27,6 +37,7 @@ def generate_fish_s2_pro(request: WslTtsRequest) -> None:
         _run([
             sys.executable, str(codec), "-i", str(request.reference_audio_path),
             "--checkpoint-path", str(checkpoint),
+            "--device", _requested_or_available_device("LOCAL_TTS_FISH_S2_CODEC_DEVICE"),
         ], cwd=work, label="Fish S2 Pro reference encoding")
         tokens = work / "fake.npy"
         if not tokens.is_file():
@@ -37,7 +48,7 @@ def generate_fish_s2_pro(request: WslTtsRequest) -> None:
             "--checkpoint-path", str(model), "--num-samples", "1",
             "--output-dir", str(work),
         ]
-        device = os.environ.get("LOCAL_TTS_FISH_S2_SEMANTIC_DEVICE", "cuda").strip().lower()
+        device = _requested_or_available_device("LOCAL_TTS_FISH_S2_SEMANTIC_DEVICE")
         if device not in {"cpu", "cuda"}:
             raise ValueError(f"invalid Fish S2 semantic device: {device}")
         command += ["--device", device]
@@ -52,6 +63,7 @@ def generate_fish_s2_pro(request: WslTtsRequest) -> None:
         _run([
             sys.executable, str(codec), "-i", str(codes[0]),
             "--checkpoint-path", str(checkpoint),
+            "--device", _requested_or_available_device("LOCAL_TTS_FISH_S2_CODEC_DEVICE"),
         ], cwd=work, label="Fish S2 Pro waveform decoding")
         generated = work / (codes[0].stem + ".wav")
         # Upstream decoder currently writes fake.wav for codes_*.npy;
