@@ -1,7 +1,7 @@
-$script:LocalTtsNodeVersion = 'v24.18.0'
-$script:LocalTtsNodeArchiveName = 'node-v24.18.0-win-x64.zip'
-$script:LocalTtsNodeArchiveSha256 = '0AE68406B42D7725661DA979B1403EC9926DA205C6770827F33AAC9D8F26E821'
-$script:LocalTtsNodeDownloadUrl = 'https://nodejs.org/dist/v24.18.0/node-v24.18.0-win-x64.zip'
+$script:LocalTtsNodeVersion = 'v24.22.1'
+$script:LocalTtsNodeArchiveName = 'node-v24.22.1-win-x64.zip'
+$script:LocalTtsNodeArchiveSha256 = 'D2046D28C2C3DCD211AC5145C0BF30E2047EF9DFB306693C8C6E2ECCD8B95FA5'
+$script:LocalTtsNodeDownloadUrl = 'https://nodejs.org/dist/v24.22.1/node-v24.22.1-win-x64.zip'
 
 function New-LocalTtsNodeRuntimeResult {
     param(
@@ -121,7 +121,7 @@ function Install-LocalTtsManagedNodeRuntime {
             }
         }
         if (-not $expanded) { throw 'Portable Node.js archive extraction did not complete.' }
-        $extractedDir = Join-Path $stagingDir 'node-v24.18.0-win-x64'
+        $extractedDir = Join-Path $stagingDir 'node-v24.22.1-win-x64'
         if (-not (Test-LocalTtsNodeRuntimePair -NodeDir $extractedDir)) {
             throw "Downloaded Node.js archive did not contain the expected node.exe/npm.cmd pair."
         }
