@@ -13,6 +13,10 @@ function Assert-True {
     if (-not $Condition) { throw $Message }
 }
 
+Assert-True ($script:LocalTtsNodeArchiveName -eq ('node-' + $script:LocalTtsNodeVersion + '-win-x64.zip')) 'archive and pinned version must agree'
+Assert-True ($script:LocalTtsNodeDownloadUrl -eq ('https://nodejs.org/dist/' + $script:LocalTtsNodeVersion + '/' + $script:LocalTtsNodeArchiveName)) 'download URL must use the pinned official release'
+Assert-True ($script:LocalTtsNodeArchiveSha256 -match '^[0-9A-F]{64}$') 'pinned Node.js SHA-256 must be a full uppercase hexadecimal digest'
+
 function New-FakeNodePair {
     param([Parameter(Mandatory = $true)][string]$Directory)
     New-Item -ItemType Directory -Path $Directory -Force | Out-Null
