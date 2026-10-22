@@ -25,7 +25,7 @@ local-tts.bat
 - 固定版Python 3.11を公式配布元から取得し、SHA-256検証後にアプリ内へ導入
 - Python仮想環境、依存パッケージ、Windows用のアプリ内VC++ランタイムを導入
 - NVIDIA GPU検出時は既存のCUDA 12.8 / PyTorch 2.10.0経路、R9700検出時は別venvのROCm 10.1.0 / PyTorch 2.12.0経路を導入
-- 固定版Node.jsを公式配布元から取得し、SHA-256検証後に保存
+- 固定版Node.js 24.22.1（2026-10-21のセキュリティ修正版）を公式配布元から取得し、SHA-256検証後に保存
 - 固定版MinGitを公式配布元から取得し、SHA-256検証後に保存
 - frontend依存を導入
 - Qwen3-TTS Voice Clone 1.7Bモデルを取得
